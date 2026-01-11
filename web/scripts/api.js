@@ -10,7 +10,7 @@
 const API_BASE =
   window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1")
     ? "http://localhost:4000/api"
-    : "https://wisewallet-l1d5.onrender.com";
+    : "https://wisewallet-l1d5.onrender.com/api";
 
 // --------------------------------------
 // INTERNAL REQUEST WRAPPER
