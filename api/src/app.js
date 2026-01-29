@@ -42,6 +42,7 @@ const allowedOrigins = Array.from(
     "https://app.thequantifier.com",
     "https://thequantifier.com",
     "https://www.thequantifier.com",
+    "https://wisewallet.manuswebworks.org",
 
     // Local dev
     "http://localhost:5000",
@@ -51,33 +52,26 @@ const allowedOrigins = Array.from(
   ])
 );
 
-// Must come BEFORE cors()
-app.use((req, res, next) => {
-  res.header("Access-Control-Allow-Credentials", "true");
-  res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-  next();
-});
+const corsOptions = {
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true); // Postman / curl / server-side
+
+    if (allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    console.warn("❌ BLOCKED CORS ORIGIN:", origin);
+    return callback(new Error("CORS: Not allowed by server"), false);
+  },
+  credentials: true,
+  methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+};
 
 // Main CORS handler
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true); // Postman / curl / server-side
-
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-
-      console.warn("❌ BLOCKED CORS ORIGIN:", origin);
-      return callback(new Error("CORS: Not allowed by server"), false);
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  })
-);
+app.use(cors(corsOptions));
 
 // Preflight
-app.options("*", cors());
+app.options("*", cors(corsOptions));
 
 // --------------------------------------------------
 // Health Check
