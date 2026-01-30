@@ -6,6 +6,38 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("registerForm");
   const msg = document.getElementById("registerMessage");
   const btn = document.getElementById("registerBtn");
+  const passwordInput = document.getElementById("password");
+  const confirmInput = document.getElementById("confirmPassword");
+
+  const setPasswordStyle = (input, isValid) => {
+    if (!input) return;
+    if (isValid) {
+      input.style.borderColor = "";
+      input.style.color = "";
+      input.style.boxShadow = "";
+      return;
+    }
+    input.style.borderColor = "#b91c1c";
+    input.style.color = "#b91c1c";
+    if (document.activeElement === input) {
+      input.style.boxShadow = "0 0 0 3px rgba(185,28,28,0.15)";
+    } else {
+      input.style.boxShadow = "none";
+    }
+  };
+
+  const isPasswordAcceptable = (value) => value && value.length >= 8;
+
+  const updatePasswordStyles = () => {
+    const passwordValue = passwordInput?.value || "";
+    const confirmValue = confirmInput?.value || "";
+
+    const passwordOk = isPasswordAcceptable(passwordValue);
+    setPasswordStyle(passwordInput, passwordOk);
+
+    const confirmOk = passwordOk && confirmValue === passwordValue;
+    setPasswordStyle(confirmInput, confirmOk);
+  };
 
   const showMsg = (text, kind = "info") => {
     if (!msg) return;
@@ -26,6 +58,12 @@ document.addEventListener("DOMContentLoaded", () => {
     console.error("❌ registerForm not found on page.");
     return;
   }
+
+  updatePasswordStyles();
+  passwordInput?.addEventListener("input", updatePasswordStyles);
+  confirmInput?.addEventListener("input", updatePasswordStyles);
+  passwordInput?.addEventListener("blur", updatePasswordStyles);
+  confirmInput?.addEventListener("blur", updatePasswordStyles);
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
