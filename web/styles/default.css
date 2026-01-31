@@ -330,6 +330,20 @@ footer {
 
 .subtle { color: var(--muted); }
 
+.status-banner {
+  margin: var(--status-margin, 0);
+  padding: var(--status-padding, 0.55rem 0.7rem);
+  border-radius: calc(var(--radius) - 2px);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--muted);
+}
+
+.status-banner.is-ok,
+.status-banner.is-error {
+  color: var(--text);
+}
+
 .flex { display: flex; }
 .flex-between { display: flex; justify-content: space-between; align-items: center; }
 .grid { display: grid; }
@@ -375,6 +389,12 @@ footer {
   background: var(--bad);
   border-color: var(--bad);
   color: white;
+}
+
+.btn--warning {
+  background: #e6a100;
+  border-color: #e6a100;
+  color: #111;
 }
 
 .btn:disabled {
@@ -464,6 +484,13 @@ textarea:focus-visible {
   backdrop-filter: blur(3px);
 }
 
+.modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: transparent;
+  z-index: 0;
+}
+
 .modal.hidden {
   display: none;
 }
@@ -472,9 +499,11 @@ textarea:focus-visible {
   background: var(--card-bg);
   border-radius: 1rem;
   width: 100%;
-  max-width: 540px;
-  padding: 1.8rem 2rem;
+  max-width: var(--modal-max-width, 540px);
+  padding: var(--modal-padding, 1.8rem 2rem);
   box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+  position: relative;
+  z-index: 1;
 }
 
 .modal-content h2 {
@@ -505,8 +534,8 @@ textarea:focus-visible {
 .modal-actions {
   display: flex;
   justify-content: flex-end;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
+  gap: var(--modal-actions-gap, var(--space-3));
+  margin-top: var(--modal-actions-margin, var(--space-4));
 }
 
 /* =========================================================
@@ -586,6 +615,12 @@ textarea:focus-visible {
   background: var(--bad);
   border-color: var(--bad);
   color: white;
+}
+
+:root[data-theme="dark"] .btn--warning {
+  background: #e6a100;
+  border-color: #e6a100;
+  color: var(--grey-0);
 }
 
 :root[data-theme="dark"] .footer-bottom,

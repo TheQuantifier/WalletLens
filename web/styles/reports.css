@@ -23,17 +23,6 @@
   text-align: left;
 }
 
-#reportsStatus {
-  margin: 0;
-  padding: 0.55rem 0.7rem;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--muted);
-}
-
-#reportsStatus.is-ok { color: var(--text); }
-#reportsStatus.is-error { color: var(--text); }
 
 .cards {
   display: flex;

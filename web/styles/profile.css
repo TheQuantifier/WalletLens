@@ -1,10 +1,3 @@
-/* ===== GLOBAL ===== */
-body {
-  background-color: var(--bg);
-  color: var(--text);
-  font-family: system-ui, sans-serif;
-}
-
 /* ===== HERO ===== */
 .profile-hero {
   display: flex;
@@ -36,8 +29,7 @@ body {
 .profile-card,
 .quick-stats,
 .security,
-.activity,
-.modal-content {
+.activity {
   padding: 1.25rem;
   background-color: var(--card-bg);
   color: var(--text);
@@ -81,21 +73,7 @@ body {
 .identity .subtle { color: var(--muted); }
 
 #profileStatus {
-  margin-top: 0.6rem;
-  padding: 0.55rem 0.7rem;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--muted);
-}
-
-/* Optional states (use via JS by toggling these classes) */
-#profileStatus.is-ok {
-  color: var(--text);
-}
-
-#profileStatus.is-error {
-  color: var(--text);
+  --status-margin: 0.6rem 0 0;
 }
 
 /* ===== META LIST ===== */
@@ -219,34 +197,19 @@ textarea { resize: vertical; }
 }
 
 /* ===== MODAL ===== */
-.modal {
-  position: fixed;
-  inset: 0;
-  background: var(--modal-backdrop);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
+#passwordModal {
+  --modal-max-width: 420px;
+  --modal-padding: 1.5rem;
 }
 
-.modal-content {
-  width: 100%;
-  max-width: 420px;
-  padding: 1.5rem;
-  background-color: var(--card-bg);
-  color: var(--text);
+#passwordModal .modal-actions {
+  --modal-actions-gap: 0.6rem;
+  --modal-actions-margin: 0.25rem;
 }
 
-.modal-content form {
+#passwordModal .modal-content form {
   display: grid;
   gap: 0.75rem;
-}
-
-.modal-actions {
-  display: flex;
-  gap: 0.6rem;
-  justify-content: flex-end;
-  margin-top: 0.25rem;
 }
 
 /* ===== ACTIVITY ===== */

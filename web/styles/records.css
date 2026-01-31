@@ -38,22 +38,7 @@
 
 #recordsStatusExpense,
 #recordsStatusIncome {
-  margin: -0.5rem 0 1.25rem;
-  padding: 0.55rem 0.7rem;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--muted);
-}
-
-#recordsStatusExpense.is-ok,
-#recordsStatusIncome.is-ok {
-  color: var(--text);
-}
-
-#recordsStatusExpense.is-error,
-#recordsStatusIncome.is-error {
-  color: var(--text);
+  --status-margin: -0.5rem 0 1.25rem;
 }
 
 /* Ensure label text always above input */
@@ -210,87 +195,39 @@
 }
 
 /* =========================================================
-   MODAL STYLES (SAME AS UPLOAD PAGE)
+   MODAL OVERRIDES (sizes + layout)
    ========================================================= */
 
-.modal {
-  position: fixed;
-  inset: 0;
-  z-index: 2000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+#addExpenseModal,
+#addIncomeModal,
+#deleteRecordModal {
+  --modal-max-width: 400px;
+  --modal-padding: 1.5rem;
 }
 
-.modal.hidden {
-  display: none;
-}
-
-/* Backdrop */
-.modal-backdrop {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.55);
-}
-
-/* Modal Box */
-.modal-box,
-.modal-content {
-  position: relative;
-  z-index: 1;
-  width: min(90%, 400px);
-  background: var(--card-bg);
-  padding: 1.5rem;
-  border-radius: var(--radius);
-  box-shadow: var(--shadow-sm);
-}
-
-.modal-box h2,
-.modal-content h2 {
+#addExpenseModal h2,
+#addIncomeModal h2,
+#deleteRecordModal h2 {
   margin-top: 0;
   margin-bottom: 0.75rem;
 }
 
-.modal-box p,
-.modal-content p {
-  margin: 0;
-  color: var(--text);
-}
-
-/* Modal buttons */
-.modal-actions {
-  margin-top: 1.25rem;
-
-  /* centered buttons (same fix as Upload modal) */
-  display: flex;
+#addExpenseModal .modal-actions,
+#addIncomeModal .modal-actions,
+#deleteRecordModal .modal-actions {
+  --modal-actions-gap: 0.75rem;
+  --modal-actions-margin: 1.25rem;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-
-  gap: 0.75rem;
 }
 
-.modal-actions .btn {
+#addExpenseModal .modal-actions .btn,
+#addIncomeModal .modal-actions .btn,
+#deleteRecordModal .modal-actions .btn {
   width: min(100%, 320px);
   min-width: 0;
   text-align: center;
-}
-
-/* Red */
-.btn--danger {
-  background: #b00020;
-  color: #fff;
-}
-
-/* Yellow */
-.btn--warning {
-  background: #e6a100;
-  color: #111;
-}
-
-:root[data-theme="dark"] .btn--warning {
-  background: #e6a100;
-  color: var(--grey-0);
 }
 /* =========================================================
    RESPONSIVE

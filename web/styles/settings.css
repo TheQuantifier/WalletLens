@@ -132,28 +132,6 @@
   gap: 0.6rem;
 }
 
-#settingsStatus,
-#deleteAccountStatus,
-#signOutAllStatus {
-  margin: 0;
-  padding: 0.55rem 0.7rem;
-  border-radius: calc(var(--radius) - 2px);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  color: var(--muted);
-}
-
-#settingsStatus.is-ok,
-#deleteAccountStatus.is-ok,
-#signOutAllStatus.is-ok {
-  color: var(--text);
-}
-
-#settingsStatus.is-error,
-#deleteAccountStatus.is-error,
-#signOutAllStatus.is-error {
-  color: var(--text);
-}
 
 /* Sessions list */
 .session-list {
@@ -188,8 +166,8 @@
 }
 
 /* Modal spacing to match other pages */
-#deleteAccountModal .modal-content {
-  max-width: 520px;
+#deleteAccountModal {
+  --modal-max-width: 520px;
 }
 
 #deleteAccountModal .modal-actions {
@@ -203,8 +181,8 @@
   min-width: 160px;
 }
 
-#signOutAllModal .modal-content {
-  max-width: 520px;
+#signOutAllModal {
+  --modal-max-width: 520px;
 }
 
 #signOutAllModal .modal-actions {
