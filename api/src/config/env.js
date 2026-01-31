@@ -33,6 +33,8 @@ const env = {
   // Authentication
   jwtSecret: required("JWT_SECRET"),
   jwtExpiresIn: process.env.JWT_EXPIRES_IN || "7d",
+  sessionIdleDays: Number(process.env.SESSION_IDLE_DAYS || 1),
+  sessionCleanupDays: Number(process.env.SESSION_CLEANUP_DAYS || 30),
 
   // CORS
   clientOrigins: (process.env.CORS_ORIGIN || "http://localhost:5500")

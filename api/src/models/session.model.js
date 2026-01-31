@@ -76,3 +76,20 @@ export async function listActiveSessionsForUser(userId) {
   );
   return rows;
 }
+
+export async function cleanupOldSessions({ cutoffDays = 30 } = {}) {
+  const days = Number(cutoffDays);
+  const safeDays = Number.isFinite(days) && days >= 0 ? days : 30;
+
+  const { rows } = await query(
+    `
+    DELETE FROM user_sessions
+    WHERE revoked_at IS NOT NULL
+       OR last_seen_at < now() - ($1::text || ' days')::interval
+    RETURNING id
+    `,
+    [safeDays]
+  );
+
+  return rows?.length || 0;
+}

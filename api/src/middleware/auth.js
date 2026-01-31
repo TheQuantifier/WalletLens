@@ -3,7 +3,7 @@ import jwt from "jsonwebtoken";
 
 import env from "../config/env.js";
 import { findUserById } from "../models/user.model.js";
-import { getSessionById, updateSessionLastSeen } from "../models/session.model.js";
+import { getSessionById, revokeSessionById, updateSessionLastSeen } from "../models/session.model.js";
 
 export default async function auth(req, res, next) {
   try {
@@ -54,6 +54,15 @@ export default async function auth(req, res, next) {
     const session = await getSessionById(payload.sid);
     if (!session || session.revoked_at || session.user_id !== payload.id) {
       return res.status(401).json({ message: "Session expired" });
+    }
+
+    const idleMs = Math.max(0, env.sessionIdleDays) * 24 * 60 * 60 * 1000;
+    if (idleMs > 0 && session.last_seen_at) {
+      const lastSeenMs = new Date(session.last_seen_at).getTime();
+      if (Number.isFinite(lastSeenMs) && Date.now() - lastSeenMs > idleMs) {
+        await revokeSessionById(session.id);
+        return res.status(401).json({ message: "Session expired" });
+      }
     }
 
     await updateSessionLastSeen(session.id);
