@@ -329,6 +329,7 @@ footer {
    ========================================================= */
 
 .subtle { color: var(--muted); }
+.is-hidden { display: none !important; }
 
 .status-banner {
   margin: var(--status-margin, 0);
