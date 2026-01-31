@@ -410,7 +410,8 @@ import { api } from "./api.js";
   async function personalizeWelcome() {
     try {
       const { user } = await api.auth.me();
-      setText("#welcomeTitle", `Welcome back, ${user.fullName || user.username}`);
+      const displayName = user?.fullName ?? user?.username ?? "";
+      setText("#welcomeTitle", `Welcome back, ${displayName}`);
     } catch {
       setText("#welcomeTitle", "Welcome back");
     }
