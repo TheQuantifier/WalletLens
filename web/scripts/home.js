@@ -4,6 +4,39 @@ import { api } from "./api.js";
 (() => {
   const CURRENCY_FALLBACK = "USD";
   const $ = (sel, root = document) => root.querySelector(sel);
+  const BASE_EXPENSE_CATEGORIES = [
+    "Housing",
+    "Utilities",
+    "Groceries",
+    "Transportation",
+    "Dining",
+    "Health",
+    "Entertainment",
+    "Subscriptions",
+    "Travel",
+    "Education",
+    "Giving",
+    "Savings",
+    "Other",
+  ];
+
+  const BASE_INCOME_CATEGORIES = [
+    "Salary / Wages",
+    "Bonus / Commission",
+    "Business Income",
+    "Freelance / Contract",
+    "Rental Income",
+    "Interest / Dividends",
+    "Capital Gains",
+    "Refunds / Reimbursements",
+    "Gifts Received",
+    "Government Benefits",
+    "Other",
+  ];
+
+  let userCustomCategories = { expense: [], income: [] };
+  let allRecordsCache = [];
+  let pendingCategorySelect = null;
 
   const setText = (sel, value) => {
     const el = $(sel);
@@ -62,6 +95,182 @@ import { api } from "./api.js";
         month: "short",
         day: "2-digit",
       });
+
+  const normalizeName = (name) => String(name || "").trim().toLowerCase();
+
+  const normalizeCategoryList = (list) => {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    return list
+      .map((c) => String(c || "").trim())
+      .filter((c) => {
+        if (!c) return false;
+        const key = c.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
+
+  const loadUserCustomCategories = async () => {
+    try {
+      const me = await api.auth.me();
+      const expList =
+        me?.user?.custom_expense_categories ??
+        me?.user?.customExpenseCategories ??
+        me?.user?.custom_categories ??
+        me?.user?.customCategories ??
+        [];
+      const incList =
+        me?.user?.custom_income_categories ??
+        me?.user?.customIncomeCategories ??
+        [];
+      userCustomCategories = {
+        expense: normalizeCategoryList(expList),
+        income: normalizeCategoryList(incList),
+      };
+    } catch {
+      userCustomCategories = { expense: [], income: [] };
+    }
+  };
+
+  const populateCategorySelect = () => {
+    const select = $("#txnCategory");
+    if (!select) return;
+    select.innerHTML = "";
+    const placeholder = document.createElement("option");
+    placeholder.value = "";
+    placeholder.textContent = "Select a category";
+    placeholder.disabled = true;
+    placeholder.selected = true;
+    select.appendChild(placeholder);
+
+    const type = $("#txnType")?.value === "income" ? "income" : "expense";
+    const base =
+      type === "income" ? BASE_INCOME_CATEGORIES : BASE_EXPENSE_CATEGORIES;
+    const merged = [...base];
+    (userCustomCategories[type] || []).forEach((name) => {
+      if (!merged.some((c) => normalizeName(c) === normalizeName(name))) {
+        merged.push(name);
+      }
+    });
+
+    merged.forEach((name) => {
+      const opt = document.createElement("option");
+      opt.value = name;
+      opt.textContent = name;
+      select.appendChild(opt);
+    });
+
+    renderCustomCategoryList(type);
+  };
+
+  const renderCustomCategoryList = (type) => {
+    const listEl = $("#txnCustomCategories");
+    if (!listEl) return;
+    listEl.innerHTML = "";
+
+    const base =
+      type === "income" ? BASE_INCOME_CATEGORIES : BASE_EXPENSE_CATEGORIES;
+    const normalizedDefaults = new Set(base.map((c) => normalizeName(c)));
+    const custom = (userCustomCategories[type] || []).filter(
+      (name) => !normalizedDefaults.has(normalizeName(name))
+    );
+
+    if (!custom.length) return;
+
+    custom.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "custom-category-item";
+
+      const label = document.createElement("span");
+      label.textContent = name;
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "custom-category-delete";
+      del.dataset.category = name;
+      del.setAttribute("aria-label", `Delete ${name}`);
+      del.textContent = "✕";
+
+      row.appendChild(label);
+      row.appendChild(del);
+      listEl.appendChild(row);
+    });
+  };
+
+  const removeCategoryFromSelect = (name) => {
+    const select = $("#txnCategory");
+    if (!select) return;
+    Array.from(select.options).forEach((opt) => {
+      if (opt.value === name) opt.remove();
+    });
+    if (select.value === name) select.value = "";
+  };
+
+  const purgeCategoryFromAllMonths = (name) => {
+    const key = normalizeName(name);
+    const keys = Object.keys(localStorage);
+    keys.forEach((k) => {
+      if (!k.startsWith("budgeting_categories_")) return;
+      const raw = localStorage.getItem(k);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        const filtered = parsed.filter(
+          (c) => normalizeName(c?.name) !== key
+        );
+        localStorage.setItem(k, JSON.stringify(filtered));
+      } catch {
+        // ignore bad payloads
+      }
+    });
+  };
+
+  const deleteCustomCategory = async (name, type) => {
+    const normalized = normalizeName(name);
+    if (!normalized) return;
+
+    let records = allRecordsCache;
+    if (!records.length) {
+      try {
+        records = await api.records.getAll();
+      } catch {
+        records = [];
+      }
+    }
+
+    const inUse = records.some(
+      (r) => r.type === type && normalizeName(r.category) === normalized
+    );
+    if (inUse) {
+      window.alert(
+        "Error: could not delete. Custom category is being used by records."
+      );
+      return;
+    }
+
+    userCustomCategories = {
+      ...userCustomCategories,
+      [type]: (userCustomCategories[type] || []).filter(
+        (c) => normalizeName(c) !== normalized
+      ),
+    };
+
+    try {
+      await api.auth.updateProfile({
+        customExpenseCategories: userCustomCategories.expense || [],
+        customIncomeCategories: userCustomCategories.income || [],
+      });
+    } catch (err) {
+      console.warn("Failed to delete custom category:", err);
+    }
+
+    purgeCategoryFromAllMonths(name);
+    populateCategorySelect();
+    removeCategoryFromSelect(name);
+  };
 
   // ============================================================
   //  FILTER RECORDS BY DASHBOARD VIEW
@@ -577,7 +786,9 @@ import { api } from "./api.js";
   //  API LOADER
   // ============================================================
   async function loadFromAPI() {
-    return await api.records.getAll();
+    const records = await api.records.getAll();
+    allRecordsCache = Array.isArray(records) ? records : [];
+    return records;
   }
 
   // ============================================================
@@ -587,11 +798,24 @@ import { api } from "./api.js";
     const modal = $("#addTxnModal");
     const form = $("#txnForm");
     const btnCancel = $("#btnCancelModal");
+    const customCategoryModal = $("#customCategoryModal");
+    const customCategoryForm = $("#customCategoryForm");
+    const customCategoryInput = $("#customCategoryInput");
+    const cancelCustomCategoryBtn = $("#cancelCustomCategoryBtn");
+    const customList = $("#txnCustomCategories");
 
     const btnAddTxn = $("#btnAddTxn");
 
     const closeModal = () => modal?.classList.add("hidden");
     const openModal = () => modal?.classList.remove("hidden");
+    const openCustomModal = () => customCategoryModal?.classList.remove("hidden");
+    const closeCustomModal = () => {
+      if (pendingCategorySelect && pendingCategorySelect.value === "Other") {
+        pendingCategorySelect.value = "";
+      }
+      customCategoryModal?.classList.add("hidden");
+      pendingCategorySelect = null;
+    };
 
     $("#btnUpload")?.addEventListener("click", () => {
       window.location.href = "upload.html";
@@ -609,17 +833,45 @@ import { api } from "./api.js";
     btnAddTxn?.addEventListener("click", openModal);
 
     btnCancel?.addEventListener("click", closeModal);
+    cancelCustomCategoryBtn?.addEventListener("click", closeCustomModal);
 
     // Close modal on ESC
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && modal && !modal.classList.contains("hidden")) {
         closeModal();
       }
+      if (e.key === "Escape" && customCategoryModal && !customCategoryModal.classList.contains("hidden")) {
+        closeCustomModal();
+      }
     });
 
     // Close modal when clicking the backdrop (but not the modal content)
     modal?.addEventListener("click", (e) => {
       if (e.target === modal) closeModal();
+    });
+    customCategoryModal?.addEventListener("click", (e) => {
+      if (e.target === customCategoryModal) closeCustomModal();
+    });
+
+    $("#txnCategory")?.addEventListener("change", (e) => {
+      const select = e.target;
+      if (select.value === "Other") {
+        pendingCategorySelect = select;
+        if (customCategoryInput) customCategoryInput.value = "";
+        openCustomModal();
+        customCategoryInput?.focus();
+      }
+    });
+
+    $("#txnType")?.addEventListener("change", () => {
+      populateCategorySelect();
+    });
+
+    customList?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".custom-category-delete");
+      if (!btn) return;
+      const type = $("#txnType")?.value === "income" ? "income" : "expense";
+      deleteCustomCategory(btn.dataset.category || "", type);
     });
 
     form?.addEventListener("submit", async (e) => {
@@ -652,6 +904,42 @@ import { api } from "./api.js";
         showTxnStatus("Failed to save transaction: " + err.message, "error");
       }
     });
+
+    customCategoryForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      if (!pendingCategorySelect) return;
+
+      const raw = customCategoryInput?.value || "";
+      const name = String(raw).trim();
+      if (!name) {
+        customCategoryInput?.focus();
+        return;
+      }
+
+      const type = $("#txnType")?.value === "income" ? "income" : "expense";
+      if (!userCustomCategories[type]?.some((c) => normalizeName(c) === normalizeName(name))) {
+        userCustomCategories = {
+          ...userCustomCategories,
+          [type]: [...(userCustomCategories[type] || []), name],
+        };
+      }
+
+      try {
+        await api.auth.updateProfile({
+          customExpenseCategories: userCustomCategories.expense || [],
+          customIncomeCategories: userCustomCategories.income || [],
+        });
+      } catch (err) {
+        console.warn("Failed to save custom category:", err);
+      }
+
+      populateCategorySelect();
+      const select = $("#txnCategory");
+      if (select) {
+        select.value = name;
+      }
+      closeCustomModal();
+    });
   }
 
   async function personalizeWelcome() {
@@ -668,6 +956,8 @@ import { api } from "./api.js";
   //  INIT
   // ============================================================
   async function init() {
+    await loadUserCustomCategories();
+    populateCategorySelect();
     wireActions();
     await personalizeWelcome();
 

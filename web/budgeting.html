@@ -94,10 +94,32 @@
           </tbody>
         </table>
       </div>
+      <div class="budget-table-actions">
+        <button class="btn" id="btnAddBudgetCategory" type="button">Add category</button>
+      </div>
     </section>
   </main>
 
   <div id="footer"></div>
+
+  <!-- ========== CUSTOM CATEGORY MODAL ========== -->
+  <div id="customCategoryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="customCategoryTitle">
+    <div class="modal-content card">
+      <h2 id="customCategoryTitle">Add Custom Category</h2>
+      <p class="subtle">Enter a name to add a custom category.</p>
+
+      <form id="customCategoryForm" class="txn-form">
+        <div class="form-row">
+          <label><span>Category Name</span><input type="text" id="customCategoryInput" autocomplete="off" required /></label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn--primary">Save Category</button>
+          <button type="button" class="btn" id="cancelCustomCategoryBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <script src="scripts/default.js" type="module" defer></script>
   <script src="scripts/budgeting.js" type="module" defer></script>

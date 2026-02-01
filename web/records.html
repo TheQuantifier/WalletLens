@@ -275,7 +275,13 @@
           </div>
 
           <div class="form-row">
-            <label><span>Category</span><input type="text" id="expenseCategory" name="expenseCategory" autocomplete="off" required /></label>
+            <label>
+              <span>Category</span>
+              <select id="expenseCategory" name="expenseCategory" required>
+                <option value="" disabled selected>Select a category</option>
+              </select>
+            </label>
+            <div class="custom-category-list" id="expenseCustomCategories" aria-live="polite"></div>
           </div>
 
           <div class="form-row">
@@ -302,7 +308,13 @@
           </div>
 
           <div class="form-row">
-            <label><span>Category</span><input type="text" id="incomeCategory" name="incomeCategory" autocomplete="off" required /></label>
+            <label>
+              <span>Category</span>
+              <select id="incomeCategory" name="incomeCategory" required>
+                <option value="" disabled selected>Select a category</option>
+              </select>
+            </label>
+            <div class="custom-category-list" id="incomeCustomCategories" aria-live="polite"></div>
           </div>
 
           <div class="form-row">
@@ -333,6 +345,27 @@
           <button id="btnDeleteRecordAndReceipt" class="btn btn--warning" type="button">Delete Record & Receipt</button>
           <button id="btnCancelDeleteRecord" class="btn" type="button">Cancel</button>
         </div>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         CUSTOM CATEGORY MODAL
+    ========================================================= -->
+    <div id="customCategoryModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Add Custom Category</h2>
+        <p class="subtle">Enter a name to add a custom category.</p>
+
+        <form id="customCategoryForm" class="txn-form">
+          <div class="form-row">
+            <label><span>Category Name</span><input type="text" id="customCategoryInput" autocomplete="off" required /></label>
+          </div>
+
+          <div class="modal-actions">
+            <button type="submit" class="btn btn--primary">Save Category</button>
+            <button type="button" class="btn" id="cancelCustomCategoryBtn">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
 

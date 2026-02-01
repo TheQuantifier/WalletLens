@@ -4,8 +4,9 @@ import { api } from "./api.js";
 (() => {
   const STORAGE_KEY = "budgeting_categories";
   const CURRENCY_FALLBACK = "USD";
+  let userCustomCategories = { expense: [] };
 
-  const DEFAULT_CATEGORIES = [
+  const BASE_CATEGORIES = [
     { name: "Housing", budget: null },
     { name: "Utilities", budget: null },
     { name: "Groceries", budget: null },
@@ -18,7 +19,6 @@ import { api } from "./api.js";
     { name: "Education", budget: null },
     { name: "Giving", budget: null },
     { name: "Savings", budget: null },
-    { name: "Other", budget: null },
   ];
 
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -30,6 +30,119 @@ import { api } from "./api.js";
     }).format(Number.isFinite(value) ? value : 0);
 
   const normalizeName = (name) => String(name || "").trim().toLowerCase();
+
+  const normalizeCategoryList = (list) => {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    return list
+      .map((c) => String(c || "").trim())
+      .filter((c) => {
+        if (!c) return false;
+        const key = c.toLowerCase();
+        if (key === "other") return false;
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
+
+  const loadUserCustomCategories = async () => {
+    try {
+      const me = await api.auth.me();
+      const expList =
+        me?.user?.custom_expense_categories ??
+        me?.user?.customExpenseCategories ??
+        me?.user?.custom_categories ??
+        me?.user?.customCategories ??
+        [];
+      userCustomCategories = { expense: normalizeCategoryList(expList) };
+    } catch {
+      userCustomCategories = { expense: [] };
+    }
+  };
+
+  const getBudgetCategoryNames = () => {
+    const baseNames = BASE_CATEGORIES.map((c) => c.name);
+    const baseSet = new Set(baseNames.map((c) => normalizeName(c)));
+    const eligibleCustom = (userCustomCategories.expense || []).filter((name) => {
+      const key = normalizeName(name);
+      if (baseSet.has(key)) return false;
+      return true;
+    });
+
+    return [...baseNames, ...eligibleCustom];
+  };
+
+  const purgeCategoryFromAllMonths = (name) => {
+    const key = normalizeName(name);
+    const keys = Object.keys(localStorage);
+    keys.forEach((k) => {
+      if (!k.startsWith(`${STORAGE_KEY}_`)) return;
+      const raw = localStorage.getItem(k);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        const filtered = parsed.filter(
+          (c) => normalizeName(c?.name) !== key
+        );
+        localStorage.setItem(k, JSON.stringify(filtered));
+      } catch {
+        // ignore bad payloads
+      }
+    });
+  };
+
+  const isCustomCategory = (name) => {
+    const baseSet = new Set(BASE_CATEGORIES.map((c) => normalizeName(c.name)));
+    return !baseSet.has(normalizeName(name));
+  };
+
+  const deleteCustomCategory = async (name, state) => {
+    const key = normalizeName(name);
+    if (!key) return;
+
+    const inUse = (state.records || []).some(
+      (r) => normalizeName(r.category) === key
+    );
+    if (inUse) {
+      window.alert(
+        "Error: could not delete. Custom category is being used by records."
+      );
+      return;
+    }
+
+    userCustomCategories = {
+      expense: (userCustomCategories.expense || []).filter(
+        (c) => normalizeName(c) !== key
+      ),
+    };
+
+    try {
+      await api.auth.updateProfile({
+        customExpenseCategories: userCustomCategories.expense || [],
+      });
+    } catch (err) {
+      console.warn("Failed to delete custom category:", err);
+    }
+
+    purgeCategoryFromAllMonths(name);
+
+    state.categories = state.categories.filter(
+      (c) => normalizeName(c.name) !== key
+    );
+    saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
+
+    state.spentMap = buildSpentMap(state.records || [], state.categories);
+    state.categories = state.categories.map((c) => ({
+      ...c,
+      spent: state.spentMap.get(normalizeName(c.name)) || 0,
+    }));
+
+    renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+    renderReallocateOptions(state.categories);
+    renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+  };
 
   const showStatus = (msg, tone = "") => {
     const el = $("#budgetStatus");
@@ -50,16 +163,18 @@ import { api } from "./api.js";
 
   function loadCategories(monthKey) {
     const raw = localStorage.getItem(`${STORAGE_KEY}_${monthKey}`);
-    if (!raw) return DEFAULT_CATEGORIES.map((c) => ({ ...c }));
+    const names = getBudgetCategoryNames();
+    const defaults = names.map((name) => ({ name, budget: null }));
+
+    if (!raw) return defaults.map((c) => ({ ...c }));
 
     try {
       const parsed = JSON.parse(raw);
-      if (!Array.isArray(parsed)) return DEFAULT_CATEGORIES.map((c) => ({ ...c }));
+      if (!Array.isArray(parsed)) return defaults.map((c) => ({ ...c }));
 
-      const normalized = DEFAULT_CATEGORIES.map((c) => ({ ...c }));
       const byName = new Map(parsed.map((c) => [normalizeName(c.name), c]));
 
-      return normalized.map((c) => {
+      return defaults.map((c) => {
         const stored = byName.get(normalizeName(c.name));
         if (!stored) return c;
         if (stored.budget === null || stored.budget === undefined || stored.budget === "") {
@@ -69,7 +184,7 @@ import { api } from "./api.js";
         return { ...c, budget: Number.isFinite(value) ? value : null };
       });
     } catch {
-      return DEFAULT_CATEGORIES.map((c) => ({ ...c }));
+      return defaults.map((c) => ({ ...c }));
     }
   }
 
@@ -101,14 +216,13 @@ import { api } from "./api.js";
 
   function buildSpentMap(records, categories) {
     const map = new Map(categories.map((c) => [normalizeName(c.name), 0]));
-    const otherKey = normalizeName("Other");
 
     records.forEach((r) => {
       if (r.type !== "expense") return;
-      const key = normalizeName(r.category || "Other");
-      const match = map.has(key) ? key : otherKey;
-      const current = map.get(match) || 0;
-      map.set(match, current + Number(r.amount || 0));
+      const key = normalizeName(r.category || "");
+      if (!map.has(key)) return;
+      const current = map.get(key) || 0;
+      map.set(key, current + Number(r.amount || 0));
     });
 
     return map;
@@ -166,7 +280,23 @@ import { api } from "./api.js";
       const tr = document.createElement("tr");
 
       const tdName = document.createElement("td");
-      tdName.textContent = c.name;
+      const nameWrap = document.createElement("div");
+      nameWrap.className = "category-cell";
+      const nameLabel = document.createElement("span");
+      nameLabel.textContent = c.name;
+      nameWrap.appendChild(nameLabel);
+
+      if (isCustomCategory(c.name)) {
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "custom-category-delete";
+        del.dataset.category = c.name;
+        del.setAttribute("aria-label", `Delete ${c.name}`);
+        del.textContent = "✕";
+        nameWrap.appendChild(del);
+      }
+
+      tdName.appendChild(nameWrap);
 
       const tdBudget = document.createElement("td");
       tdBudget.className = "num";
@@ -236,6 +366,7 @@ import { api } from "./api.js";
   }
 
   async function init() {
+    await loadUserCustomCategories();
     let records = [];
     try {
       records = await api.records.getAll();
@@ -263,6 +394,7 @@ import { api } from "./api.js";
       monthEnd: monthOptions[0].end,
       categories: [],
       spentMap: new Map(),
+      records,
     };
 
     const renderForMonth = (monthKey) => {
@@ -324,7 +456,7 @@ import { api } from "./api.js";
     });
 
     $("#btnResetBudgets")?.addEventListener("click", () => {
-      state.categories = DEFAULT_CATEGORIES.map((c) => ({ ...c }));
+      state.categories = getBudgetCategoryNames().map((name) => ({ name, budget: null }));
       saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
 
       const refreshedMap = buildSpentMap(
@@ -411,6 +543,94 @@ import { api } from "./api.js";
       renderReallocateOptions(state.categories);
       renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
       showStatus(`Moved ${fmtMoney(moved, CURRENCY_FALLBACK)} to ${target}.`);
+    });
+
+    const customCategoryModal = $("#customCategoryModal");
+    const customCategoryForm = $("#customCategoryForm");
+    const customCategoryInput = $("#customCategoryInput");
+    const cancelCustomCategoryBtn = $("#cancelCustomCategoryBtn");
+    const btnAddBudgetCategory = $("#btnAddBudgetCategory");
+
+    const openCustomModal = () => {
+      if (customCategoryInput) customCategoryInput.value = "";
+      customCategoryModal?.classList.remove("hidden");
+      customCategoryInput?.focus();
+    };
+
+    const closeCustomModal = () => {
+      customCategoryModal?.classList.add("hidden");
+    };
+
+    btnAddBudgetCategory?.addEventListener("click", openCustomModal);
+    cancelCustomCategoryBtn?.addEventListener("click", closeCustomModal);
+    customCategoryModal?.addEventListener("click", (e) => {
+      if (e.target === customCategoryModal) closeCustomModal();
+    });
+
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && customCategoryModal && !customCategoryModal.classList.contains("hidden")) {
+        closeCustomModal();
+      }
+    });
+
+    $("#budgetTbody")?.addEventListener("click", (e) => {
+      const btn = e.target.closest(".custom-category-delete");
+      if (!btn) return;
+      deleteCustomCategory(btn.dataset.category || "", state);
+    });
+
+    customCategoryForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const raw = customCategoryInput?.value || "";
+      const name = String(raw).trim();
+      if (!name) {
+        customCategoryInput?.focus();
+        return;
+      }
+
+      const key = normalizeName(name);
+      if (!userCustomCategories.expense?.some((c) => normalizeName(c) === key)) {
+        userCustomCategories = {
+          expense: [...(userCustomCategories.expense || []), name],
+        };
+      }
+
+      try {
+        await api.auth.updateProfile({
+          customExpenseCategories: userCustomCategories.expense || [],
+        });
+      } catch (err) {
+        console.warn("Failed to save custom category:", err);
+      }
+
+      const names = getBudgetCategoryNames();
+      const exists = state.categories.some((c) => normalizeName(c.name) === key);
+      if (!exists && names.includes(name)) {
+        state.categories = [
+          ...state.categories,
+          { name, budget: null, spent: 0 },
+        ];
+      }
+
+      saveCategories(state.categories.map(({ name: n, budget }) => ({ name: n, budget })), state.monthKey);
+      state.spentMap = buildSpentMap(
+        records.filter((r) => {
+          if (!r.date) return false;
+          const d = new Date(r.date);
+          if (Number.isNaN(d.getTime())) return false;
+          return d >= state.monthStart && d <= state.monthEnd;
+        }),
+        state.categories
+      );
+      state.categories = state.categories.map((c) => ({
+        ...c,
+        spent: state.spentMap.get(normalizeName(c.name)) || 0,
+      }));
+
+      renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+      renderReallocateOptions(state.categories);
+      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+      closeCustomModal();
     });
   }
 

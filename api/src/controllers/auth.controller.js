@@ -265,12 +265,36 @@ export const updateMe = asyncHandler(async (req, res) => {
     "phoneNumber",
     "bio",
     "avatarUrl",
+    "customExpenseCategories",
+    "customIncomeCategories",
   ];
 
   for (const key of allowedFields) {
     if (req.body[key] !== undefined) {
       updates[key] = typeof req.body[key] === "string" ? req.body[key].trim() : req.body[key];
     }
+  }
+
+  const normalizeCategoryList = (value) => {
+    const raw = Array.isArray(value) ? value : [];
+    const seen = new Set();
+    return raw
+      .map((c) => String(c || "").trim())
+      .filter((c) => {
+        if (!c) return false;
+        const key = c.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
+
+  if (updates.customExpenseCategories !== undefined) {
+    updates.customExpenseCategories = normalizeCategoryList(updates.customExpenseCategories);
+  }
+
+  if (updates.customIncomeCategories !== undefined) {
+    updates.customIncomeCategories = normalizeCategoryList(updates.customIncomeCategories);
   }
 
   // Unique email check

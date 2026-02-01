@@ -16,6 +16,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const expenseForm = document.getElementById("expenseForm");
   const incomeForm = document.getElementById("incomeForm");
 
+  const customCategoryModal = document.getElementById("customCategoryModal");
+  const customCategoryForm = document.getElementById("customCategoryForm");
+  const customCategoryInput = document.getElementById("customCategoryInput");
+  const cancelCustomCategoryBtn = document.getElementById("cancelCustomCategoryBtn");
+
   const btnAddExpense = document.getElementById("btnAddExpense");
   const btnAddIncome = document.getElementById("btnAddIncome");
   const cancelExpenseBtn = document.getElementById("cancelExpenseBtn");
@@ -32,9 +37,14 @@ document.addEventListener("DOMContentLoaded", () => {
   const statusExpense = document.getElementById("recordsStatusExpense");
   const statusIncome = document.getElementById("recordsStatusIncome");
 
+  const expenseCustomList = document.getElementById("expenseCustomCategories");
+  const incomeCustomList = document.getElementById("incomeCustomCategories");
+
   let pendingDelete = { recordId: null, linkedReceiptId: null };
   let expensePage = 1;
   let incomePage = 1;
+  let pendingCategorySelect = null;
+  let userCustomCategories = { expense: [], income: [] };
 
   // NEW: cache so we don’t hit API on each keystroke
   let allRecordsCache = [];
@@ -59,6 +69,39 @@ document.addEventListener("DOMContentLoaded", () => {
   // ===============================
   // HELPERS
   // ===============================
+  const BUDGETING_STORAGE_KEY = "budgeting_categories";
+  const EXPENSE_CATEGORIES = [
+    { name: "Housing" },
+    { name: "Utilities" },
+    { name: "Groceries" },
+    { name: "Transportation" },
+    { name: "Dining" },
+    { name: "Health" },
+    { name: "Entertainment" },
+    { name: "Subscriptions" },
+    { name: "Travel" },
+    { name: "Education" },
+    { name: "Giving" },
+    { name: "Savings" },
+    { name: "Other" },
+  ];
+
+  const INCOME_CATEGORIES = [
+    { name: "Salary / Wages" },
+    { name: "Bonus / Commission" },
+    { name: "Business Income" },
+    { name: "Freelance / Contract" },
+    { name: "Rental Income" },
+    { name: "Interest / Dividends" },
+    { name: "Capital Gains" },
+    { name: "Refunds / Reimbursements" },
+    { name: "Gifts Received" },
+    { name: "Government Benefits" },
+    { name: "Other" },
+  ];
+
+  const normalizeName = (name) => String(name || "").trim().toLowerCase();
+
   const showModal = (modal) => modal?.classList.remove("hidden");
   const hideModal = (modal) => modal?.classList.add("hidden");
 
@@ -115,6 +158,204 @@ document.addEventListener("DOMContentLoaded", () => {
       style: "currency",
       currency,
     }).format(converted);
+  };
+
+  const normalizeCategoryList = (list) => {
+    if (!Array.isArray(list)) return [];
+    const seen = new Set();
+    return list
+      .map((c) => String(c || "").trim())
+      .filter((c) => {
+        if (!c) return false;
+        const key = c.toLowerCase();
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+  };
+
+  const loadUserCustomCategories = async () => {
+    try {
+      const me = await api.auth.me();
+      const expList =
+        me?.user?.custom_expense_categories ??
+        me?.user?.customExpenseCategories ??
+        me?.user?.custom_categories ??
+        me?.user?.customCategories ??
+        [];
+      const incList =
+        me?.user?.custom_income_categories ??
+        me?.user?.customIncomeCategories ??
+        [];
+      userCustomCategories = {
+        expense: normalizeCategoryList(expList),
+        income: normalizeCategoryList(incList),
+      };
+    } catch {
+      userCustomCategories = { expense: [], income: [] };
+    }
+  };
+
+  const ensureCategoryOption = (selectEl, value) => {
+    if (!selectEl || !value) return;
+    const exists = Array.from(selectEl.options).some((opt) => opt.value === value);
+    if (exists) return;
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = value;
+    selectEl.appendChild(opt);
+  };
+
+  const populateBudgetCategorySelects = () => {
+    const expenseSelect = document.getElementById("expenseCategory");
+    const incomeSelect = document.getElementById("incomeCategory");
+
+    const buildOptions = (select, base, customList) => {
+      if (!select) return;
+      select.innerHTML = "";
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Select a category";
+      placeholder.disabled = true;
+      placeholder.selected = true;
+      select.appendChild(placeholder);
+
+      const allNames = new Set(base.map((c) => normalizeName(c.name)));
+      const merged = [...base];
+      customList.forEach((name) => {
+        if (!allNames.has(normalizeName(name))) {
+          merged.push({ name });
+          allNames.add(normalizeName(name));
+        }
+      });
+
+      merged.forEach((c) => {
+        const opt = document.createElement("option");
+        opt.value = c.name;
+        opt.textContent = c.name;
+        select.appendChild(opt);
+      });
+    };
+
+    buildOptions(expenseSelect, EXPENSE_CATEGORIES, userCustomCategories.expense || []);
+    buildOptions(incomeSelect, INCOME_CATEGORIES, userCustomCategories.income || []);
+
+    renderAllCustomLists();
+  };
+
+  const renderCustomCategoryList = (container, type) => {
+    if (!container) return;
+    container.innerHTML = "";
+
+    const base = type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const normalizedDefaults = new Set(base.map((c) => normalizeName(c.name)));
+    const custom = (userCustomCategories[type] || []).filter(
+      (name) => !normalizedDefaults.has(normalizeName(name))
+    );
+
+    if (!custom.length) return;
+
+    custom.forEach((name) => {
+      const row = document.createElement("div");
+      row.className = "custom-category-item";
+
+      const label = document.createElement("span");
+      label.textContent = name;
+
+      const del = document.createElement("button");
+      del.type = "button";
+      del.className = "custom-category-delete";
+      del.dataset.category = name;
+      del.setAttribute("aria-label", `Delete ${name}`);
+      del.textContent = "✕";
+
+      row.appendChild(label);
+      row.appendChild(del);
+      container.appendChild(row);
+    });
+  };
+
+  const renderAllCustomLists = () => {
+    renderCustomCategoryList(expenseCustomList, "expense");
+    renderCustomCategoryList(incomeCustomList, "income");
+  };
+
+  const removeCategoryFromSelects = (name) => {
+    const selects = [
+      document.getElementById("expenseCategory"),
+      document.getElementById("incomeCategory"),
+    ].filter(Boolean);
+    selects.forEach((select) => {
+      Array.from(select.options).forEach((opt) => {
+        if (opt.value === name) opt.remove();
+      });
+      if (select.value === name) select.value = "";
+    });
+  };
+
+  const purgeCategoryFromAllMonths = (name) => {
+    const key = normalizeName(name);
+    const keys = Object.keys(localStorage);
+    keys.forEach((k) => {
+      if (!k.startsWith(`${BUDGETING_STORAGE_KEY}_`)) return;
+      const raw = localStorage.getItem(k);
+      if (!raw) return;
+      try {
+        const parsed = JSON.parse(raw);
+        if (!Array.isArray(parsed)) return;
+        const filtered = parsed.filter(
+          (c) => normalizeName(c?.name) !== key
+        );
+        localStorage.setItem(k, JSON.stringify(filtered));
+      } catch {
+        // ignore bad payloads
+      }
+    });
+  };
+
+  const deleteCustomCategory = async (name, type) => {
+    const normalized = normalizeName(name);
+    if (!normalized) return;
+
+    let records = allRecordsCache;
+    if (!records.length) {
+      try {
+        records = await api.records.getAll();
+      } catch {
+        records = [];
+      }
+    }
+
+    const inUse = records.some(
+      (r) => r.type === type && normalizeName(r.category) === normalized
+    );
+    if (inUse) {
+      window.alert(
+        "Error: could not delete. Custom category is being used by records."
+      );
+      return;
+    }
+
+    userCustomCategories = {
+      ...userCustomCategories,
+      [type]: (userCustomCategories[type] || []).filter(
+        (c) => normalizeName(c) !== normalized
+      ),
+    };
+
+    try {
+      await api.auth.updateProfile({
+        customExpenseCategories: userCustomCategories.expense || [],
+        customIncomeCategories: userCustomCategories.income || [],
+      });
+    } catch (err) {
+      console.warn("Failed to delete custom category:", err);
+    }
+
+    purgeCategoryFromAllMonths(name);
+    populateBudgetCategorySelects();
+    renderAllCustomLists();
+    removeCategoryFromSelects(name);
   };
 
   // Support both Mongo-style `_id` and SQL-style `id`
@@ -246,6 +487,7 @@ document.addEventListener("DOMContentLoaded", () => {
     hideModal(addExpenseModal);
     hideModal(addIncomeModal);
     hideModal(deleteRecordModal);
+    hideModal(customCategoryModal);
   };
 
   document.addEventListener("keydown", (e) => {
@@ -261,6 +503,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
   addIncomeModal?.addEventListener("click", (e) => {
     if (e.target.classList.contains("modal")) hideModal(addIncomeModal);
+  });
+  customCategoryModal?.addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal")) hideModal(customCategoryModal);
   });
 
   // ===============================
@@ -285,6 +530,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const modal = record.type === "expense" ? addExpenseModal : addIncomeModal;
       const prefix = record.type === "expense" ? "expense" : "income";
+
+      const categorySelect = document.getElementById(`${prefix}Category`);
+      ensureCategoryOption(categorySelect, record.category);
 
       document.getElementById(`${prefix}Date`).value = isoToInputDate(record.date);
       document.getElementById(`${prefix}Amount`).value = record.amount;
@@ -427,12 +675,14 @@ document.addEventListener("DOMContentLoaded", () => {
   btnAddExpense?.addEventListener("click", () => {
     delete addExpenseModal.dataset.editId;
     expenseForm?.reset();
+    populateBudgetCategorySelects();
     showModal(addExpenseModal);
   });
   cancelExpenseBtn?.addEventListener("click", () => hideModal(addExpenseModal));
   btnAddIncome?.addEventListener("click", () => {
     delete addIncomeModal.dataset.editId;
     incomeForm?.reset();
+    populateBudgetCategorySelects();
     showModal(addIncomeModal);
   });
   cancelIncomeBtn?.addEventListener("click", () => hideModal(addIncomeModal));
@@ -496,6 +746,84 @@ document.addEventListener("DOMContentLoaded", () => {
 
   expenseForm?.addEventListener("submit", handleFormSubmit(expenseForm, addExpenseModal, "expense"));
   incomeForm?.addEventListener("submit", handleFormSubmit(incomeForm, addIncomeModal, "income"));
+
+  // ===============================
+  // CUSTOM CATEGORY HANDLING
+  // ===============================
+  const openCustomCategoryModal = (selectEl) => {
+    pendingCategorySelect = selectEl;
+    if (customCategoryInput) customCategoryInput.value = "";
+    showModal(customCategoryModal);
+    customCategoryInput?.focus();
+  };
+
+  const closeCustomCategoryModal = () => {
+    if (pendingCategorySelect && pendingCategorySelect.value === "Other") {
+      pendingCategorySelect.value = "";
+    }
+    hideModal(customCategoryModal);
+    pendingCategorySelect = null;
+  };
+
+  const wireCustomCategorySelect = (selectEl) => {
+    if (!selectEl) return;
+    selectEl.addEventListener("change", () => {
+      if (selectEl.value === "Other") {
+        openCustomCategoryModal(selectEl);
+      }
+    });
+  };
+
+  wireCustomCategorySelect(document.getElementById("expenseCategory"));
+  wireCustomCategorySelect(document.getElementById("incomeCategory"));
+
+  expenseCustomList?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".custom-category-delete");
+    if (!btn) return;
+    deleteCustomCategory(btn.dataset.category || "", "expense");
+  });
+
+  incomeCustomList?.addEventListener("click", (e) => {
+    const btn = e.target.closest(".custom-category-delete");
+    if (!btn) return;
+    deleteCustomCategory(btn.dataset.category || "", "income");
+  });
+
+  cancelCustomCategoryBtn?.addEventListener("click", closeCustomCategoryModal);
+
+  customCategoryForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+    if (!pendingCategorySelect) return;
+
+    const raw = customCategoryInput?.value || "";
+    const name = String(raw).trim();
+    if (!name) {
+      customCategoryInput?.focus();
+      return;
+    }
+
+    const listType = pendingCategorySelect?.id === "incomeCategory" ? "income" : "expense";
+    if (!userCustomCategories[listType]?.some((c) => normalizeName(c) === normalizeName(name))) {
+      userCustomCategories = {
+        ...userCustomCategories,
+        [listType]: [...(userCustomCategories[listType] || []), name],
+      };
+    }
+
+    try {
+      await api.auth.updateProfile({
+        customExpenseCategories: userCustomCategories.expense || [],
+        customIncomeCategories: userCustomCategories.income || [],
+      });
+    } catch (err) {
+      console.warn("Failed to save custom category:", err);
+    }
+
+    populateBudgetCategorySelects();
+    ensureCategoryOption(pendingCategorySelect, name);
+    pendingCategorySelect.value = name;
+    closeCustomCategoryModal();
+  });
 
   // ===============================
   // FILTERS & CLEAR (LIVE)
@@ -633,5 +961,9 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 
   // INITIAL LOAD
-  loadRecords();
+  (async () => {
+    await loadUserCustomCategories();
+    populateBudgetCategorySelects();
+    loadRecords();
+  })();
 });

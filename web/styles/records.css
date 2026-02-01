@@ -229,6 +229,43 @@
   min-width: 0;
   text-align: center;
 }
+
+#customCategoryModal {
+  --modal-max-width: 420px;
+  --modal-padding: 1.5rem;
+}
+
+.custom-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-top: 0.65rem;
+}
+
+.custom-category-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  font-size: 0.9rem;
+}
+
+.custom-category-delete {
+  border: none;
+  background: transparent;
+  color: #dc2626;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.custom-category-delete:hover {
+  color: #b91c1c;
+}
 /* =========================================================
    RESPONSIVE
    ========================================================= */
