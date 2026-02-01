@@ -256,7 +256,16 @@ export const updateMe = asyncHandler(async (req, res) => {
   const userId = req.user.id;
   const updates = {};
 
-  const allowedFields = ["username", "email", "fullName", "location", "role", "phoneNumber", "bio"];
+  const allowedFields = [
+    "username",
+    "email",
+    "fullName",
+    "location",
+    "role",
+    "phoneNumber",
+    "bio",
+    "avatarUrl",
+  ];
 
   for (const key of allowedFields) {
     if (req.body[key] !== undefined) {
