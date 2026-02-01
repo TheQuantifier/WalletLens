@@ -13,6 +13,23 @@
   font-size: 1.6rem;
 }
 
+.kpi-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.kpi-toolbar select {
+  min-width: 200px;
+  padding: 0.45rem 0.6rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+  color: var(--text);
+}
+
 /* ======================
    QUICK ACTIONS FIX
    ====================== */
@@ -302,6 +319,14 @@
 
 /* Small screens */
 @media (max-width: 800px) {
+  .kpi-toolbar {
+    justify-content: flex-start;
+  }
+
+  .kpi-toolbar select {
+    width: 100%;
+  }
+
   .chart-section {
     grid-template-columns: minmax(0, 1fr);
   }

@@ -38,6 +38,10 @@ import { api } from "./api.js";
   let userCustomCategories = { expense: [], income: [] };
   let allRecordsCache = [];
   let pendingCategorySelect = null;
+  const LINKED_ACCOUNTS_KEY = "linked_accounts";
+  const BANK_FILTER_KEY = "home_bank_filter";
+  let currentComputed = null;
+  let currentNetWorth = null;
 
   const setText = (sel, value) => {
     const el = $(sel);
@@ -111,6 +115,48 @@ import { api } from "./api.js";
         seen.add(key);
         return true;
       });
+  };
+
+  const loadLinkedAccounts = () => {
+    const raw = localStorage.getItem(LINKED_ACCOUNTS_KEY);
+    if (!raw) return [];
+    try {
+      const parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const getAccountBalance = (account) => {
+    if (!account || typeof account !== "object") return 0;
+    const direct =
+      account.balance ??
+      account.currentBalance ??
+      account.availableBalance ??
+      account.current_balance ??
+      account.available_balance;
+    if (Number.isFinite(Number(direct))) return Number(direct);
+    const nested = account.balances || account.balanceInfo || {};
+    const nestedValue = nested.current ?? nested.available ?? nested.balance;
+    return Number.isFinite(Number(nestedValue)) ? Number(nestedValue) : 0;
+  };
+
+  const sumAccountBalances = (accounts) =>
+    (accounts || []).reduce((sum, acc) => sum + getAccountBalance(acc), 0);
+
+  const getRecordBankId = (record) =>
+    record?.bankId ||
+    record?.accountId ||
+    record?.institutionId ||
+    record?.bank_id ||
+    record?.account_id ||
+    record?.institution_id ||
+    "";
+
+  const filterRecordsByBank = (records, bankId) => {
+    if (!bankId || bankId === "all") return records;
+    return (records || []).filter((r) => getRecordBankId(r) === bankId);
   };
 
   const loadUserCustomCategories = async () => {
@@ -582,24 +628,35 @@ import { api } from "./api.js";
     return months;
   }
 
-  function getNetWorthData(records, currency) {
+  function getNetWorthData(records, currency, netBalance, accounts) {
     const stored = localStorage.getItem("netWorthData");
+    const baseBalance = (Number(netBalance) || 0) + sumAccountBalances(accounts);
+    const hasRecords = Array.isArray(records) && records.length > 0;
+    const hasAccounts = Array.isArray(accounts) && accounts.length > 0;
     if (stored) {
       try {
         const parsed = JSON.parse(stored);
-        if (parsed?.assets && parsed?.liabilities && parsed?.trend) return parsed;
+        if (parsed?.assets && parsed?.liabilities && parsed?.trend) {
+          return {
+            ...parsed,
+            baseBalance,
+            hasData: true,
+          };
+        }
       } catch {
         // fall through to demo
       }
     }
 
-    if (!records?.length) {
+    if (!hasRecords) {
       return {
         currency,
         asOf: null,
         assets: [],
         liabilities: [],
         trend: [],
+        baseBalance,
+        hasData: hasAccounts || Number(netBalance) !== 0,
       };
     }
 
@@ -616,7 +673,9 @@ import { api } from "./api.js";
       asOf: new Date().toISOString(),
       assets: [],
       liabilities: [],
-      trend,
+      trend: trend.map((t) => ({ ...t, value: t.value + baseBalance })),
+      baseBalance,
+      hasData: true,
     };
   }
 
@@ -624,9 +683,9 @@ import { api } from "./api.js";
     if (!data) return;
     const assetsTotal = (data.assets || []).reduce((s, a) => s + a.amount, 0);
     const liabilitiesTotal = (data.liabilities || []).reduce((s, l) => s + l.amount, 0);
-    const netWorth = assetsTotal - liabilitiesTotal;
+    const netWorth = (data.baseBalance || 0) + assetsTotal - liabilitiesTotal;
 
-    if (!data.assets?.length && !data.liabilities?.length && !data.trend?.length) {
+    if (!data.hasData && !data.assets?.length && !data.liabilities?.length && !data.trend?.length) {
       setText("#netWorthTotal", "—");
       setText("#assetsTotal", "—");
       setText("#liabilitiesTotal", "—");
@@ -683,6 +742,44 @@ import { api } from "./api.js";
       drawNetWorthChart($("#netWorthChart"), data.trend, data.currency);
     }
   }
+
+  function setupBankFilter(accounts, onChange) {
+    const wrap = $("#kpiBankWrap");
+    const select = $("#kpiBankSelect");
+    if (!wrap || !select) return "all";
+
+    if (!accounts?.length) {
+      wrap.style.display = "none";
+      return "all";
+    }
+
+    wrap.style.display = "flex";
+    select.innerHTML = "";
+
+    const options = [{ id: "all", name: "All accounts" }, ...accounts];
+    options.forEach((opt) => {
+      const option = document.createElement("option");
+      option.value = opt.id;
+      option.textContent = opt.name || opt.id;
+      select.appendChild(option);
+    });
+
+    const saved = localStorage.getItem(BANK_FILTER_KEY) || "all";
+    const valid = options.some((opt) => opt.id === saved) ? saved : "all";
+    select.value = valid;
+
+    select.addEventListener("change", () => {
+      localStorage.setItem(BANK_FILTER_KEY, select.value || "all");
+      if (typeof onChange === "function") onChange();
+    });
+
+    return valid;
+  }
+
+  const getSelectedBankId = () => {
+    const select = $("#kpiBankSelect");
+    return select?.value || "all";
+  };
 
   function renderKpis(comp, viewLabel) {
     setText("#kpiIncome", fmtMoney(comp.total_income, comp.currency));
@@ -954,6 +1051,46 @@ import { api } from "./api.js";
   // ============================================================
   //  INIT
   // ============================================================
+  function renderDashboard(records, dashboardView, accounts) {
+    const viewLabel =
+      dashboardView === "Weekly"
+        ? "This Week"
+        : dashboardView === "Monthly"
+        ? "This Month"
+        : dashboardView === "Yearly"
+        ? "This Year"
+        : dashboardView === "All"
+        ? "All Time"
+        : "This Month";
+
+    const bankId = getSelectedBankId();
+    const bankRecords = filterRecordsByBank(records, bankId);
+    const filteredRecords = filterRecordsByView(bankRecords, dashboardView);
+
+    const computed = computeOverview(filteredRecords);
+    const accountsInView =
+      bankId === "all" ? accounts : (accounts || []).filter((acc) => acc.id === bankId);
+    const netWorthData = getNetWorthData(
+      bankRecords,
+      computed.currency,
+      computed.net_balance,
+      accountsInView
+    );
+
+    currentComputed = computed;
+    currentNetWorth = netWorthData;
+
+    renderKpis(computed, viewLabel);
+    renderNetWorth(netWorthData);
+    renderExpensesTable($("#txnTbody"), filteredRecords, computed.currency);
+
+    const canvas = $("#categoriesChart");
+    drawBarChart(canvas, computed.categories);
+
+    renderLegend($("#chartLegend"), computed.categories);
+    renderBreakdown($("#categoryList"), computed.categories, computed.currency);
+  }
+
   async function init() {
     await loadUserCustomCategories();
     populateCategorySelect();
@@ -967,37 +1104,17 @@ import { api } from "./api.js";
         JSON.parse(localStorage.getItem("userSettings")) || {};
 
       const dashboardView = savedSettings.dashboardView || "Monthly";
+      const accounts = loadLinkedAccounts();
 
-      const viewLabel =
-        dashboardView === "Weekly"
-          ? "This Week"
-          : dashboardView === "Monthly"
-          ? "This Month"
-          : dashboardView === "Yearly"
-          ? "This Year"
-          : dashboardView === "All"
-          ? "All Time"
-          : "This Month";
-
-      const filteredRecords = filterRecordsByView(records, dashboardView);
-
-      const computed = computeOverview(filteredRecords);
-      const netWorthData = getNetWorthData(records, computed.currency);
-
-      renderKpis(computed, viewLabel);
-      renderNetWorth(netWorthData);
-      renderExpensesTable($("#txnTbody"), filteredRecords, computed.currency);
-
-      const canvas = $("#categoriesChart");
-      drawBarChart(canvas, computed.categories);
-
-      renderLegend($("#chartLegend"), computed.categories);
-      renderBreakdown($("#categoryList"), computed.categories, computed.currency);
+      setupBankFilter(accounts, () => renderDashboard(records, dashboardView, accounts));
+      renderDashboard(records, dashboardView, accounts);
 
       const redraw = debounce(() => {
-        drawBarChart(canvas, computed.categories);
-        if (netWorthData.trend?.length) {
-          drawNetWorthChart($("#netWorthChart"), netWorthData.trend, netWorthData.currency);
+        if (!currentComputed) return;
+        const canvas = $("#categoriesChart");
+        drawBarChart(canvas, currentComputed.categories);
+        if (currentNetWorth?.trend?.length) {
+          drawNetWorthChart($("#netWorthChart"), currentNetWorth.trend, currentNetWorth.currency);
         }
       }, 150);
 
