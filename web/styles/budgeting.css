@@ -211,6 +211,18 @@
   text-align: right;
 }
 
+/* Remove number input spinners */
+.budget-input::-webkit-outer-spin-button,
+.budget-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.budget-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
 .progress {
   height: 8px;
   background: var(--grey-1);
