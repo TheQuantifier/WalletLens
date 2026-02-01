@@ -41,10 +41,14 @@ export async function replaceCategory(x, y) {
         UPDATE users
         SET custom_expense_categories =
           ARRAY(
-            SELECT CASE WHEN c = $1 THEN $2 ELSE c END
+            SELECT CASE WHEN trim(lower(c)) = trim(lower($1)) THEN $2 ELSE c END
             FROM unnest(custom_expense_categories) AS c
           )
-        WHERE $1 = ANY(custom_expense_categories)
+        WHERE EXISTS (
+          SELECT 1
+          FROM unnest(custom_expense_categories) AS c
+          WHERE trim(lower(c)) = trim(lower($1))
+        )
         `,
         [from, to]
       );
@@ -53,10 +57,14 @@ export async function replaceCategory(x, y) {
         UPDATE users
         SET custom_income_categories =
           ARRAY(
-            SELECT CASE WHEN c = $1 THEN $2 ELSE c END
+            SELECT CASE WHEN trim(lower(c)) = trim(lower($1)) THEN $2 ELSE c END
             FROM unnest(custom_income_categories) AS c
           )
-        WHERE $1 = ANY(custom_income_categories)
+        WHERE EXISTS (
+          SELECT 1
+          FROM unnest(custom_income_categories) AS c
+          WHERE trim(lower(c)) = trim(lower($1))
+        )
         `,
         [from, to]
       );
@@ -65,7 +73,7 @@ export async function replaceCategory(x, y) {
 
     const updateRecords = async (from, to) => {
       const res = await query(
-        `UPDATE records SET category = $2 WHERE category = $1`,
+        `UPDATE records SET category = $2 WHERE trim(lower(category)) = trim(lower($1))`,
         [from, to]
       );
       total += res.rowCount || 0;
@@ -83,7 +91,9 @@ export async function replaceCategory(x, y) {
       }
     } else if (xIsArr && yIsStr) {
       const res = await query(
-        `UPDATE records SET category = $2 WHERE category = ANY($1::text[])`,
+        `UPDATE records SET category = $2 WHERE trim(lower(category)) = ANY(
+          SELECT trim(lower(x)) FROM unnest($1::text[]) AS x
+        )`,
         [x, y]
       );
       total += res.rowCount || 0;
@@ -136,7 +146,8 @@ async function run() {
   }
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) {
+const isDirectRun = process.argv[1] && process.argv[1].includes("replaceCategories.js");
+if (isDirectRun) {
   run().catch((err) => {
     console.error("Error:", err.message || err);
     process.exit(1);
