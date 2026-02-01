@@ -25,6 +25,7 @@ import { api } from "./api.js";
     { name: "Dining", budget: null },
     { name: "Health", budget: null },
     { name: "Entertainment", budget: null },
+    { name: "Shopping", budget: null },
     { name: "Subscriptions", budget: null },
     { name: "Travel", budget: null },
     { name: "Education", budget: null },

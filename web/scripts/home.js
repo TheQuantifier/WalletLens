@@ -12,6 +12,7 @@ import { api } from "./api.js";
     "Dining",
     "Health",
     "Entertainment",
+    "Shopping",
     "Subscriptions",
     "Travel",
     "Education",

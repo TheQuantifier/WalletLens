@@ -78,6 +78,7 @@ document.addEventListener("DOMContentLoaded", () => {
     { name: "Dining" },
     { name: "Health" },
     { name: "Entertainment" },
+    { name: "Shopping" },
     { name: "Subscriptions" },
     { name: "Travel" },
     { name: "Education" },
