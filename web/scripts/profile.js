@@ -220,6 +220,7 @@ if (themeToggleBtn) {
 const showForm = () => {
   if (form) form.hidden = false;
   if (editBtn) editBtn.disabled = true;
+  if (input.role) input.role.setAttribute("readonly", "readonly");
 };
 
 const hideForm = () => {
@@ -325,7 +326,16 @@ async function loadUserProfile() {
     setText(identityEls.income, "—");
 
     Object.keys(input).forEach((k) => {
-      if (input[k]) input[k].value = user[k] || "";
+      if (!input[k]) return;
+      if (k === "fullName") {
+        input[k].value = user?.fullName || user?.full_name || user?.name || "";
+        return;
+      }
+      if (k === "phoneNumber") {
+        input[k].value = user?.phoneNumber || user?.phone_number || "";
+        return;
+      }
+      input[k].value = user?.[k] || "";
     });
 
     currentAvatarUrl = avatarUrl || "";
@@ -350,6 +360,7 @@ async function saveProfile(e) {
   showStatus("Saving…");
   const updates = {};
   for (const key in input) {
+    if (key === "role") continue;
     if(input[key]) updates[key] = input[key].value.trim();
   }
 
