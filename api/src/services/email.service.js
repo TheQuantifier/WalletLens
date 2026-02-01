@@ -41,12 +41,20 @@ export async function sendEmail({ to, subject, text }) {
   const transport = getTransporter();
   const from = process.env.EMAIL_FROM || "no-reply@wisewallet.local";
 
-  const info = await transport.sendMail({
-    from,
-    to,
-    subject,
-    text,
-  });
+  let info;
+  try {
+    info = await transport.sendMail({
+      from,
+      to,
+      subject,
+      text,
+    });
+  } catch (err) {
+    console.error("EMAIL SEND ERROR:", err);
+    const error = new Error("Email delivery failed. Check SMTP settings.");
+    error.status = 502;
+    throw error;
+  }
 
   if (!hasSmtpConfig && info?.message) {
     console.log("EMAIL (dev):\n" + info.message.toString());
