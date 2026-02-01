@@ -6,19 +6,19 @@ import { api } from "./api.js";
   const CURRENCY_FALLBACK = "USD";
 
   const DEFAULT_CATEGORIES = [
-    { name: "Housing", budget: 1500 },
-    { name: "Utilities", budget: 220 },
-    { name: "Groceries", budget: 450 },
-    { name: "Transportation", budget: 180 },
-    { name: "Dining", budget: 200 },
-    { name: "Health", budget: 160 },
-    { name: "Entertainment", budget: 140 },
-    { name: "Subscriptions", budget: 65 },
-    { name: "Travel", budget: 120 },
-    { name: "Education", budget: 90 },
-    { name: "Giving", budget: 75 },
-    { name: "Savings", budget: 300 },
-    { name: "Other", budget: 100 },
+    { name: "Housing", budget: null },
+    { name: "Utilities", budget: null },
+    { name: "Groceries", budget: null },
+    { name: "Transportation", budget: null },
+    { name: "Dining", budget: null },
+    { name: "Health", budget: null },
+    { name: "Entertainment", budget: null },
+    { name: "Subscriptions", budget: null },
+    { name: "Travel", budget: null },
+    { name: "Education", budget: null },
+    { name: "Giving", budget: null },
+    { name: "Savings", budget: null },
+    { name: "Other", budget: null },
   ];
 
   const $ = (sel, root = document) => root.querySelector(sel);
@@ -61,7 +61,12 @@ import { api } from "./api.js";
 
       return normalized.map((c) => {
         const stored = byName.get(normalizeName(c.name));
-        return stored ? { ...c, budget: Number(stored.budget) || 0 } : c;
+        if (!stored) return c;
+        if (stored.budget === null || stored.budget === undefined || stored.budget === "") {
+          return { ...c, budget: null };
+        }
+        const value = Number(stored.budget);
+        return { ...c, budget: Number.isFinite(value) ? value : null };
       });
     } catch {
       return DEFAULT_CATEGORIES.map((c) => ({ ...c }));
@@ -112,9 +117,10 @@ import { api } from "./api.js";
   function computeTotals(categories, spentMap) {
     const totals = categories.reduce(
       (acc, c) => {
+        const budget = Number.isFinite(c.budget) ? c.budget : 0;
         const spent = spentMap.get(normalizeName(c.name)) || 0;
-        const remaining = c.budget - spent;
-        acc.totalBudget += c.budget;
+        const remaining = budget - spent;
+        acc.totalBudget += budget;
         acc.totalSpent += spent;
         acc.totalRemaining += remaining;
         if (normalizeName(c.name) !== "savings" && remaining > 0) acc.unused += remaining;
@@ -153,8 +159,9 @@ import { api } from "./api.js";
 
     categories.forEach((c, idx) => {
       const spent = spentMap.get(normalizeName(c.name)) || 0;
-      const remaining = c.budget - spent;
-      const progress = c.budget > 0 ? Math.min(spent / c.budget, 1) : 0;
+      const budget = Number.isFinite(c.budget) ? c.budget : 0;
+      const remaining = budget - spent;
+      const progress = budget > 0 ? Math.min(spent / budget, 1) : 0;
 
       const tr = document.createElement("tr");
 
@@ -167,7 +174,7 @@ import { api } from "./api.js";
       input.type = "number";
       input.min = "0";
       input.step = "1";
-      input.value = c.budget;
+      input.value = c.budget ?? "";
       input.className = "budget-input";
       input.dataset.index = String(idx);
       tdBudget.appendChild(input);
@@ -208,7 +215,8 @@ import { api } from "./api.js";
       if (isTarget) return { ...c };
 
       const spent = c.spent || 0;
-      const remaining = c.budget - spent;
+      const budget = Number.isFinite(c.budget) ? c.budget : 0;
+      const remaining = budget - spent;
       if (remaining > 0) {
         unused += remaining;
         return { ...c, budget: spent };
@@ -218,7 +226,10 @@ import { api } from "./api.js";
 
     const targetIndex = updated.findIndex((c) => normalizeName(c.name) === targetKey);
     if (targetIndex >= 0) {
-      updated[targetIndex].budget += unused;
+      const current = Number.isFinite(updated[targetIndex].budget)
+        ? updated[targetIndex].budget
+        : 0;
+      updated[targetIndex].budget = current + unused;
     }
 
     return { updated, moved: unused };
@@ -298,8 +309,12 @@ import { api } from "./api.js";
       if (!target.dataset.index) return;
 
       const idx = Number(target.dataset.index);
-      const next = Number(target.value || 0);
-      state.categories[idx].budget = Math.max(0, Number.isFinite(next) ? next : 0);
+      if (target.value === "") {
+        state.categories[idx].budget = null;
+      } else {
+        const next = Number(target.value || 0);
+        state.categories[idx].budget = Math.max(0, Number.isFinite(next) ? next : 0);
+      }
       saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
 
       const updatedTotals = computeTotals(state.categories, state.spentMap);

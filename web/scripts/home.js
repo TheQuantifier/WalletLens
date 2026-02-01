@@ -173,13 +173,13 @@ import { api } from "./api.js";
     const dpr = window.devicePixelRatio || 1;
 
     canvas.width = parentWidth * dpr;
-    canvas.height = 220 * dpr;
+    canvas.height = 260 * dpr;
 
     const ctx = canvas.getContext("2d");
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
 
-    ctx.clearRect(0, 0, parentWidth, 220);
+    ctx.clearRect(0, 0, parentWidth, 260);
 
     if (!series?.length) return;
 
@@ -329,33 +329,7 @@ import { api } from "./api.js";
   // ============================================================
   //  NET WORTH DATA + RENDER
   // ============================================================
-  function buildDemoNetWorth(currency) {
-    return {
-      currency,
-      asOf: new Date().toISOString(),
-      assets: [
-        { name: "Checking", amount: 4200 },
-        { name: "Savings", amount: 7800 },
-        { name: "Investments", amount: 15300 },
-        { name: "Property", amount: 62000 },
-      ],
-      liabilities: [
-        { name: "Credit Card", amount: 1800 },
-        { name: "Auto Loan", amount: 6200 },
-        { name: "Student Loan", amount: 12400 },
-      ],
-      trend: [
-        { label: "Aug", value: 68000 },
-        { label: "Sep", value: 69200 },
-        { label: "Oct", value: 70100 },
-        { label: "Nov", value: 71450 },
-        { label: "Dec", value: 70980 },
-        { label: "Jan", value: 72620 },
-      ],
-    };
-  }
-
-  function buildMonthlyNet(records, monthsBack = 6) {
+  function buildMonthlyNet(records, monthsBack = 12) {
     const now = new Date();
     const months = [];
     for (let i = monthsBack - 1; i >= 0; i -= 1) {
@@ -392,14 +366,18 @@ import { api } from "./api.js";
       }
     }
 
-    const demo = buildDemoNetWorth(currency);
-    if (!records?.length) return demo;
+    if (!records?.length) {
+      return {
+        currency,
+        asOf: null,
+        assets: [],
+        liabilities: [],
+        trend: [],
+      };
+    }
 
-    const assetsTotal = demo.assets.reduce((s, a) => s + a.amount, 0);
-    const liabilitiesTotal = demo.liabilities.reduce((s, l) => s + l.amount, 0);
-    const base = assetsTotal - liabilitiesTotal;
-    const months = buildMonthlyNet(records, 6);
-
+    const base = 0;
+    const months = buildMonthlyNet(records, 12);
     let running = base;
     const trend = months.map((m) => {
       running += m.net;
@@ -407,9 +385,11 @@ import { api } from "./api.js";
     });
 
     return {
-      ...demo,
-      trend,
+      currency,
       asOf: new Date().toISOString(),
+      assets: [],
+      liabilities: [],
+      trend,
     };
   }
 
@@ -419,21 +399,29 @@ import { api } from "./api.js";
     const liabilitiesTotal = (data.liabilities || []).reduce((s, l) => s + l.amount, 0);
     const netWorth = assetsTotal - liabilitiesTotal;
 
-    setText("#netWorthTotal", fmtMoney(netWorth, data.currency));
-    setText("#assetsTotal", fmtMoney(assetsTotal, data.currency));
-    setText("#liabilitiesTotal", fmtMoney(liabilitiesTotal, data.currency));
+    if (!data.assets?.length && !data.liabilities?.length && !data.trend?.length) {
+      setText("#netWorthTotal", "—");
+      setText("#assetsTotal", "—");
+      setText("#liabilitiesTotal", "—");
+      setText("#netWorthDelta", "Connect accounts to see your net worth trend.");
+      setText("#netWorthUpdated", "No net worth data yet");
+    } else {
+      setText("#netWorthTotal", fmtMoney(netWorth, data.currency));
+      setText("#assetsTotal", fmtMoney(assetsTotal, data.currency));
+      setText("#liabilitiesTotal", fmtMoney(liabilitiesTotal, data.currency));
 
-    const deltaBase = data.trend?.length ? data.trend[0].value : netWorth;
-    const delta = netWorth - deltaBase;
-    const deltaLabel = delta >= 0 ? "up" : "down";
-    setText(
-      "#netWorthDelta",
-      `${delta >= 0 ? "+" : "-"}${fmtMoney(Math.abs(delta), data.currency)} ${deltaLabel} vs 6 months ago`
-    );
-    setText(
-      "#netWorthUpdated",
-      `Updated ${new Date(data.asOf).toLocaleDateString()}`
-    );
+      const deltaBase = data.trend?.length ? data.trend[0].value : netWorth;
+      const delta = netWorth - deltaBase;
+      const deltaLabel = delta >= 0 ? "up" : "down";
+      setText(
+        "#netWorthDelta",
+        `${delta >= 0 ? "+" : "-"}${fmtMoney(Math.abs(delta), data.currency)} ${deltaLabel} vs previous period`
+      );
+      setText(
+        "#netWorthUpdated",
+        data.asOf ? `Updated ${new Date(data.asOf).toLocaleDateString()}` : "No net worth data yet"
+      );
+    }
 
     const assetsList = $("#assetsList");
     const liabilitiesList = $("#liabilitiesList");
@@ -464,7 +452,9 @@ import { api } from "./api.js";
     renderList(assetsList, data.assets);
     renderList(liabilitiesList, data.liabilities);
 
-    drawNetWorthChart($("#netWorthChart"), data.trend, data.currency);
+    if (data.trend?.length) {
+      drawNetWorthChart($("#netWorthChart"), data.trend, data.currency);
+    }
   }
 
   function renderKpis(comp, viewLabel) {
@@ -697,7 +687,9 @@ import { api } from "./api.js";
 
       const redraw = debounce(() => {
         drawBarChart(canvas, computed.categories);
-        drawNetWorthChart($("#netWorthChart"), netWorthData.trend, netWorthData.currency);
+        if (netWorthData.trend?.length) {
+          drawNetWorthChart($("#netWorthChart"), netWorthData.trend, netWorthData.currency);
+        }
       }, 150);
 
       window.addEventListener("resize", redraw);

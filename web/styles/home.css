@@ -70,15 +70,14 @@
 
 .net-worth-grid {
   display: grid;
-  grid-template-columns: minmax(0, 2fr) minmax(0, 1.2fr);
+  grid-template-columns: minmax(0, 2.4fr) minmax(0, 1.6fr);
   gap: 1rem;
 }
 
 .net-worth-summary {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
-  gap: 1.5rem;
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 1rem;
   padding: 1.25rem;
 }
 
@@ -106,13 +105,18 @@
 
 .net-worth-breakdown {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
   gap: 1rem;
-  padding: 1.25rem !important;
+  padding: 1.5rem !important;
+  align-items: start;
 }
 
 .breakdown-col h3 {
   margin-bottom: 0.5rem;
+}
+
+.breakdown-col {
+  min-width: 0;
 }
 
 .networth-list {
@@ -124,7 +128,7 @@
 .networth-list li {
   display: flex;
   justify-content: space-between;
-  gap: 0.75rem;
+  gap: 1rem;
   padding: 0.4rem 0;
   border-bottom: 1px dashed var(--border);
 }

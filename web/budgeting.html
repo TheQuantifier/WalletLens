@@ -27,9 +27,13 @@
         <p class="subtle">Plan your monthly spend, track actuals, and move unused funds to savings or another category.</p>
       </div>
       <div class="budget-hero-meta">
-        <label class="subtle" for="budgetMonthSelect">Month</label>
-        <select id="budgetMonthSelect" class="month-select" aria-label="Select budget month"></select>
-        <span class="pill" id="budgetPeriod" aria-live="polite">—</span>
+        <div class="month-controls">
+          <div class="month-row">
+            <label class="subtle" for="budgetMonthSelect">Month</label>
+            <select id="budgetMonthSelect" class="month-select" aria-label="Select budget month"></select>
+          </div>
+          <span class="pill" id="budgetPeriod" aria-live="polite">—</span>
+        </div>
         <button class="btn" id="btnResetBudgets" type="button">Reset defaults</button>
       </div>
     </section>
