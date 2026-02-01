@@ -81,14 +81,6 @@
           </div>
         </div>
       </div>
-      <div class="action-card">
-        <h3>Budget sheet actions</h3>
-        <p class="subtle">Save the current budget or export it to CSV.</p>
-        <div class="action-row">
-          <button class="btn btn--primary" id="btnSaveBudget" type="button">Save budget</button>
-          <button class="btn" id="btnExportBudgetCsv" type="button">Export to CSV</button>
-        </div>
-      </div>
       <p id="budgetStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
     </section>
 
@@ -115,6 +107,10 @@
       </div>
       <div class="budget-table-actions">
         <button class="btn" id="btnAddBudgetCategory" type="button">Add category</button>
+        <div class="budget-table-actions-right">
+          <button class="btn" id="btnExportBudgetCsv" type="button">Export to CSV</button>
+          <button class="btn btn--primary" id="btnSaveBudget" type="button" disabled>Save budget</button>
+        </div>
       </div>
     </section>
   </main>

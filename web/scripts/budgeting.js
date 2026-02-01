@@ -628,6 +628,7 @@ import { api } from "./api.js";
       spentMap: new Map(),
       records,
       sheetId: null,
+      isDirty: false,
     };
 
     const getPeriodRecords = () =>
@@ -652,6 +653,7 @@ import { api } from "./api.js";
     };
 
     const saveBudgetSheet = async ({ forceCreate = false, silent = false } = {}) => {
+      const saveBtn = $("#btnSaveBudget");
       const payload = buildBudgetPayload(state.categories);
       try {
         if (state.sheetId && !forceCreate) {
@@ -671,6 +673,8 @@ import { api } from "./api.js";
           });
           state.sheetId = created?.id || null;
         }
+        state.isDirty = false;
+        if (saveBtn) saveBtn.disabled = true;
         if (!silent) showStatus("Budget saved.", "ok");
       } catch (err) {
         if (!silent) showStatus("Failed to save budget.", "error");
@@ -686,6 +690,9 @@ import { api } from "./api.js";
         });
         state.sheetId = sheet?.id || null;
         applySheetToState(sheet, state);
+        state.isDirty = false;
+        const saveBtn = $("#btnSaveBudget");
+        if (saveBtn) saveBtn.disabled = true;
         refreshView();
       } catch (err) {
         if (err?.message?.includes("not found")) {
@@ -713,6 +720,9 @@ import { api } from "./api.js";
       }
 
       state.categories = loadCategories(state.cadence, selected.key);
+      state.isDirty = false;
+      const saveBtn = $("#btnSaveBudget");
+      if (saveBtn) saveBtn.disabled = true;
       refreshView();
       await loadBudgetSheet({ autoCreate });
     };
@@ -751,6 +761,9 @@ import { api } from "./api.js";
         state.cadence,
         state.periodKey
       );
+      state.isDirty = true;
+      const saveBtn = $("#btnSaveBudget");
+      if (saveBtn) saveBtn.disabled = false;
 
       const updatedTotals = computeTotals(state.categories, state.spentMap);
       renderSummary(updatedTotals, CURRENCY_FALLBACK);
@@ -765,6 +778,9 @@ import { api } from "./api.js";
         state.cadence,
         state.periodKey
       );
+      state.isDirty = true;
+      const saveBtn = $("#btnSaveBudget");
+      if (saveBtn) saveBtn.disabled = false;
 
       const refreshedMap = buildSpentMap(
         records.filter((r) => {
@@ -801,6 +817,9 @@ import { api } from "./api.js";
         state.cadence,
         state.periodKey
       );
+      state.isDirty = true;
+      const saveBtn = $("#btnSaveBudget");
+      if (saveBtn) saveBtn.disabled = false;
 
       const monthRecords = records.filter((r) => {
         if (!r.date) return false;
@@ -839,6 +858,9 @@ import { api } from "./api.js";
         state.cadence,
         state.periodKey
       );
+      state.isDirty = true;
+      const saveBtn = $("#btnSaveBudget");
+      if (saveBtn) saveBtn.disabled = false;
 
       const monthRecords = records.filter((r) => {
         if (!r.date) return false;
@@ -947,17 +969,20 @@ import { api } from "./api.js";
       const names = getBudgetCategoryNames();
       const exists = state.categories.some((c) => normalizeName(c.name) === key);
       if (!exists && names.includes(name)) {
-        state.categories = [
-          ...state.categories,
-          { name, budget: null, spent: 0 },
-        ];
-      }
+      state.categories = [
+        ...state.categories,
+        { name, budget: null, spent: 0 },
+      ];
+    }
 
-      saveCategories(
-        state.categories.map(({ name: n, budget }) => ({ name: n, budget })),
-        state.cadence,
-        state.periodKey
-      );
+    saveCategories(
+      state.categories.map(({ name: n, budget }) => ({ name: n, budget })),
+      state.cadence,
+      state.periodKey
+    );
+    state.isDirty = true;
+    const saveBtn = $("#btnSaveBudget");
+    if (saveBtn) saveBtn.disabled = false;
       state.spentMap = buildSpentMap(
         records.filter((r) => {
           if (!r.date) return false;
