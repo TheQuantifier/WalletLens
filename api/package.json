@@ -8,7 +8,8 @@
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
     "seed": "node src/db/seed.js",
-    "cleanup:sessions": "node src/jobs/cleanupSessions.js"
+    "cleanup:sessions": "node src/jobs/cleanupSessions.js",
+    "replace:categories": "node scripts/replaceCategories.js"
   },
   "engines": {
     "node": ">=20.0.0"
