@@ -97,70 +97,29 @@
         </div>
       </div>
 
-      <!-- SECURITY + STATS -->
+      <!-- IDENTITY + STATS -->
       <section class="card security">
-        <h2>Security & Stats</h2>
+        <h2>Identity & Stats</h2>
 
         <div class="security-rows">
-
           <div class="security-row">
-            <div class="sr-left">
-              <p class="label">Two-Factor Authentication</p>
-              <p class="subtle">Protect your account with a second step.</p>
-            </div>
-            <div class="sr-right align-right">
-              <span id="stat_2FA">—</span>
-              <button class="btn btn--primary" id="toggle2FA" type="button">Configure</button>
-            </div>
+            <div class="sr-left"><p class="label">Legal Name</p></div>
+            <div class="sr-right align-right" id="identityName">—</div>
           </div>
 
           <div class="security-row">
-            <div class="sr-left">
-              <p class="label">Password</p>
-              <p class="subtle">Use a strong unique password.</p>
-            </div>
-            <div class="sr-right align-right">
-              <button class="btn btn--primary" id="changePasswordBtn" type="button">Change</button>
-            </div>
-          </div>
-
-          <!-- CHANGE PASSWORD MODAL -->
-          <div id="passwordModal" class="modal hidden">
-            <div class="modal-content card">
-              <h2>Change Password</h2>
-
-              <form id="passwordForm" class="form-grid">
-                <label class="span-2">
-                  <span class="label">Current Password</span>
-                  <input id="currentPassword" type="password" autocomplete="current-password" required />
-                </label>
-
-                <label class="span-2">
-                  <span class="label">New Password</span>
-                  <input id="newPassword" type="password" autocomplete="new-password" required minlength="8" />
-                </label>
-
-                <label class="span-2">
-                  <span class="label">Confirm New Password</span>
-                  <input id="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
-                </label>
-
-                <div class="form-actions span-2">
-                  <button type="button" class="btn" id="closePasswordModal">Cancel</button>
-                  <button type="submit" class="btn btn--primary">Update Password</button>
-                </div>
-              </form>
-            </div>
+            <div class="sr-left"><p class="label">Address</p></div>
+            <div class="sr-right align-right" id="identityAddress">—</div>
           </div>
 
           <div class="security-row">
-            <div class="sr-left">
-              <p class="label">Sessions</p>
-              <p class="subtle">Manage signed-in devices.</p>
-            </div>
-            <div class="sr-right align-right">
-              <button class="btn btn--primary" id="signOutAllBtn" type="button">Sign Out All</button>
-            </div>
+            <div class="sr-left"><p class="label">Employer</p></div>
+            <div class="sr-right align-right" id="identityEmployer">—</div>
+          </div>
+
+          <div class="security-row">
+            <div class="sr-left"><p class="label">Income Range</p></div>
+            <div class="sr-right align-right" id="identityIncome">—</div>
           </div>
 
           <div class="security-row">
@@ -173,6 +132,73 @@
             <div class="sr-right align-right" id="stat_uploads">—</div>
           </div>
 
+        </div>
+      </section>
+
+      <!-- LINKED ACCOUNTS -->
+      <section class="card linked-accounts">
+        <div class="section-head">
+          <div>
+            <h2>Linked Accounts</h2>
+            <p class="subtle">Connect your bank to sync balances and transactions.</p>
+          </div>
+          <button class="btn btn--primary" id="linkAccountBtn" type="button">Link Account</button>
+        </div>
+
+        <div id="linkedAccountsList" class="linked-list">
+          <div class="linked-item">
+            <div>
+              <p class="label">No accounts linked yet</p>
+              <p class="subtle">Connect a bank or card to sync balances.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LINK ACCOUNT MODAL -->
+      <div id="linkAccountModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="linkAccountTitle">
+        <div class="modal-backdrop" data-close="link-account"></div>
+        <div class="modal-content card">
+          <div class="modal-header">
+            <h2 id="linkAccountTitle">Link a Bank Account</h2>
+            <button class="btn btn--link" id="closeLinkAccountModal" type="button">Close</button>
+          </div>
+          <p class="subtle">Choose a bank to start linking. (Backend connection coming soon.)</p>
+
+          <div class="bank-grid" id="bankGrid" role="listbox" aria-label="Bank options"></div>
+
+          <div class="modal-actions">
+            <button class="btn" id="cancelLinkAccount" type="button">Cancel</button>
+            <button class="btn btn--primary" id="confirmLinkAccount" type="button">Link Selected</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACHIEVEMENTS -->
+      <section class="card achievements">
+        <h2>Achievements</h2>
+        <div class="achievement-grid" id="achievementGrid">
+          <div class="achievement-card">
+            <span class="badge">🎯</span>
+            <div>
+              <p class="label">First Goal Created</p>
+              <p class="subtle">Set up your first savings goal.</p>
+            </div>
+          </div>
+          <div class="achievement-card">
+            <span class="badge">💸</span>
+            <div>
+              <p class="label">Saver Streak</p>
+              <p class="subtle">Save 3 months in a row.</p>
+            </div>
+          </div>
+          <div class="achievement-card">
+            <span class="badge">📈</span>
+            <div>
+              <p class="label">Budget Balanced</p>
+              <p class="subtle">Stay under budget for a full month.</p>
+            </div>
+          </div>
         </div>
       </section>
 

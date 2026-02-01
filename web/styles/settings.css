@@ -203,6 +203,21 @@
   min-width: 160px;
 }
 
+#passwordModal {
+  --modal-max-width: 520px;
+}
+
+#passwordModal .modal-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+#passwordModal .modal-actions .btn {
+  width: auto;
+  min-width: 160px;
+}
+
 @media (max-width: 520px) {
   #deleteAccountModal .modal-actions .btn {
     width: 100%;
@@ -210,6 +225,11 @@
   }
 
   #signOutAllModal .modal-actions .btn {
+    width: 100%;
+    min-width: 0;
+  }
+
+  #passwordModal .modal-actions .btn {
     width: 100%;
     min-width: 0;
   }

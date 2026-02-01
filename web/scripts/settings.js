@@ -50,6 +50,15 @@ import { api } from "./api.js";
     confirmDisableTwoFaBtn: $("#confirmDisableTwoFaBtn"),
     cancelDisableTwoFaBtn: $("#cancelDisableTwoFaBtn"),
     disableTwoFaStatus: $("#disableTwoFaStatus"),
+
+    changePasswordBtn: $("#changePasswordBtn"),
+    passwordModal: $("#passwordModal"),
+    passwordForm: $("#passwordForm"),
+    closePasswordModal: $("#closePasswordModal"),
+    passwordStatus: $("#passwordStatus"),
+    currentPassword: $("#currentPassword"),
+    newPassword: $("#newPassword"),
+    confirmPassword: $("#confirmPassword"),
   };
 
   // ===============================
@@ -562,6 +571,59 @@ import { api } from "./api.js";
   };
 
   // ===============================
+  // CHANGE PASSWORD
+  // ===============================
+  const openPasswordModal = () => {
+    if (!els.passwordModal) return;
+    if (els.passwordStatus) {
+      els.passwordStatus.style.display = "none";
+      els.passwordStatus.textContent = "";
+      els.passwordStatus.classList.remove("is-ok", "is-error");
+    }
+    if (els.currentPassword) els.currentPassword.value = "";
+    if (els.newPassword) els.newPassword.value = "";
+    if (els.confirmPassword) els.confirmPassword.value = "";
+    showModal(els.passwordModal);
+    els.currentPassword?.focus?.();
+  };
+
+  const closePasswordModal = () => hideModal(els.passwordModal);
+
+  const submitPasswordChange = async (e) => {
+    e.preventDefault();
+    const currentPassword = (els.currentPassword?.value || "").trim();
+    const newPassword = (els.newPassword?.value || "").trim();
+    const confirmPassword = (els.confirmPassword?.value || "").trim();
+
+    if (!currentPassword || !newPassword || !confirmPassword) {
+      showStatus(els.passwordStatus, "Fill out all fields.", "error");
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      showStatus(els.passwordStatus, "New passwords do not match.", "error");
+      return;
+    }
+
+    if (els.passwordStatus) {
+      showStatus(els.passwordStatus, "Updating password…");
+    }
+
+    try {
+      await api.auth.changePassword(currentPassword, newPassword);
+      showStatus(els.passwordStatus, "Password updated.", "ok");
+      clearStatusSoon(els.passwordStatus, 1500);
+      window.setTimeout(() => closePasswordModal(), 700);
+    } catch (err) {
+      showStatus(
+        els.passwordStatus,
+        "Password update failed: " + (err?.message || "Unknown error"),
+        "error"
+      );
+    }
+  };
+
+  // ===============================
   // WIRE EVENTS
   // ===============================
   const wire = () => {
@@ -619,12 +681,24 @@ import { api } from "./api.js";
       if (e.target.classList.contains("modal")) closeDisableTwoFaModal();
     });
 
+    // Change password flow
+    els.changePasswordBtn?.addEventListener("click", openPasswordModal);
+    els.closePasswordModal?.addEventListener("click", closePasswordModal);
+    els.passwordForm?.addEventListener("submit", submitPasswordChange);
+
+    els.passwordModal?.addEventListener("click", (e) => {
+      if (e.target.classList.contains("modal")) closePasswordModal();
+    });
+
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && els.enableTwoFaModal && !els.enableTwoFaModal.classList.contains("hidden")) {
         closeEnableTwoFaModal();
       }
       if (e.key === "Escape" && els.disableTwoFaModal && !els.disableTwoFaModal.classList.contains("hidden")) {
         closeDisableTwoFaModal();
+      }
+      if (e.key === "Escape" && els.passwordModal && !els.passwordModal.classList.contains("hidden")) {
+        closePasswordModal();
       }
     });
   };

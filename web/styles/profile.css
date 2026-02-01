@@ -2,7 +2,9 @@
 .profile-card,
 .quick-stats,
 .security,
-.activity {
+.activity,
+.linked-accounts,
+.achievements {
   padding: 1.25rem;
   background-color: var(--card-bg);
   color: var(--text);
@@ -172,20 +174,115 @@ textarea { resize: vertical; }
   gap: 0.6rem;
 }
 
-/* ===== MODAL ===== */
-#passwordModal {
-  --modal-max-width: 420px;
-  --modal-padding: 1.5rem;
-}
-
-#passwordModal .modal-actions {
-  --modal-actions-gap: 0.6rem;
-  --modal-actions-margin: 0.25rem;
-}
-
-#passwordModal .modal-content form {
+/* ===== LINKED ACCOUNTS ===== */
+.linked-list {
   display: grid;
   gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.linked-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+}
+
+.linked-item .label {
+  font-weight: 700;
+}
+
+.linked-item .linked-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.linked-badge {
+  padding: 0.15rem 0.5rem;
+  border-radius: 999px;
+  background: rgba(0,87,184,0.12);
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.bank-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+  margin: 1rem 0;
+}
+
+.bank-option {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background:
+    linear-gradient(90deg, rgba(0,87,184,0.12), rgba(0,87,184,0.12)) left top / 6px 100% no-repeat,
+    var(--card-bg);
+  color: var(--text);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.12s ease;
+}
+
+.bank-option:hover {
+  transform: translateY(-1px);
+  border-color: var(--accent);
+  box-shadow: 0 8px 18px rgba(0,0,0,0.08);
+}
+
+.bank-option.is-selected {
+  border-color: var(--primary);
+  background:
+    linear-gradient(90deg, rgba(0,87,184,0.22), rgba(0,87,184,0.22)) left top / 6px 100% no-repeat,
+    var(--card-bg);
+  box-shadow: 0 0 0 3px rgba(0,87,184,0.15);
+}
+
+.bank-option .label {
+  font-weight: 700;
+}
+
+.bank-option .subtle {
+  margin: 0;
+  color: var(--muted);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+/* ===== ACHIEVEMENTS ===== */
+.achievement-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.achievement-card {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--card-bg);
+}
+
+.achievement-card .badge {
+  font-size: 1.4rem;
 }
 
 /* ===== AVATAR MODAL ===== */

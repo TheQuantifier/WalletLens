@@ -1,12 +1,5 @@
 import { api } from "./api.js";
 
-if (!api.auth.signOutAll) {
-  api.auth.signOutAll = async () => ({
-    status: false,
-    message: "Sign-out-from-all-devices is not implemented yet.",
-  });
-}
-
 /* ----------------------------------------
    DOM ELEMENTS
 ---------------------------------------- */
@@ -14,6 +7,20 @@ if (!api.auth.signOutAll) {
 const $ = (id) => document.getElementById(id);
 const setText = (el, text) => {
   if (el) el.innerText = text;
+};
+
+const formatShortDateTime = (value) => {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    weekday: "short",
+    year: "numeric",
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 };
 
 const getInitials = (name) => {
@@ -55,8 +62,121 @@ const input = {
 // SECURITY STATS
 const stats = {
   lastLogin: $("stat_lastLogin"),
-  twoFA: $("stat_2FA"),
   uploads: $("stat_uploads"),
+};
+
+// Linked accounts + identity placeholders
+const linkedAccountsList = $("linkedAccountsList");
+const identityEls = {
+  name: $("identityName"),
+  address: $("identityAddress"),
+  employer: $("identityEmployer"),
+  income: $("identityIncome"),
+};
+
+const linkAccountBtn = $("linkAccountBtn");
+const linkAccountModal = $("linkAccountModal");
+const closeLinkAccountModal = $("closeLinkAccountModal");
+const cancelLinkAccount = $("cancelLinkAccount");
+const confirmLinkAccount = $("confirmLinkAccount");
+const bankGrid = $("bankGrid");
+
+const LINKED_ACCOUNTS_KEY = "linked_accounts";
+const BANK_OPTIONS = [
+  { id: "chase", name: "Chase", desc: "Checking, Savings, Credit Card" },
+  { id: "bofa", name: "Bank of America", desc: "Checking, Savings, Credit Card" },
+  { id: "wells", name: "Wells Fargo", desc: "Checking, Savings, Mortgage" },
+  { id: "citi", name: "Citi", desc: "Checking, Savings, Credit Card" },
+  { id: "capital-one", name: "Capital One", desc: "Checking, Savings, Card" },
+  { id: "us-bank", name: "U.S. Bank", desc: "Checking, Savings, Credit Card" },
+  { id: "pnc", name: "PNC", desc: "Checking, Savings, Auto Loan" },
+  { id: "td", name: "TD Bank", desc: "Checking, Savings, Credit Card" },
+  { id: "discover", name: "Discover", desc: "Credit Card, Savings" },
+];
+
+let selectedBankId = "";
+
+const loadLinkedAccounts = () => {
+  const raw = localStorage.getItem(LINKED_ACCOUNTS_KEY);
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+const saveLinkedAccounts = (accounts) => {
+  localStorage.setItem(LINKED_ACCOUNTS_KEY, JSON.stringify(accounts));
+};
+
+const renderLinkedAccounts = () => {
+  if (!linkedAccountsList) return;
+  const accounts = loadLinkedAccounts();
+  if (!accounts.length) {
+    linkedAccountsList.innerHTML = `
+      <div class="linked-item">
+        <div>
+          <p class="label">No accounts linked yet</p>
+          <p class="subtle">Connect a bank or card to sync balances.</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  linkedAccountsList.innerHTML = "";
+  accounts.forEach((acc) => {
+    const row = document.createElement("div");
+    row.className = "linked-item";
+    row.innerHTML = `
+      <div>
+        <p class="label">${acc.name}</p>
+        <p class="subtle">${acc.desc}</p>
+      </div>
+      <div class="linked-meta">
+        <span class="linked-badge">Pending</span>
+        <button class="btn btn--link" data-remove="${acc.id}" type="button">Remove</button>
+      </div>
+    `;
+    linkedAccountsList.appendChild(row);
+  });
+};
+
+const renderBankOptions = () => {
+  if (!bankGrid) return;
+  bankGrid.innerHTML = "";
+  BANK_OPTIONS.forEach((bank) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "bank-option";
+    btn.dataset.bankId = bank.id;
+    btn.innerHTML = `
+      <span class="label">${bank.name}</span>
+      <span class="subtle">${bank.desc}</span>
+    `;
+    btn.addEventListener("click", () => {
+      selectedBankId = bank.id;
+      const options = bankGrid.querySelectorAll(".bank-option");
+      options.forEach((opt) => {
+        opt.classList.toggle("is-selected", opt.dataset.bankId === selectedBankId);
+        opt.setAttribute("aria-selected", opt.dataset.bankId === selectedBankId ? "true" : "false");
+      });
+    });
+    bankGrid.appendChild(btn);
+  });
+};
+
+const openLinkAccountModal = () => {
+  if (!linkAccountModal) return;
+  selectedBankId = "";
+  renderBankOptions();
+  linkAccountModal.classList.remove("hidden");
+};
+
+const closeLinkModal = () => {
+  linkAccountModal?.classList.add("hidden");
 };
 
 // AVATAR ELEMENTS
@@ -160,6 +280,28 @@ const applyHeaderAvatar = (avatarUrl) => {
 async function loadUserProfile() {
   try {
     const { user } = await api.auth.me();
+    let lastLogin = "Not available";
+    let totalUploads = "Not available";
+    try {
+      const sessionData = await api.auth.sessions();
+      const sessions = sessionData?.sessions || [];
+      const latest = sessions
+        .map((s) => s.lastSeenAt)
+        .filter(Boolean)
+        .sort()
+        .slice(-1)[0];
+      if (latest) lastLogin = formatShortDateTime(latest);
+    } catch {
+      // fall back to default
+    }
+    try {
+      const stats = await api.records.stats();
+      if (Number.isFinite(stats?.totalRecords)) {
+        totalUploads = String(stats.totalRecords);
+      }
+    } catch {
+      // fall back to default
+    }
 
     const createdAt = user?.createdAt || user?.created_at;
     const avatarUrl = user?.avatarUrl || user?.avatar_url;
@@ -175,9 +317,12 @@ async function loadUserProfile() {
     setText(f.createdAt, createdAt ? new Date(createdAt).toLocaleDateString() : "—");
     setText(f.bio, user?.bio || "—");
 
-    setText(stats.lastLogin, "Not available");
-    setText(stats.twoFA, user?.two_fa_enabled ? "Enabled" : "Disabled");
-    setText(stats.uploads, "Not available");
+    setText(stats.lastLogin, lastLogin);
+    setText(stats.uploads, totalUploads);
+    setText(identityEls.name, displayName || "—");
+    setText(identityEls.address, "—");
+    setText(identityEls.employer, "—");
+    setText(identityEls.income, "—");
 
     Object.keys(input).forEach((k) => {
       if (input[k]) input[k].value = user[k] || "";
@@ -187,6 +332,10 @@ async function loadUserProfile() {
     pendingAvatarUrl = currentAvatarUrl;
     applyAvatarPreview(currentAvatarUrl, displayName);
     applyHeaderAvatar(currentAvatarUrl);
+
+    if (linkedAccountsList) {
+      renderLinkedAccounts();
+    }
   } catch (err) {
     showStatus("Please log in to view your profile.", "error");
     window.location.href = "login.html";
@@ -325,81 +474,14 @@ copyLinkBtn?.addEventListener("click", async () => {
   }
 });
 
-/* ----------------------------------------
-   CHANGE PASSWORD
----------------------------------------- */
-const passwordModal = $("passwordModal");
-const passwordForm = $("passwordForm");
-const closePasswordModal = $("closePasswordModal");
-const changePasswordBtn = $("changePasswordBtn");
-
-changePasswordBtn?.addEventListener("click", () => {
-  passwordModal?.classList.remove("hidden");
-});
-
-closePasswordModal?.addEventListener("click", () => {
-  passwordModal?.classList.add("hidden");
-});
-
-passwordModal?.addEventListener("click", (e) => {
-  if (e.target === passwordModal) passwordModal.classList.add("hidden");
-});
-
-// Close password modal on ESC
+// Close avatar modal on ESC
 document.addEventListener("keydown", (e) => {
   if (e.key !== "Escape") return;
-  if (passwordModal && !passwordModal.classList.contains("hidden")) {
-    passwordModal.classList.add("hidden");
-  }
   if (avatarModal && !avatarModal.classList.contains("hidden")) {
     avatarModal.classList.add("hidden");
   }
-});
-
-passwordForm?.addEventListener("submit", async (e) => {
-  e.preventDefault();
-
-  const currentPassword = $("currentPassword")?.value?.trim() || "";
-  const newPassword = $("newPassword")?.value?.trim() || "";
-  const confirmPassword = $("confirmPassword")?.value?.trim() || "";
-
-  if (newPassword !== confirmPassword) {
-    showStatus("New passwords do not match.", "error");
-    clearStatusSoon(3000);
-    return;
-  }
-
-  try {
-    await api.auth.changePassword(currentPassword, newPassword);
-    showStatus("Password updated.");
-    clearStatusSoon(2500);
-    passwordModal?.classList.add("hidden");
-    passwordForm.reset();
-  } catch (err) {
-    showStatus("Password update failed: " + (err?.message || "Unknown error"), "error");
-    clearStatusSoon(3500);
-  }
-});
-
-/* ----------------------------------------
-   TWO-FACTOR AUTH
------------------------------------------ */
-$("toggle2FA")?.addEventListener("click", () => {
-  window.location.href = "settings.html";
-});
-
-/* ----------------------------------------
-   SIGN OUT ALL SESSIONS (STUB)
----------------------------------------- */
-$("signOutAllBtn")?.addEventListener("click", async () => {
-  if (!confirm("Sign out all devices?")) return;
-  try {
-    const result = await api.auth.signOutAll();
-    showStatus(result.message, "error");
-    clearStatusSoon(3500);
-  } catch (err) {
-    showStatus("Failed to sign out all sessions.", "error");
-    clearStatusSoon(3500);
+  if (linkAccountModal && !linkAccountModal.classList.contains("hidden")) {
+    linkAccountModal.classList.add("hidden");
   }
 });
 
@@ -416,4 +498,46 @@ cancelBtn?.addEventListener("click", () => {
     statusEl.textContent = "";
     statusEl.classList.remove("is-ok", "is-error");
   }
+});
+
+linkAccountBtn?.addEventListener("click", openLinkAccountModal);
+closeLinkAccountModal?.addEventListener("click", closeLinkModal);
+cancelLinkAccount?.addEventListener("click", closeLinkModal);
+linkAccountModal?.addEventListener("click", (e) => {
+  if (e.target === linkAccountModal || e.target?.dataset?.close === "link-account") {
+    closeLinkModal();
+  }
+});
+
+confirmLinkAccount?.addEventListener("click", () => {
+  if (!selectedBankId) {
+    showStatus("Select a bank to continue.", "error");
+    clearStatusSoon(2000);
+    return;
+  }
+
+  const bank = BANK_OPTIONS.find((b) => b.id === selectedBankId);
+  if (!bank) return;
+
+  const accounts = loadLinkedAccounts();
+  if (!accounts.find((a) => a.id === bank.id)) {
+    accounts.push({ ...bank });
+    saveLinkedAccounts(accounts);
+    renderLinkedAccounts();
+  }
+
+  closeLinkModal();
+  showStatus("Link request saved. Backend connection coming soon.");
+  clearStatusSoon(2500);
+});
+
+linkedAccountsList?.addEventListener("click", (e) => {
+  const target = e.target;
+  if (!(target instanceof HTMLElement)) return;
+  const removeId = target.getAttribute("data-remove");
+  if (!removeId) return;
+
+  const accounts = loadLinkedAccounts().filter((a) => a.id !== removeId);
+  saveLinkedAccounts(accounts);
+  renderLinkedAccounts();
 });

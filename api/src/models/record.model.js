@@ -137,3 +137,15 @@ export async function deleteRecord(userId, id) {
   );
   return rows[0] || null;
 }
+
+export async function countRecordsByUser(userId) {
+  const { rows } = await query(
+    `
+    SELECT COUNT(*)::int AS total
+    FROM records
+    WHERE user_id = $1
+    `,
+    [userId]
+  );
+  return rows[0]?.total ?? 0;
+}

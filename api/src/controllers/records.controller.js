@@ -7,6 +7,7 @@ import {
   getRecordById,
   updateRecord,
   deleteRecord,
+  countRecordsByUser,
 } from "../models/record.model.js";
 
 import { query } from "../config/db.js";
@@ -42,6 +43,14 @@ export const getOne = asyncHandler(async (req, res) => {
 export const getAll = asyncHandler(async (req, res) => {
   const records = await listRecords(req.user.id);
   res.json(records);
+});
+
+// ==========================================================
+// GET /api/records/stats
+// ==========================================================
+export const getStats = asyncHandler(async (req, res) => {
+  const totalRecords = await countRecordsByUser(req.user.id);
+  res.json({ totalRecords });
 });
 
 // ==========================================================

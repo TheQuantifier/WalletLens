@@ -171,6 +171,10 @@ export const records = {
     return request(`/records${query ? `?${query}` : ""}`);
   },
 
+  stats() {
+    return request("/records/stats");
+  },
+
   getOne(id) {
     return request(`/records/${id}`);
   },

@@ -141,6 +141,13 @@
         </div>
 
         <div class="settings-row">
+          <label>Password</label>
+          <div class="settings-actions-inline">
+            <button class="settings-btn btn--primary" id="changePasswordBtn" type="button">Change Password</button>
+          </div>
+        </div>
+
+        <div class="settings-row">
           <label>Delete Account</label>
           <button class="settings-btn btn--danger" id="deleteAccountBtn" type="button">Delete</button>
         </div>
@@ -200,6 +207,38 @@
       </div>
 
       <p id="signOutAllStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+    </div>
+  </div>
+
+  <!-- CHANGE PASSWORD MODAL -->
+  <div class="modal hidden" id="passwordModal" aria-hidden="true">
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
+      <h2 id="passwordModalTitle">Change Password</h2>
+      <p class="subtle">Use a strong unique password for better security.</p>
+
+      <form id="passwordForm" class="form-grid">
+        <label class="span-2">
+          <span class="label">Current Password</span>
+          <input id="currentPassword" type="password" autocomplete="current-password" required />
+        </label>
+
+        <label class="span-2">
+          <span class="label">New Password</span>
+          <input id="newPassword" type="password" autocomplete="new-password" required minlength="8" />
+        </label>
+
+        <label class="span-2">
+          <span class="label">Confirm New Password</span>
+          <input id="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
+        </label>
+
+        <div class="modal-actions span-2">
+          <button type="button" class="btn" id="closePasswordModal">Cancel</button>
+          <button type="submit" class="btn btn--primary">Update Password</button>
+        </div>
+      </form>
+
+      <p id="passwordStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
     </div>
   </div>
 
