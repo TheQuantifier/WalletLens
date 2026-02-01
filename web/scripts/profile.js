@@ -56,7 +56,14 @@ const stats = {
 const changeAvatarBtn = $("changeAvatarBtn");
 const avatarInput = $("avatarInput");
 const avatarBlock = document.querySelector(".avatar-block .avatar");
-let avatarFile = null;
+const avatarModal = $("avatarModal");
+const avatarChoicesEl = $("avatarChoices");
+const saveAvatarBtn = $("saveAvatarBtn");
+const cancelAvatarBtn = $("cancelAvatarBtn");
+const closeAvatarModalBtn = $("closeAvatarModal");
+let currentAvatarUrl = "";
+let pendingAvatarUrl = "";
+let avatarChoicesRendered = false;
 
 /* ----------------------------------------
    DARK MODE SUPPORT
@@ -112,6 +119,28 @@ const clearStatusSoon = (ms = 2000) => {
 };
 
 /* ----------------------------------------
+   AVATAR PRESETS
+---------------------------------------- */
+const AVATAR_OPTIONS = Array.from({ length: 15 }, (_, index) => {
+  const num = String(index + 1).padStart(2, "0");
+  return {
+    id: `avatar-${num}`,
+    label: `Avatar ${num}`,
+    url: `images/avatars/avatar-${num}.png`,
+  };
+});
+
+const applyAvatarPreview = (avatarUrl) => {
+  if (!avatarBlock) return;
+  avatarBlock.style.backgroundImage = avatarUrl ? `url(${avatarUrl})` : "";
+  avatarBlock.textContent = "";
+};
+
+const applyHeaderAvatar = (avatarUrl) => {
+  window.dispatchEvent(new CustomEvent("avatar:updated", { detail: { avatarUrl } }));
+};
+
+/* ----------------------------------------
    LOAD USER PROFILE
 ---------------------------------------- */
 async function loadUserProfile() {
@@ -138,14 +167,10 @@ async function loadUserProfile() {
       if (input[k]) input[k].value = user[k] || "";
     });
 
-    // Load avatar if exists
-    if (avatarUrl && avatarBlock) {
-      avatarBlock.style.backgroundImage = `url(${avatarUrl})`;
-      avatarBlock.textContent = "";
-    } else if (avatarBlock) {
-      avatarBlock.style.backgroundImage = "";
-      avatarBlock.textContent = "";
-    }
+    currentAvatarUrl = avatarUrl || "";
+    pendingAvatarUrl = currentAvatarUrl;
+    applyAvatarPreview(currentAvatarUrl);
+    applyHeaderAvatar(currentAvatarUrl);
   } catch (err) {
     showStatus("Please log in to view your profile.", "error");
     window.location.href = "login.html";
@@ -165,11 +190,6 @@ async function saveProfile(e) {
 
   try {
     await api.auth.updateProfile(updates);
- 
-    if (avatarFile) {
-      await api.auth.uploadAvatar(avatarFile);
-      avatarFile = null;
-    }
 
     hideForm();
     await loadUserProfile();
@@ -183,38 +203,80 @@ async function saveProfile(e) {
 /* ----------------------------------------
    CHANGE AVATAR
 ---------------------------------------- */
-changeAvatarBtn?.addEventListener("click", () => {
-  avatarInput?.click();
+const renderAvatarChoices = () => {
+  if (!avatarChoicesEl || avatarChoicesRendered) return;
+  avatarChoicesEl.innerHTML = "";
+  AVATAR_OPTIONS.forEach((choice) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "avatar-choice";
+    btn.setAttribute("role", "option");
+    btn.setAttribute("aria-label", choice.label);
+    btn.dataset.avatarUrl = choice.url;
+    btn.style.backgroundImage = `url(${choice.url})`;
+    btn.addEventListener("click", () => {
+      pendingAvatarUrl = choice.url;
+      updateAvatarSelection();
+    });
+    avatarChoicesEl.appendChild(btn);
+  });
+  avatarChoicesRendered = true;
+};
+
+const updateAvatarSelection = () => {
+  if (!avatarChoicesEl) return;
+  const buttons = avatarChoicesEl.querySelectorAll(".avatar-choice");
+  buttons.forEach((btn) => {
+    const isSelected = btn.dataset.avatarUrl === pendingAvatarUrl;
+    btn.classList.toggle("is-selected", isSelected);
+    btn.setAttribute("aria-selected", isSelected ? "true" : "false");
+  });
+};
+
+const openAvatarModal = () => {
+  renderAvatarChoices();
+  pendingAvatarUrl = currentAvatarUrl;
+  updateAvatarSelection();
+  avatarModal?.classList.remove("hidden");
+};
+
+const closeAvatarModal = () => {
+  avatarModal?.classList.add("hidden");
+};
+
+changeAvatarBtn?.addEventListener("click", openAvatarModal);
+closeAvatarModalBtn?.addEventListener("click", closeAvatarModal);
+cancelAvatarBtn?.addEventListener("click", closeAvatarModal);
+avatarModal?.addEventListener("click", (e) => {
+  if (e.target === avatarModal || e.target?.dataset?.close === "avatar") {
+    closeAvatarModal();
+  }
 });
 
-avatarInput?.addEventListener("change", (e) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
-
-  // basic guardrails
-  if (!file.type.startsWith("image/")) {
-    showStatus("Please choose an image file.", "error");
+saveAvatarBtn?.addEventListener("click", async () => {
+  if (!pendingAvatarUrl) {
+    showStatus("Please select an avatar.", "error");
     clearStatusSoon(2500);
     return;
   }
-  if (file.size > 5 * 1024 * 1024) {
-    showStatus("Image is too large (max 5MB).", "error");
-    clearStatusSoon(2500);
+  if (pendingAvatarUrl === currentAvatarUrl) {
+    closeAvatarModal();
     return;
   }
 
-  const reader = new FileReader();
-  reader.onload = (event) => {
-    if(avatarBlock) {
-      avatarBlock.style.backgroundImage = `url(${event.target.result})`;
-      avatarBlock.textContent = "";
-    }
-  };
-  reader.readAsDataURL(file);
-
-  avatarFile = file;
-  showStatus("Avatar selected. Click Save Changes to upload.");
-  clearStatusSoon(3500);
+  try {
+    showStatus("Updating avatar...");
+    await api.auth.updateProfile({ avatarUrl: pendingAvatarUrl });
+    currentAvatarUrl = pendingAvatarUrl;
+    applyAvatarPreview(currentAvatarUrl);
+    applyHeaderAvatar(currentAvatarUrl);
+    closeAvatarModal();
+    showStatus("Avatar updated.");
+    clearStatusSoon(2500);
+  } catch (err) {
+    showStatus("Avatar update failed: " + (err?.message || "Unknown error"), "error");
+    clearStatusSoon(3500);
+  }
 });
 
 /* ----------------------------------------
@@ -269,8 +331,12 @@ passwordModal?.addEventListener("click", (e) => {
 
 // Close password modal on ESC
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && passwordModal && !passwordModal.classList.contains("hidden")) {
+  if (e.key !== "Escape") return;
+  if (passwordModal && !passwordModal.classList.contains("hidden")) {
     passwordModal.classList.add("hidden");
+  }
+  if (avatarModal && !avatarModal.classList.contains("hidden")) {
+    avatarModal.classList.add("hidden");
   }
 });
 
