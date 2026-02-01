@@ -3,8 +3,19 @@ import { api } from "./api.js";
 
 (() => {
   const STORAGE_KEY = "budgeting_categories";
+  const CADENCE_STORAGE_KEY = "budgeting_cadence";
+  const PERIOD_STORAGE_PREFIX = "budgeting_period_";
   const CURRENCY_FALLBACK = "USD";
   let userCustomCategories = { expense: [] };
+
+  const CADENCE_OPTIONS = [
+    { id: "weekly", label: "Weekly", days: 7 },
+    { id: "biweekly", label: "Biweekly", days: 14 },
+    { id: "monthly", label: "Monthly", months: 1 },
+    { id: "3m", label: "3 Months", months: 3 },
+    { id: "6m", label: "6 Months", months: 6 },
+  ];
+  const CADENCE_LOOKUP = new Map(CADENCE_OPTIONS.map((c) => [c.id, c]));
 
   const BASE_CATEGORIES = [
     { name: "Housing", budget: null },
@@ -45,6 +56,138 @@ import { api } from "./api.js";
         return true;
       });
   };
+
+  const formatDateKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const formatMonthKey = (date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    return `${year}-${month}`;
+  };
+
+  const startOfWeek = (date) => {
+    const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const day = d.getDay();
+    const diff = (day + 6) % 7;
+    d.setDate(d.getDate() - diff);
+    d.setHours(0, 0, 0, 0);
+    return d;
+  };
+
+  const formatRangeLabel = (start, end) => {
+    const sameMonth =
+      start.getMonth() === end.getMonth() &&
+      start.getFullYear() === end.getFullYear();
+    const sameYear = start.getFullYear() === end.getFullYear();
+
+    if (sameMonth) {
+      const left = start.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+      const right = end.toLocaleDateString(undefined, {
+        day: "numeric",
+        year: "numeric",
+      });
+      return `${left}–${right}`;
+    }
+
+    if (sameYear) {
+      const left = start.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+      });
+      const right = end.toLocaleDateString(undefined, {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      });
+      return `${left}–${right}`;
+    }
+
+    const left = start.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    const right = end.toLocaleDateString(undefined, {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
+    return `${left}–${right}`;
+  };
+
+  const formatMonthSpanLabel = (start, end) => {
+    const sameYear = start.getFullYear() === end.getFullYear();
+    if (sameYear) {
+      const left = start.toLocaleDateString(undefined, { month: "short" });
+      const right = end.toLocaleDateString(undefined, {
+        month: "short",
+        year: "numeric",
+      });
+      return `${left}–${right}`;
+    }
+    const left = start.toLocaleDateString(undefined, {
+      month: "short",
+      year: "numeric",
+    });
+    const right = end.toLocaleDateString(undefined, {
+      month: "short",
+      year: "numeric",
+    });
+    return `${left}–${right}`;
+  };
+
+  const buildPeriodOptions = (cadenceId) => {
+    const cadence = CADENCE_LOOKUP.get(cadenceId) || CADENCE_LOOKUP.get("monthly");
+    const now = new Date();
+    const options = [];
+    const count = 12;
+
+    if (cadence.days) {
+      const baseStart = startOfWeek(now);
+      for (let i = 0; i < count; i += 1) {
+        const start = new Date(baseStart);
+        start.setDate(start.getDate() - i * cadence.days);
+        const end = new Date(start);
+        end.setDate(end.getDate() + cadence.days - 1);
+        end.setHours(23, 59, 59, 999);
+        options.push({
+          start,
+          end,
+          label: formatRangeLabel(start, end),
+          key: formatDateKey(start),
+        });
+      }
+      return options;
+    }
+
+    const span = cadence.months || 1;
+    for (let i = 0; i < count; i += 1) {
+      const start = new Date(now.getFullYear(), now.getMonth() - i * span, 1);
+      const end = new Date(start.getFullYear(), start.getMonth() + span, 0, 23, 59, 59, 999);
+      const label =
+        span === 1
+          ? start.toLocaleDateString(undefined, { month: "long", year: "numeric" })
+          : formatMonthSpanLabel(start, end);
+      options.push({
+        start,
+        end,
+        label,
+        key: formatMonthKey(start),
+      });
+    }
+    return options;
+  };
+
+  const getCadenceLabel = (cadenceId) =>
+    CADENCE_LOOKUP.get(cadenceId)?.label || "Monthly";
 
   const loadUserCustomCategories = async () => {
     try {
@@ -131,7 +274,11 @@ import { api } from "./api.js";
     state.categories = state.categories.filter(
       (c) => normalizeName(c.name) !== key
     );
-    saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
+    saveCategories(
+      state.categories.map(({ name, budget }) => ({ name, budget })),
+      state.cadence,
+      state.periodKey
+    );
 
     state.spentMap = buildSpentMap(state.records || [], state.categories);
     state.categories = state.categories.map((c) => ({
@@ -161,8 +308,16 @@ import { api } from "./api.js";
     el.classList.remove("is-error", "is-ok");
   };
 
-  function loadCategories(monthKey) {
-    const raw = localStorage.getItem(`${STORAGE_KEY}_${monthKey}`);
+  function loadCategories(cadence, periodKey) {
+    let raw = localStorage.getItem(`${STORAGE_KEY}_${cadence}_${periodKey}`);
+    if (!raw && cadence === "monthly") {
+      const legacyRaw = localStorage.getItem(`${STORAGE_KEY}_${periodKey}`);
+      if (legacyRaw) {
+        raw = legacyRaw;
+        localStorage.setItem(`${STORAGE_KEY}_${cadence}_${periodKey}`, legacyRaw);
+        localStorage.removeItem(`${STORAGE_KEY}_${periodKey}`);
+      }
+    }
     const names = getBudgetCategoryNames();
     const defaults = names.map((name) => ({ name, budget: null }));
 
@@ -188,30 +343,11 @@ import { api } from "./api.js";
     }
   }
 
-  function saveCategories(categories, monthKey) {
-    localStorage.setItem(`${STORAGE_KEY}_${monthKey}`, JSON.stringify(categories));
-  }
-
-  function getMonthRange(year, monthIndex) {
-    const start = new Date(year, monthIndex, 1);
-    const end = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
-    return {
-      start,
-      end,
-      label: start.toLocaleDateString(undefined, { month: "long", year: "numeric" }),
-      key: `${start.getFullYear()}-${String(start.getMonth() + 1).padStart(2, "0")}`,
-    };
-  }
-
-  function buildMonthOptions() {
-    const now = new Date();
-    const options = [];
-    for (let i = 0; i < 12; i += 1) {
-      const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
-      const range = getMonthRange(d.getFullYear(), d.getMonth());
-      options.push(range);
-    }
-    return options;
+  function saveCategories(categories, cadence, periodKey) {
+    localStorage.setItem(
+      `${STORAGE_KEY}_${cadence}_${periodKey}`,
+      JSON.stringify(categories)
+    );
   }
 
   function buildSpentMap(records, categories) {
@@ -374,48 +510,70 @@ import { api } from "./api.js";
       showStatus("Could not load records. Budgets shown without spending data.", "error");
     }
 
-    const monthSelect = $("#budgetMonthSelect");
-    const monthOptions = buildMonthOptions();
-    if (monthSelect) {
-      monthSelect.innerHTML = "";
-      monthOptions.forEach((opt) => {
-        const option = document.createElement("option");
-        option.value = opt.key;
-        option.textContent = opt.label;
-        monthSelect.appendChild(option);
-      });
-      monthSelect.value = monthOptions[0].key;
-    }
+    const cadenceSelect = $("#budgetCadenceSelect");
+    const periodSelect = $("#budgetMonthSelect");
+    const getSavedCadence = () => {
+      const saved = localStorage.getItem(CADENCE_STORAGE_KEY);
+      return CADENCE_LOOKUP.has(saved) ? saved : "monthly";
+    };
+
+    let periodOptions = [];
+
+    const setPeriodOptions = (cadenceId) => {
+      periodOptions = buildPeriodOptions(cadenceId);
+      if (periodSelect) {
+        periodSelect.innerHTML = "";
+        periodOptions.forEach((opt) => {
+          const option = document.createElement("option");
+          option.value = opt.key;
+          option.textContent = opt.label;
+          periodSelect.appendChild(option);
+        });
+      }
+
+      const savedKey = localStorage.getItem(`${PERIOD_STORAGE_PREFIX}${cadenceId}`);
+      const selected = periodOptions.find((p) => p.key === savedKey) || periodOptions[0];
+      if (periodSelect) periodSelect.value = selected.key;
+      return selected;
+    };
+
+    const initialCadence = getSavedCadence();
+    if (cadenceSelect) cadenceSelect.value = initialCadence;
+    const initialPeriod = setPeriodOptions(initialCadence);
 
     let state = {
-      monthKey: monthOptions[0].key,
-      monthLabel: monthOptions[0].label,
-      monthStart: monthOptions[0].start,
-      monthEnd: monthOptions[0].end,
+      cadence: initialCadence,
+      periodKey: initialPeriod.key,
+      periodLabel: initialPeriod.label,
+      periodStart: initialPeriod.start,
+      periodEnd: initialPeriod.end,
       categories: [],
       spentMap: new Map(),
       records,
     };
 
-    const renderForMonth = (monthKey) => {
-      const selected = monthOptions.find((m) => m.key === monthKey) || monthOptions[0];
-      state.monthKey = selected.key;
-      state.monthLabel = selected.label;
-      state.monthStart = selected.start;
-      state.monthEnd = selected.end;
+    const renderForPeriod = (periodKey) => {
+      const selected = periodOptions.find((p) => p.key === periodKey) || periodOptions[0];
+      state.periodKey = selected.key;
+      state.periodLabel = selected.label;
+      state.periodStart = selected.start;
+      state.periodEnd = selected.end;
+      localStorage.setItem(`${PERIOD_STORAGE_PREFIX}${state.cadence}`, selected.key);
 
       const periodEl = $("#budgetPeriod");
-      if (periodEl) periodEl.textContent = selected.label;
+      if (periodEl) {
+        periodEl.textContent = `${getCadenceLabel(state.cadence)} · ${selected.label}`;
+      }
 
-      const monthRecords = records.filter((r) => {
+      const periodRecords = records.filter((r) => {
         if (!r.date) return false;
         const d = new Date(r.date);
         if (Number.isNaN(d.getTime())) return false;
         return d >= selected.start && d <= selected.end;
       });
 
-      state.categories = loadCategories(selected.key);
-      state.spentMap = buildSpentMap(monthRecords, state.categories);
+      state.categories = loadCategories(state.cadence, selected.key);
+      state.spentMap = buildSpentMap(periodRecords, state.categories);
 
       state.categories = state.categories.map((c) => ({
         ...c,
@@ -427,11 +585,20 @@ import { api } from "./api.js";
       renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
     };
 
-    renderForMonth(state.monthKey);
+    renderForPeriod(state.periodKey);
 
-    monthSelect?.addEventListener("change", (e) => {
+    cadenceSelect?.addEventListener("change", (e) => {
       const next = e.target.value;
-      renderForMonth(next);
+      state.cadence = CADENCE_LOOKUP.has(next) ? next : "monthly";
+      localStorage.setItem(CADENCE_STORAGE_KEY, state.cadence);
+      const selected = setPeriodOptions(state.cadence);
+      renderForPeriod(selected.key);
+      hideStatus();
+    });
+
+    periodSelect?.addEventListener("change", (e) => {
+      const next = e.target.value;
+      renderForPeriod(next);
       hideStatus();
     });
 
@@ -447,7 +614,11 @@ import { api } from "./api.js";
         const next = Number(target.value || 0);
         state.categories[idx].budget = Math.max(0, Number.isFinite(next) ? next : 0);
       }
-      saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
+      saveCategories(
+        state.categories.map(({ name, budget }) => ({ name, budget })),
+        state.cadence,
+        state.periodKey
+      );
 
       const updatedTotals = computeTotals(state.categories, state.spentMap);
       renderSummary(updatedTotals, CURRENCY_FALLBACK);
@@ -457,14 +628,18 @@ import { api } from "./api.js";
 
     $("#btnResetBudgets")?.addEventListener("click", () => {
       state.categories = getBudgetCategoryNames().map((name) => ({ name, budget: null }));
-      saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
+      saveCategories(
+        state.categories.map(({ name, budget }) => ({ name, budget })),
+        state.cadence,
+        state.periodKey
+      );
 
       const refreshedMap = buildSpentMap(
         records.filter((r) => {
           if (!r.date) return false;
           const d = new Date(r.date);
           if (Number.isNaN(d.getTime())) return false;
-          return d >= state.monthStart && d <= state.monthEnd;
+          return d >= state.periodStart && d <= state.periodEnd;
         }),
         state.categories
       );
@@ -489,13 +664,17 @@ import { api } from "./api.js";
       }
 
       state.categories = updated;
-      saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
+      saveCategories(
+        state.categories.map(({ name, budget }) => ({ name, budget })),
+        state.cadence,
+        state.periodKey
+      );
 
       const monthRecords = records.filter((r) => {
         if (!r.date) return false;
         const d = new Date(r.date);
         if (Number.isNaN(d.getTime())) return false;
-        return d >= state.monthStart && d <= state.monthEnd;
+        return d >= state.periodStart && d <= state.periodEnd;
       });
 
       const newMap = buildSpentMap(monthRecords, state.categories);
@@ -523,13 +702,17 @@ import { api } from "./api.js";
       }
 
       state.categories = updated;
-      saveCategories(state.categories.map(({ name, budget }) => ({ name, budget })), state.monthKey);
+      saveCategories(
+        state.categories.map(({ name, budget }) => ({ name, budget })),
+        state.cadence,
+        state.periodKey
+      );
 
       const monthRecords = records.filter((r) => {
         if (!r.date) return false;
         const d = new Date(r.date);
         if (Number.isNaN(d.getTime())) return false;
-        return d >= state.monthStart && d <= state.monthEnd;
+        return d >= state.periodStart && d <= state.periodEnd;
       });
 
       const newMap = buildSpentMap(monthRecords, state.categories);
@@ -612,13 +795,17 @@ import { api } from "./api.js";
         ];
       }
 
-      saveCategories(state.categories.map(({ name: n, budget }) => ({ name: n, budget })), state.monthKey);
+      saveCategories(
+        state.categories.map(({ name: n, budget }) => ({ name: n, budget })),
+        state.cadence,
+        state.periodKey
+      );
       state.spentMap = buildSpentMap(
         records.filter((r) => {
           if (!r.date) return false;
           const d = new Date(r.date);
           if (Number.isNaN(d.getTime())) return false;
-          return d >= state.monthStart && d <= state.monthEnd;
+          return d >= state.periodStart && d <= state.periodEnd;
         }),
         state.categories
       );

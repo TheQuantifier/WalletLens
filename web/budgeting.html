@@ -24,13 +24,23 @@
     <section class="budget-hero">
       <div>
         <h1>Budgeting</h1>
-        <p class="subtle">Plan your monthly spend, track actuals, and move unused funds to savings or another category.</p>
+        <p class="subtle">Plan your spend, track actuals, and move unused funds to savings or another category.</p>
       </div>
       <div class="budget-hero-meta">
         <div class="month-controls">
           <div class="month-row">
-            <label class="subtle" for="budgetMonthSelect">Month</label>
-            <select id="budgetMonthSelect" class="month-select" aria-label="Select budget month"></select>
+            <label class="subtle" for="budgetCadenceSelect">Budget cadence</label>
+            <select id="budgetCadenceSelect" class="month-select" aria-label="Select budget cadence">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Biweekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="3m">3 Months</option>
+              <option value="6m">6 Months</option>
+            </select>
+          </div>
+          <div class="month-row">
+            <label class="subtle" for="budgetMonthSelect">Period</label>
+            <select id="budgetMonthSelect" class="month-select" aria-label="Select budget period"></select>
           </div>
           <span class="pill" id="budgetPeriod" aria-live="polite">—</span>
         </div>
