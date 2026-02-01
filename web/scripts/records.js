@@ -241,6 +241,51 @@ document.addEventListener("DOMContentLoaded", () => {
     buildOptions(incomeSelect, INCOME_CATEGORIES, userCustomCategories.income || []);
 
     renderAllCustomLists();
+    populateFilterCategorySelects(allRecordsCache);
+  };
+
+  const populateFilterCategorySelects = (records = []) => {
+    const expenseFilter = document.getElementById("category");
+    const incomeFilter = document.getElementById("categoryIncome");
+
+    const buildOptions = (select, base, customList, type) => {
+      if (!select) return;
+      const previous = select.value || "";
+      select.innerHTML = "";
+
+      const allOption = document.createElement("option");
+      allOption.value = "";
+      allOption.textContent = "All";
+      select.appendChild(allOption);
+
+      const merged = new Map();
+      base.forEach((c) => {
+        if (c?.name) merged.set(normalizeName(c.name), c.name);
+      });
+      (customList || []).forEach((name) => {
+        if (name) merged.set(normalizeName(name), name);
+      });
+      (records || []).forEach((r) => {
+        if (r.type !== type) return;
+        if (r.category) merged.set(normalizeName(r.category), r.category);
+      });
+
+      Array.from(merged.values())
+        .sort((a, b) => a.localeCompare(b))
+        .forEach((name) => {
+          const opt = document.createElement("option");
+          opt.value = name;
+          opt.textContent = name;
+          select.appendChild(opt);
+        });
+
+      if (previous && Array.from(select.options).some((opt) => opt.value === previous)) {
+        select.value = previous;
+      }
+    };
+
+    buildOptions(expenseFilter, EXPENSE_CATEGORIES, userCustomCategories.expense, "expense");
+    buildOptions(incomeFilter, INCOME_CATEGORIES, userCustomCategories.income, "income");
   };
 
   const renderCustomCategoryList = (container, type) => {
@@ -576,6 +621,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       allRecordsCache = await api.records.getAll();
+      populateFilterCategorySelects(allRecordsCache);
       renderAll();
     } catch (err) {
       console.error(err);
