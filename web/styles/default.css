@@ -202,16 +202,6 @@ header {
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
-.account-icon.has-avatar {
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-
-.account-icon.has-avatar .avatar-initials {
-  display: none;
-}
-
 .account-icon:hover {
   border-color: var(--primary);
   box-shadow: 0 0 0 3px rgba(0,87,184,0.15);

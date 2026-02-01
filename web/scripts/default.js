@@ -169,23 +169,6 @@ function getInitials(name) {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-function applyAccountAvatar(avatarUrl, fallbackName) {
-  const accountIcon = document.getElementById("account-icon");
-  const avatarLetters = document.getElementById("avatarLetters");
-  if (!accountIcon || !avatarLetters) return;
-
-  if (avatarUrl) {
-    accountIcon.style.backgroundImage = `url(${avatarUrl})`;
-    accountIcon.classList.add("has-avatar");
-    avatarLetters.textContent = "";
-    return;
-  }
-
-  accountIcon.style.backgroundImage = "";
-  accountIcon.classList.remove("has-avatar");
-  avatarLetters.textContent = getInitials(fallbackName);
-}
-
 
 /* ===============================================
   AUTH STATE IN HEADER
@@ -209,8 +192,11 @@ async function updateHeaderAuthState() {
       nameEl.textContent = user.fullName || user.username || "Account";
     }
 
-    const avatarUrl = user.avatarUrl || user.avatar_url || "";
-    applyAccountAvatar(avatarUrl, user.fullName || user.username);
+    // --- Avatar initials ---
+    const avatar = document.getElementById("avatarLetters");
+    if (avatar) {
+      avatar.textContent = getInitials(user.fullName || user.username);
+    }
 
   } catch {
     // Not authenticated
@@ -219,14 +205,8 @@ async function updateHeaderAuthState() {
 
     document.querySelectorAll(".auth-logged-out")
       .forEach((el) => el.classList.remove("hidden"));
-
-    applyAccountAvatar("", "");
   }
 }
-
-window.addEventListener("avatar:updated", (event) => {
-  applyAccountAvatar(event?.detail?.avatarUrl || "", "");
-});
 
 
 /* ===============================================
