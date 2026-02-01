@@ -136,11 +136,10 @@ function initMobileNavMenu() {
     toggle.setAttribute("aria-expanded", isOpen);
   });
 
-  menu.querySelectorAll("a").forEach((link) => {
-    link.addEventListener("click", (e) => {
-      const href = link.getAttribute("href");
+  menu.querySelectorAll(".mobile-nav-link").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const href = btn.getAttribute("data-href");
       if (!href) return;
-      e.preventDefault();
       window.location.href = href;
     });
   });

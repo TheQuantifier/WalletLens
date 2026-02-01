@@ -233,15 +233,18 @@ header {
   display: block;
 }
 
-.mobile-nav-menu a {
-  display: block;
+.mobile-nav-link {
+  width: 100%;
+  text-align: left;
   padding: 0.5rem 0.85rem;
-  text-decoration: none;
+  background: transparent;
+  border: none;
   color: var(--text);
   font-weight: 600;
+  cursor: pointer;
 }
 
-.mobile-nav-menu a:hover {
+.mobile-nav-link:hover {
   background: var(--blue-3);
   color: var(--primary);
 }
