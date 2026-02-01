@@ -765,7 +765,29 @@ import { api } from "./api.js";
 
       const updatedTotals = computeTotals(state.categories, state.spentMap);
       renderSummary(updatedTotals, CURRENCY_FALLBACK);
-      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+      const row = target.closest("tr");
+      if (row) {
+        const category = state.categories[idx];
+        const spent = state.spentMap.get(normalizeName(category.name)) || 0;
+        const budget = Number.isFinite(category.budget) ? category.budget : 0;
+        const remaining = budget - spent;
+        const progress = budget > 0 ? Math.min(spent / budget, 1) : 0;
+
+        const remainingCell = row.querySelector("td.remaining");
+        if (remainingCell) {
+          remainingCell.textContent = fmtMoney(remaining, CURRENCY_FALLBACK);
+          remainingCell.classList.toggle("negative", remaining < 0);
+        }
+
+        const progressBar = row.querySelector(".progress");
+        const progressFill = row.querySelector(".progress > span");
+        if (progressBar) {
+          progressBar.classList.toggle("over", spent > budget);
+        }
+        if (progressFill) {
+          progressFill.style.width = `${progress * 100}%`;
+        }
+      }
       hideStatus();
     });
 
