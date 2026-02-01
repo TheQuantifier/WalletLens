@@ -10,6 +10,23 @@ import { api } from "./api.js";
     if (el) el.textContent = value;
   };
 
+  const showTxnStatus = (msg, kind = "ok") => {
+    const el = $("#txnStatus");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove("is-hidden");
+    el.classList.toggle("is-ok", kind === "ok");
+    el.classList.toggle("is-error", kind === "error");
+  };
+
+  const clearTxnStatus = () => {
+    const el = $("#txnStatus");
+    if (!el) return;
+    el.textContent = "";
+    el.classList.add("is-hidden");
+    el.classList.remove("is-ok", "is-error");
+  };
+
   // Avoid injecting unsanitized user content into innerHTML
   const escapeHTML = (str) =>
     String(str ?? "")
@@ -605,6 +622,7 @@ import { api } from "./api.js";
 
     form?.addEventListener("submit", async (e) => {
       e.preventDefault();
+      clearTxnStatus();
 
       const newTxn = {
         type: $("#txnType").value,
@@ -615,21 +633,21 @@ import { api } from "./api.js";
       };
 
       if (!newTxn.type || !newTxn.date) {
-        alert("Please select a type and date.");
+        showTxnStatus("Please select a type and date.", "error");
         return;
       }
 
       if (!Number.isFinite(newTxn.amount) || newTxn.amount <= 0) {
-        alert("Please enter a valid amount greater than 0.");
+        showTxnStatus("Please enter a valid amount greater than 0.", "error");
         return;
       }
 
       try {
         await api.records.create(newTxn);
-        alert("Transaction added!");
-        window.location.reload();
+        showTxnStatus("Transaction added.", "ok");
+        window.setTimeout(() => window.location.reload(), 600);
       } catch (err) {
-        alert("Failed to save transaction: " + err.message);
+        showTxnStatus("Failed to save transaction: " + err.message, "error");
       }
     });
   }
