@@ -794,6 +794,25 @@ import { api } from "./api.js";
       "#lastUpdated",
       "Data updated " + new Date(comp.last_updated).toLocaleString()
     );
+
+    const spendingEl = $("#kpiSpending");
+    if (spendingEl) {
+      spendingEl.classList.remove("kpi-good", "kpi-warn", "kpi-alert", "kpi-bad");
+      const income = Number(comp.total_income) || 0;
+      const spending = Number(comp.total_spending) || 0;
+      const ratio = income > 0 ? spending / income : 0;
+      const clamped = Math.max(0, Math.min(1, ratio));
+      let hue = 120;
+      if (clamped <= 0.6) {
+        hue = 120;
+      } else if (clamped >= 0.8) {
+        hue = 0;
+      } else {
+        const t = (clamped - 0.6) / 0.2;
+        hue = 120 - t * 120;
+      }
+      spendingEl.style.color = `hsl(${hue} 80% 40%)`;
+    }
   }
 
   // ============================================================

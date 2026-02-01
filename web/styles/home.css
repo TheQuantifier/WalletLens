@@ -67,6 +67,22 @@
 .kpi-value.negative {
   color: var(--bad);
 }
+
+.kpi-value.kpi-good {
+  color: var(--good);
+}
+
+.kpi-value.kpi-warn {
+  color: #f59e0b;
+}
+
+.kpi-value.kpi-alert {
+  color: #f97316;
+}
+
+.kpi-value.kpi-bad {
+  color: var(--bad);
+}
 .kpi-sub {
   color: var(--muted);
   font-size: 0.9rem;

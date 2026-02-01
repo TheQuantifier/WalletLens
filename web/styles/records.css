@@ -354,6 +354,14 @@
   text-align: center;
 }
 
+@media (max-width: 720px) {
+  /* Shrink Origin so Notes get more room on mobile */
+  .records-table .txn-table th:nth-child(6),
+  .records-table .txn-table td:nth-child(6) {
+    width: 80px;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .records-pager button {
     transition: none;

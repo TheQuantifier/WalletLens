@@ -139,6 +139,15 @@
   align-items: center;
   margin-left: auto;
   justify-content: flex-end;
+  position: relative;
+}
+
+.budget-save-status {
+  position: absolute;
+  right: calc(100% + 0.6rem);
+  top: 50%;
+  transform: translateY(-50%);
+  white-space: nowrap;
 }
 
 .category-cell {

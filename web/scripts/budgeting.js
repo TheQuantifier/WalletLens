@@ -62,6 +62,24 @@ import { api } from "./api.js";
       currency: currency || CURRENCY_FALLBACK,
     }).format(Number.isFinite(value) ? value : 0);
 
+  const progressFillColor = (progress) => {
+    const clamped = Math.max(0, Math.min(1, progress));
+    let hue = 120;
+    if (clamped <= 0.6) {
+      const t = clamped / 0.6;
+      hue = 120 - t * 60;
+    } else if (clamped <= 0.7) {
+      const t = (clamped - 0.6) / 0.1;
+      hue = 60 - t * 30;
+    } else if (clamped <= 0.8) {
+      const t = (clamped - 0.7) / 0.1;
+      hue = 30 - t * 30;
+    } else {
+      hue = 0;
+    }
+    return `hsl(${hue} 85% 45%)`;
+  };
+
   const normalizeName = (name) => String(name || "").trim().toLowerCase();
 
   const normalizeCategoryList = (list) => {
@@ -375,6 +393,23 @@ import { api } from "./api.js";
     el.classList.toggle("is-ok", tone === "ok");
   };
 
+  const showSaveStatus = (msg, tone = "") => {
+    const el = $("#budgetSaveStatus");
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove("is-hidden");
+    el.classList.toggle("is-error", tone === "error");
+    el.classList.toggle("is-ok", tone === "ok");
+  };
+
+  const hideSaveStatus = () => {
+    const el = $("#budgetSaveStatus");
+    if (!el) return;
+    el.textContent = "";
+    el.classList.add("is-hidden");
+    el.classList.remove("is-error", "is-ok");
+  };
+
   const hideStatus = () => {
     const el = $("#budgetStatus");
     if (!el) return;
@@ -534,6 +569,11 @@ import { api } from "./api.js";
       bar.className = "progress" + (spent > c.budget ? " over" : "");
       const fill = document.createElement("span");
       fill.style.width = `${progress * 100}%`;
+      if (spent > budget) {
+        fill.style.backgroundColor = "var(--bad)";
+      } else {
+        fill.style.backgroundColor = progressFillColor(progress);
+      }
       bar.appendChild(fill);
       tdProgress.appendChild(bar);
 
@@ -653,6 +693,7 @@ import { api } from "./api.js";
     const saveBudgetSheet = async ({ silent = false } = {}) => {
       const saveBtn = $("#btnSaveBudget");
       const payload = buildBudgetPayload(state.categories);
+      hideSaveStatus();
       try {
         let targetId = state.sheetId;
         if (!targetId) {
@@ -686,9 +727,9 @@ import { api } from "./api.js";
         }
         state.isDirty = false;
         if (saveBtn) saveBtn.disabled = true;
-        if (!silent) showStatus("Budget saved.", "ok");
+        if (!silent) showSaveStatus("Budget saved.", "ok");
       } catch (err) {
-        if (!silent) showStatus("Failed to save budget.", "error");
+        if (!silent) showSaveStatus("Failed to save budget.", "error");
         console.warn("Failed to save budget sheet:", err);
       }
     };
@@ -796,6 +837,11 @@ import { api } from "./api.js";
         }
         if (progressFill) {
           progressFill.style.width = `${progress * 100}%`;
+          if (spent > budget) {
+            progressFill.style.backgroundColor = "var(--bad)";
+          } else {
+            progressFill.style.backgroundColor = progressFillColor(progress);
+          }
         }
       }
       hideStatus();
