@@ -82,8 +82,6 @@
 
 .budget-actions {
   margin-bottom: 1.5rem;
-  position: relative;
-  padding-bottom: 2.25rem;
 }
 
 .action-card {
@@ -250,12 +248,19 @@
   font-weight: 600;
 }
 
-.budget-actions .status-banner {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  margin: 0;
+@media (max-width: 720px) {
+  .budget-actions {
+    position: relative;
+    padding-bottom: 2.25rem;
+  }
+
+  .budget-actions .status-banner {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    margin: 0;
+  }
 }
 
 @media (max-width: 900px) {
