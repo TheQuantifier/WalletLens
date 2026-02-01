@@ -136,12 +136,15 @@ function initMobileNavMenu() {
     toggle.setAttribute("aria-expanded", isOpen);
   });
 
-  menu.querySelectorAll(".mobile-nav-link").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const href = btn.getAttribute("data-href");
-      if (!href) return;
-      window.location.href = href;
-    });
+  menu.addEventListener("click", (e) => {
+    const btn = e.target.closest(".mobile-nav-link");
+    if (!btn || !menu.contains(btn)) return;
+    const href = btn.getAttribute("data-href");
+    if (!href) return;
+    menu.classList.remove("show");
+    toggle.classList.remove("is-open");
+    toggle.setAttribute("aria-expanded", "false");
+    window.location.assign(href);
   });
 
   document.addEventListener("click", (e) => {

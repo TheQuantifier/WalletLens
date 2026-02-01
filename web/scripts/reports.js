@@ -97,6 +97,8 @@ import { api } from "./api.js";
 
   const chartText = () => (theme() === "dark" ? "#e5e7eb" : "#111827");
   const chartGrid = () => (theme() === "dark" ? "rgba(255,255,255,0.08)" : "rgba(17,24,39,0.10)");
+  const incomeLineColor = () => (theme() === "dark" ? "#60a5fa" : "#0057b8");
+  const expenseLineColor = () => (theme() === "dark" ? "#fca5a5" : "#ef4444");
 
   const destroyCharts = () => {
     Object.values(charts).forEach((c) => {
@@ -293,6 +295,9 @@ import { api } from "./api.js";
               label: "Expenses",
               data: monthly.expense,
               hidden: !showExp,
+              borderColor: expenseLineColor(),
+              backgroundColor: expenseLineColor(),
+              pointBackgroundColor: expenseLineColor(),
               borderWidth: 2,
               tension: 0.25,
             },
@@ -300,6 +305,9 @@ import { api } from "./api.js";
               label: "Income",
               data: monthly.income,
               hidden: !showInc,
+              borderColor: incomeLineColor(),
+              backgroundColor: incomeLineColor(),
+              pointBackgroundColor: incomeLineColor(),
               borderWidth: 2,
               tension: 0.25,
             },
