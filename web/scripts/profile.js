@@ -56,7 +56,14 @@ const stats = {
 const changeAvatarBtn = $("changeAvatarBtn");
 const avatarInput = $("avatarInput");
 const avatarBlock = document.querySelector(".avatar-block .avatar");
-let avatarFile = null;
+const avatarModal = $("avatarModal");
+const avatarChoicesEl = $("avatarChoices");
+const saveAvatarBtn = $("saveAvatarBtn");
+const cancelAvatarBtn = $("cancelAvatarBtn");
+const closeAvatarModalBtn = $("closeAvatarModal");
+let currentAvatarUrl = "";
+let pendingAvatarUrl = "";
+let avatarChoicesRendered = false;
 
 /* ----------------------------------------
    DARK MODE SUPPORT
@@ -112,6 +119,49 @@ const clearStatusSoon = (ms = 2000) => {
 };
 
 /* ----------------------------------------
+   AVATAR PRESETS
+---------------------------------------- */
+const AVATAR_CHOICES = [
+  { id: "aurora", label: "Aurora", bg1: "#c7d2fe", bg2: "#93c5fd", accent: "#1d4ed8", initial: "A" },
+  { id: "sunset", label: "Sunset", bg1: "#fecaca", bg2: "#fdba74", accent: "#c2410c", initial: "B" },
+  { id: "meadow", label: "Meadow", bg1: "#bbf7d0", bg2: "#86efac", accent: "#166534", initial: "C" },
+  { id: "canyon", label: "Canyon", bg1: "#fed7aa", bg2: "#fdba74", accent: "#9a3412", initial: "D" },
+  { id: "ocean", label: "Ocean", bg1: "#bae6fd", bg2: "#7dd3fc", accent: "#0369a1", initial: "E" },
+  { id: "orchard", label: "Orchard", bg1: "#fde68a", bg2: "#fcd34d", accent: "#92400e", initial: "F" },
+  { id: "moss", label: "Moss", bg1: "#d9f99d", bg2: "#bef264", accent: "#3f6212", initial: "G" },
+  { id: "slate", label: "Slate", bg1: "#e2e8f0", bg2: "#cbd5f5", accent: "#334155", initial: "H" },
+  { id: "rose", label: "Rose", bg1: "#fecdd3", bg2: "#fda4af", accent: "#9f1239", initial: "I" },
+  { id: "violet", label: "Violet", bg1: "#ddd6fe", bg2: "#c4b5fd", accent: "#5b21b6", initial: "J" },
+];
+
+const createAvatarDataUrl = ({ bg1, bg2, accent, initial }) => {
+  const svg =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 128 128">` +
+    `<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1">` +
+    `<stop offset="0" stop-color="${bg1}"/><stop offset="1" stop-color="${bg2}"/></linearGradient></defs>` +
+    `<rect width="128" height="128" rx="64" fill="url(#g)"/>` +
+    `<circle cx="96" cy="28" r="16" fill="${accent}" opacity="0.9"/>` +
+    `<text x="50%" y="56%" text-anchor="middle" font-family="Arial, sans-serif" font-size="52" fill="#111827" dy="0.32em">${initial}</text>` +
+    `</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+};
+
+const avatarOptions = AVATAR_CHOICES.map((choice) => ({
+  ...choice,
+  url: createAvatarDataUrl(choice),
+}));
+
+const applyAvatarPreview = (avatarUrl) => {
+  if (!avatarBlock) return;
+  avatarBlock.style.backgroundImage = avatarUrl ? `url(${avatarUrl})` : "";
+  avatarBlock.textContent = "";
+};
+
+const applyHeaderAvatar = (avatarUrl) => {
+  window.dispatchEvent(new CustomEvent("avatar:updated", { detail: { avatarUrl } }));
+};
+
+/* ----------------------------------------
    LOAD USER PROFILE
 ---------------------------------------- */
 async function loadUserProfile() {
@@ -119,7 +169,7 @@ async function loadUserProfile() {
     const { user } = await api.auth.me();
 
     const createdAt = user?.createdAt || user?.created_at;
-    const avatarUrl = user?.avatarUrl || user?.avatar_url;
+    const avatarUrl = user?.avatarUrl || user?.avatar_url || "";
 
     setText(f.fullName, user?.fullName || user?.full_name || user?.username || "—");
     setText(f.username, "@" + (user?.username || "—"));
@@ -138,14 +188,10 @@ async function loadUserProfile() {
       if (input[k]) input[k].value = user[k] || "";
     });
 
-    // Load avatar if exists
-    if (avatarUrl && avatarBlock) {
-      avatarBlock.style.backgroundImage = `url(${avatarUrl})`;
-      avatarBlock.textContent = "";
-    } else if (avatarBlock) {
-      avatarBlock.style.backgroundImage = "";
-      avatarBlock.textContent = "";
-    }
+    currentAvatarUrl = avatarUrl;
+    pendingAvatarUrl = avatarUrl;
+    applyAvatarPreview(avatarUrl);
+    applyHeaderAvatar(avatarUrl);
   } catch (err) {
     showStatus("Please log in to view your profile.", "error");
     window.location.href = "login.html";
@@ -166,11 +212,6 @@ async function saveProfile(e) {
   try {
     await api.auth.updateProfile(updates);
 
-    if (avatarFile) {
-      await api.auth.uploadAvatar(avatarFile);
-      avatarFile = null;
-    }
-
     hideForm();
     await loadUserProfile();
     showStatus("Profile updated.");
@@ -183,38 +224,117 @@ async function saveProfile(e) {
 /* ----------------------------------------
    CHANGE AVATAR
 ---------------------------------------- */
-changeAvatarBtn?.addEventListener("click", () => {
-  avatarInput?.click();
+const renderAvatarChoices = () => {
+  if (!avatarChoicesEl || avatarChoicesRendered) return;
+  avatarChoicesEl.innerHTML = "";
+  avatarOptions.forEach((choice) => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "avatar-choice";
+    btn.setAttribute("role", "option");
+    btn.setAttribute("aria-label", choice.label);
+    btn.dataset.avatarUrl = choice.url;
+    btn.style.backgroundImage = `url(${choice.url})`;
+    btn.addEventListener("click", () => {
+      pendingAvatarUrl = choice.url;
+      updateAvatarSelection();
+    });
+    avatarChoicesEl.appendChild(btn);
+  });
+  avatarChoicesRendered = true;
+};
+
+const updateAvatarSelection = () => {
+  if (!avatarChoicesEl) return;
+  const buttons = avatarChoicesEl.querySelectorAll(".avatar-choice");
+  buttons.forEach((btn) => {
+    const isSelected = btn.dataset.avatarUrl === pendingAvatarUrl;
+    btn.classList.toggle("is-selected", isSelected);
+    btn.setAttribute("aria-selected", isSelected ? "true" : "false");
+  });
+};
+
+const openAvatarModal = () => {
+  renderAvatarChoices();
+  pendingAvatarUrl = currentAvatarUrl;
+  updateAvatarSelection();
+  avatarModal?.classList.remove("hidden");
+};
+
+const closeAvatarModal = () => {
+  avatarModal?.classList.add("hidden");
+};
+
+changeAvatarBtn?.addEventListener("click", openAvatarModal);
+closeAvatarModalBtn?.addEventListener("click", closeAvatarModal);
+cancelAvatarBtn?.addEventListener("click", closeAvatarModal);
+avatarModal?.addEventListener("click", (e) => {
+  if (e.target === avatarModal || e.target?.dataset?.close === "avatar") {
+    closeAvatarModal();
+  }
+});
+
+saveAvatarBtn?.addEventListener("click", async () => {
+  if (!pendingAvatarUrl) {
+    showStatus("Please select an avatar.", "error");
+    clearStatusSoon(2500);
+    return;
+  }
+  if (pendingAvatarUrl === currentAvatarUrl) {
+    closeAvatarModal();
+    return;
+  }
+
+  try {
+    showStatus("Updating avatar...");
+    await api.auth.updateProfile({ avatarUrl: pendingAvatarUrl });
+    currentAvatarUrl = pendingAvatarUrl;
+    applyAvatarPreview(currentAvatarUrl);
+    applyHeaderAvatar(currentAvatarUrl);
+    closeAvatarModal();
+    showStatus("Avatar updated.");
+    clearStatusSoon(2500);
+  } catch (err) {
+    showStatus("Avatar update failed: " + (err?.message || "Unknown error"), "error");
+    clearStatusSoon(3500);
+  }
 });
 
 avatarInput?.addEventListener("change", (e) => {
   const file = e.target.files?.[0];
   if (!file) return;
 
-  // basic guardrails
   if (!file.type.startsWith("image/")) {
     showStatus("Please choose an image file.", "error");
     clearStatusSoon(2500);
     return;
   }
-  if (file.size > 5 * 1024 * 1024) {
-    showStatus("Image is too large (max 5MB).", "error");
+  if (file.size > 2 * 1024 * 1024) {
+    showStatus("Image is too large (max 2MB).", "error");
     clearStatusSoon(2500);
     return;
   }
 
   const reader = new FileReader();
-  reader.onload = (event) => {
-    if(avatarBlock) {
-      avatarBlock.style.backgroundImage = `url(${event.target.result})`;
-      avatarBlock.textContent = "";
+  reader.onload = async (event) => {
+    const dataUrl = event.target?.result;
+    if (!dataUrl) return;
+    try {
+      showStatus("Updating avatar...");
+      await api.auth.updateProfile({ avatarUrl: dataUrl });
+      currentAvatarUrl = dataUrl;
+      pendingAvatarUrl = dataUrl;
+      applyAvatarPreview(dataUrl);
+      applyHeaderAvatar(dataUrl);
+      closeAvatarModal();
+      showStatus("Avatar updated.");
+      clearStatusSoon(2500);
+    } catch (err) {
+      showStatus("Avatar update failed: " + (err?.message || "Unknown error"), "error");
+      clearStatusSoon(3500);
     }
   };
   reader.readAsDataURL(file);
-
-  avatarFile = file;
-  showStatus("Avatar selected. Click Save Changes to upload.");
-  clearStatusSoon(3500);
 });
 
 /* ----------------------------------------
@@ -269,8 +389,12 @@ passwordModal?.addEventListener("click", (e) => {
 
 // Close password modal on ESC
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Escape" && passwordModal && !passwordModal.classList.contains("hidden")) {
+  if (e.key !== "Escape") return;
+  if (passwordModal && !passwordModal.classList.contains("hidden")) {
     passwordModal.classList.add("hidden");
+  }
+  if (avatarModal && !avatarModal.classList.contains("hidden")) {
+    avatarModal.classList.add("hidden");
   }
 });
 
