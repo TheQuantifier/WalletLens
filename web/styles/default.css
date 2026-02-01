@@ -203,6 +203,7 @@ header {
 }
 
 .account-icon.has-avatar {
+  background-color: #ffffff;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
