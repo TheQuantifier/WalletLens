@@ -130,6 +130,14 @@ function initMobileNavMenu() {
   const menu = document.getElementById("mobileNavMenu");
   if (!toggle || !menu) return;
 
+  const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+  const currentPage = rawPage === "" ? "index.html" : rawPage;
+  menu.querySelectorAll(".mobile-nav-link").forEach((btn) => {
+    const href = (btn.getAttribute("data-href") || "").toLowerCase();
+    const btnPage = href.startsWith("/") ? href.slice(1) : href.replace(/^\.\//, "");
+    btn.classList.toggle("active", btnPage === currentPage);
+  });
+
   toggle.addEventListener("click", () => {
     const isOpen = menu.classList.toggle("show");
     toggle.classList.toggle("is-open", isOpen);

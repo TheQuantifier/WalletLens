@@ -249,6 +249,11 @@ header {
   color: var(--primary);
 }
 
+.mobile-nav-link.active {
+  background: var(--blue-3);
+  color: var(--primary);
+}
+
 .nav-links a {
   position: relative;
   text-decoration: none;
@@ -507,6 +512,11 @@ footer {
 
   .nav-links {
     display: none;
+  }
+
+  .account-icon {
+    width: 44px;
+    height: 44px;
   }
 
   .mobile-nav {
