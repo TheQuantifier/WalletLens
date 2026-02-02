@@ -65,17 +65,33 @@ import { api } from "./api.js";
   const progressFillColor = (progress) => {
     const clamped = Math.max(0, Math.min(1, progress));
     let hue = 120;
-    if (clamped <= 0.6) {
-      const t = clamped / 0.6;
+    if (clamped <= 0.5) {
+      hue = 120;
+    } else if (clamped <= 0.75) {
+      const t = (clamped - 0.5) / 0.25;
       hue = 120 - t * 60;
-    } else if (clamped <= 0.7) {
-      const t = (clamped - 0.6) / 0.1;
+    } else if (clamped <= 0.9) {
+      const t = (clamped - 0.75) / 0.15;
       hue = 60 - t * 30;
-    } else if (clamped <= 0.8) {
-      const t = (clamped - 0.7) / 0.1;
-      hue = 30 - t * 30;
     } else {
       hue = 0;
+    }
+    return `hsl(${hue} 85% 45%)`;
+  };
+
+  const savingsFillColor = (progress) => {
+    const clamped = Math.max(0, Math.min(1, progress));
+    let hue = 30;
+    if (clamped <= 0.3) {
+      hue = 30;
+    } else if (clamped <= 0.6) {
+      const t = (clamped - 0.3) / 0.3;
+      hue = 30 + t * 30;
+    } else if (clamped <= 0.9) {
+      const t = (clamped - 0.6) / 0.3;
+      hue = 60 + t * 60;
+    } else {
+      hue = 120;
     }
     return `hsl(${hue} 85% 45%)`;
   };
@@ -565,14 +581,17 @@ import { api } from "./api.js";
       if (remaining < 0) tdRemaining.classList.add("negative");
 
       const tdProgress = document.createElement("td");
+      const isSavings = normalizeName(c.name) === "savings";
       const bar = document.createElement("div");
-      bar.className = "progress" + (spent > c.budget ? " over" : "");
+      bar.className = "progress" + (!isSavings && spent > c.budget ? " over" : "");
       const fill = document.createElement("span");
       fill.style.width = `${progress * 100}%`;
-      if (spent > budget) {
+      if (!isSavings && spent > budget) {
         fill.style.backgroundColor = "var(--bad)";
       } else {
-        fill.style.backgroundColor = progressFillColor(progress);
+        fill.style.backgroundColor = isSavings
+          ? savingsFillColor(progress)
+          : progressFillColor(progress);
       }
       bar.appendChild(fill);
       tdProgress.appendChild(bar);
@@ -823,6 +842,7 @@ import { api } from "./api.js";
         const budget = Number.isFinite(category.budget) ? category.budget : 0;
         const remaining = budget - spent;
         const progress = budget > 0 ? Math.min(spent / budget, 1) : 0;
+        const isSavings = normalizeName(category.name) === "savings";
 
         const remainingCell = row.querySelector("td.remaining");
         if (remainingCell) {
@@ -833,14 +853,16 @@ import { api } from "./api.js";
         const progressBar = row.querySelector(".progress");
         const progressFill = row.querySelector(".progress > span");
         if (progressBar) {
-          progressBar.classList.toggle("over", spent > budget);
+          progressBar.classList.toggle("over", !isSavings && spent > budget);
         }
         if (progressFill) {
           progressFill.style.width = `${progress * 100}%`;
-          if (spent > budget) {
+          if (!isSavings && spent > budget) {
             progressFill.style.backgroundColor = "var(--bad)";
           } else {
-            progressFill.style.backgroundColor = progressFillColor(progress);
+            progressFill.style.backgroundColor = isSavings
+              ? savingsFillColor(progress)
+              : progressFillColor(progress);
           }
         }
       }
