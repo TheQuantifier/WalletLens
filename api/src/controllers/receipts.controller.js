@@ -234,10 +234,11 @@ export const scanOnly = asyncHandler(async (req, res) => {
   const parsedDate = parsed?.date ? parseDateOnly(parsed.date) : null;
 
   // Create receipt metadata row without saving the file
+  const scanObjectKey = `scan-only/${req.user.id}/${cryptoRandomIdFallback()}`;
   let receipt = await createReceiptPending({
     userId: req.user.id,
     originalFilename: file.originalname || "scan",
-    objectKey: "",
+    objectKey: scanObjectKey,
     fileType: file.mimetype || "",
     fileSize: Number(file.size || 0),
     fileSaved: false,

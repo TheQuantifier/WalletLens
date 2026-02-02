@@ -509,7 +509,7 @@ import { api } from "./api.js";
 
       pendingFiles = [];
       renderPending();
-      if (!scanOnly) await refreshRecent();
+      await refreshRecent();
     } catch (err) {
       console.error(scanOnly ? "Scan error:" : "Upload error:", err);
       setStatus(
