@@ -31,22 +31,23 @@ export async function createReceiptPending({
   objectKey,
   fileType = "",
   fileSize = 0,
+  fileSaved = true,
 }) {
   const { rows } = await query(
     `
     INSERT INTO receipts (
-      user_id, original_filename, object_key, file_type, file_size,
+      user_id, original_filename, object_key, file_type, file_size, file_saved,
       ocr_text, date, date_added, source, sub_amount, amount, tax_amount,
       pay_method, items, parsed_data, linked_record_id
     )
     VALUES (
-      $1, $2, $3, $4, $5,
+      $1, $2, $3, $4, $5, $6,
       '', NULL, now(), '', 0, 0, 0,
       'Other', '[]'::jsonb, '{}'::jsonb, NULL
     )
     RETURNING *
     `,
-    [userId, originalFilename, objectKey, fileType, fileSize]
+    [userId, originalFilename, objectKey, fileType, fileSize, fileSaved]
   );
 
   return rows[0];
@@ -92,6 +93,7 @@ export async function updateReceiptParsedData(userId, id, patch = {}) {
     items,
     parsedData,
     linkedRecordId,
+    fileSaved,
   } = patch;
 
   const sets = [];
@@ -115,6 +117,7 @@ export async function updateReceiptParsedData(userId, id, patch = {}) {
   if (parsedData !== undefined) push("parsed_data = ?", JSON.stringify(parsedData || {}));
 
   if (linkedRecordId !== undefined) push("linked_record_id = ?", linkedRecordId);
+  if (fileSaved !== undefined) push("file_saved = ?", fileSaved);
 
   if (sets.length === 0) return getReceiptById(userId, id);
 

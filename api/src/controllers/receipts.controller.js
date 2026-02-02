@@ -74,6 +74,7 @@ export const presignUpload = asyncHandler(async (req, res) => {
     objectKey,
     fileType: contentType,
     fileSize: Number(sizeBytes || 0),
+    fileSaved: true,
   });
 
   const uploadUrl = await presignPut({
@@ -232,10 +233,52 @@ export const scanOnly = asyncHandler(async (req, res) => {
 
   const parsedDate = parsed?.date ? parseDateOnly(parsed.date) : null;
 
+  // Create receipt metadata row without saving the file
+  let receipt = await createReceiptPending({
+    userId: req.user.id,
+    originalFilename: file.originalname || "scan",
+    objectKey: "",
+    fileType: file.mimetype || "",
+    fileSize: Number(file.size || 0),
+    fileSaved: false,
+  });
+
+  receipt = await updateReceiptParsedData(req.user.id, receipt.id, {
+    ocrText,
+    date: parsedDate,
+    source: parsed?.source || "",
+    subAmount: parsed?.subAmount || 0,
+    amount: parsed?.amount || 0,
+    taxAmount: parsed?.taxAmount || 0,
+    payMethod: parsed?.payMethod || "Other",
+    items: parsed?.items || [],
+    parsedData: parsed || {},
+    fileSaved: false,
+  });
+
+  let autoRecord = null;
+  if (parsed && parsed.amount && Number(parsed.amount) > 0) {
+    const recordDate = parsedDate || new Date();
+    autoRecord = await createRecord(req.user.id, {
+      type: "expense",
+      amount: Number(parsed.amount),
+      category: "Uncategorized",
+      date: recordDate,
+      note: parsed?.source || "Receipt",
+      linkedReceiptId: receipt.id,
+    });
+
+    receipt = await updateReceiptParsedData(req.user.id, receipt.id, {
+      linkedRecordId: autoRecord.id,
+    });
+  }
+
   res.status(200).json({
     ocrText,
     parsed: parsed || {},
     parsedDate,
+    receipt,
+    autoRecord,
   });
 });
 
@@ -263,6 +306,9 @@ export const getOne = asyncHandler(async (req, res) => {
 export const download = asyncHandler(async (req, res) => {
   const receipt = await getReceiptById(req.user.id, req.params.id);
   if (!receipt) return res.status(404).json({ message: "Receipt not found" });
+  if (receipt.file_saved === false) {
+    return res.status(400).json({ message: "Receipt file was not saved" });
+  }
 
   const downloadUrl = await presignGet({ key: receipt.object_key, expiresIn: 60 });
   res.json({ downloadUrl });

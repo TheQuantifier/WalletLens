@@ -277,6 +277,15 @@ import { api } from "./api.js";
       else if (hasOCR) status = "Read";
       if (r?.error || r?.ocrFailed || r?.ocr_failed) status = "Error";
 
+      const fileSaved = r?.fileSaved ?? r?.file_saved ?? true;
+      const downloadBtn = fileSaved
+        ? `<button class="icon-btn js-download" type="button"
+                  data-id="${id}"
+                  data-filename="${filename}">
+            ${downloadIcon}
+          </button>`
+        : "";
+
       const tr = document.createElement("tr");
       tr.dataset.id = id;
       tr.dataset.linkedRecordId = r?.linkedRecordId || r?.linkedRecord || r?.linked_record_id || "";
@@ -289,11 +298,7 @@ import { api } from "./api.js";
         <td>${status}</td>
 
         <td class="num actions-col">
-          <button class="icon-btn js-download" type="button"
-                  data-id="${id}"
-                  data-filename="${filename}">
-            ${downloadIcon}
-          </button>
+          ${downloadBtn}
 
           <button class="icon-btn js-delete" type="button"
                   data-id="${id}">
