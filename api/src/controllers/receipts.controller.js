@@ -38,6 +38,23 @@ export const presignUpload = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "filename and contentType are required" });
   }
 
+  const allowedExt = new Set(["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff", "bmp", "webp"]);
+  const allowedMime = new Set([
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/heic",
+    "image/heif",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+  ]);
+  const ext = String(filename).split(".").pop().toLowerCase();
+  const isImage = String(contentType).startsWith("image/");
+  if (!allowedMime.has(contentType) && !(isImage && allowedExt.has(ext))) {
+    return res.status(400).json({ message: "Unsupported file type" });
+  }
+
   // Create a DB row first (source of truth)
   // Then create an object key based on the receipt id
   const tempId = cryptoRandomIdFallback(); // see helper below

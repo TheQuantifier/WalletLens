@@ -3,11 +3,13 @@ import sys
 import json
 import fitz          # PyMuPDF
 import pytesseract
+import pillow_heif
 from PIL import Image, ImageFile, ImageOps, ImageFilter
 import io
 
 # Prevent truncated-image crashes in Pillow
 ImageFile.LOAD_TRUNCATED_IMAGES = True
+pillow_heif.register_heif_opener()
 
 
 TESSERACT_CONFIG = "--oem 3 --psm 6 -l eng"

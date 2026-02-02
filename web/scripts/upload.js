@@ -4,8 +4,17 @@
 import { api } from "./api.js";
 
 (() => {
-  const ACCEPTED_MIME = ["application/pdf", "image/png", "image/jpeg"];
-  const ACCEPTED_EXT = ["pdf", "png", "jpg", "jpeg"];
+  const ACCEPTED_MIME = [
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/heic",
+    "image/heif",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+  ];
+  const ACCEPTED_EXT = ["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff", "bmp", "webp"];
   const MAX_MB = 50;
 
   // -----------------------------
