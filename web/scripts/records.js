@@ -136,15 +136,28 @@ document.addEventListener("DOMContentLoaded", () => {
     return amount;
   };
 
-  const fmtDate = (iso) => iso ? new Date(iso).toLocaleDateString(undefined, {
-    year: "numeric", month: "short", day: "2-digit"
-  }) : "—";
-
-  const isoToInputDate = (iso) => {
-    if (!iso) return "";
-    const d = new Date(iso);
-    return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`;
+  const toDateOnly = (value) => {
+    if (!value) return "";
+    if (typeof value === "string") return value.split("T")[0];
+    try {
+      return new Date(value).toISOString().split("T")[0];
+    } catch {
+      return "";
+    }
   };
+
+  const fmtDate = (value) => {
+    const dateOnly = toDateOnly(value);
+    if (!dateOnly) return "—";
+    return new Date(`${dateOnly}T00:00:00Z`).toLocaleDateString(undefined, {
+      year: "numeric",
+      month: "short",
+      day: "2-digit",
+      timeZone: "UTC",
+    });
+  };
+
+  const isoToInputDate = (value) => toDateOnly(value);
 
   const getCurrentCurrency = () => {
     return localStorage.getItem("settings_currency") ||
@@ -648,7 +661,7 @@ document.addEventListener("DOMContentLoaded", () => {
     let filtered = records.filter(r => {
       const note = (r.note || "").toLowerCase();
       const cat = (r.category || "").toLowerCase();
-      const rDate = r.date ? new Date(r.date) : null;
+      const rDate = r.date ? Date.parse(`${toDateOnly(r.date)}T00:00:00Z`) : null;
       return (!q || cat.includes(q) || note.includes(q)) &&
              (!category || r.category === category) &&
              (!minDate || (rDate && rDate >= minDate)) &&
@@ -657,8 +670,8 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     filtered.sort((a,b) => {
-      const da = a.date ? new Date(a.date) : null;
-      const db = b.date ? new Date(b.date) : null;
+      const da = a.date ? Date.parse(`${toDateOnly(a.date)}T00:00:00Z`) : null;
+      const db = b.date ? Date.parse(`${toDateOnly(b.date)}T00:00:00Z`) : null;
       switch(sort) {
         case "date_asc": return da - db;
         case "date_desc": return db - da;
