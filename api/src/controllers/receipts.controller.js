@@ -16,7 +16,7 @@ import {
   deleteReceipt,
 } from "../models/receipt.model.js";
 
-import { createRecord } from "../models/record.model.js";
+import { createRecord, updateRecord } from "../models/record.model.js";
 
 import {
   makeObjectKey,
@@ -298,11 +298,56 @@ export const updateOcrText = asyncHandler(async (req, res) => {
   const receipt = await getReceiptById(req.user.id, receiptId);
   if (!receipt) return res.status(404).json({ message: "Receipt not found" });
 
-  const updated = await updateReceiptParsedData(req.user.id, receiptId, {
+  let updated = await updateReceiptParsedData(req.user.id, receiptId, {
     ocrText,
   });
 
-  res.json({ receipt: updated });
+  // Re-run parser on corrected text
+  let parsed = null;
+  if (ocrText.trim().length > 5) {
+    parsed = await parseReceiptText(ocrText);
+  }
+
+  const parsedDate = parsed?.date ? parseDateOnly(parsed.date) : null;
+
+  if (parsed) {
+    updated = await updateReceiptParsedData(req.user.id, receiptId, {
+      date: parsedDate,
+      source: parsed?.source || "",
+      subAmount: parsed?.subAmount || 0,
+      amount: parsed?.amount || 0,
+      taxAmount: parsed?.taxAmount || 0,
+      payMethod: parsed?.payMethod || "Other",
+      items: parsed?.items || [],
+      parsedData: parsed || {},
+    });
+  }
+
+  let autoRecord = null;
+  if (parsed && parsed.amount && Number(parsed.amount) > 0) {
+    const recordDate = parsedDate || new Date();
+    if (updated?.linked_record_id) {
+      autoRecord = await updateRecord(req.user.id, updated.linked_record_id, {
+        amount: Number(parsed.amount),
+        date: recordDate,
+        note: parsed?.source || "Receipt",
+      });
+    } else {
+      autoRecord = await createRecord(req.user.id, {
+        type: "expense",
+        amount: Number(parsed.amount),
+        category: "Uncategorized",
+        date: recordDate,
+        note: parsed?.source || "Receipt",
+        linkedReceiptId: receiptId,
+      });
+      updated = await updateReceiptParsedData(req.user.id, receiptId, {
+        linkedRecordId: autoRecord.id,
+      });
+    }
+  }
+
+  res.json({ receipt: updated, autoRecord, parsed: parsed || {} });
 });
 
 /* ============================================================
