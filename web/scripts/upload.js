@@ -34,6 +34,12 @@ import { api } from "./api.js";
   const btnDeleteBoth = document.getElementById("btnDeleteBoth");
   const btnDeleteCancel = document.getElementById("btnDeleteCancel");
 
+  // Upload mode modal
+  const uploadModeModal = document.getElementById("uploadModeModal");
+  const btnScanOnly = document.getElementById("btnScanOnly");
+  const btnSaveAndScan = document.getElementById("btnSaveAndScan");
+  const btnUploadCancel = document.getElementById("btnUploadCancel");
+
   if (!dropzone || !fileInput) {
     console.error("upload.js: Missing #dropzone or #fileInput in DOM");
     return;
@@ -220,7 +226,10 @@ import { api } from "./api.js";
     }
 
     if (rejected) {
-      setStatus(`${rejected} file(s) skipped (PDF/PNG/JPG only, ≤ ${MAX_MB} MB).`, "error");
+      setStatus(
+        `${rejected} file(s) skipped (PDF/PNG/JPG/HEIC/TIFF/BMP/WEBP only, ≤ ${MAX_MB} MB).`,
+        "error"
+      );
       clearStatusSoon(3000);
     }
 
@@ -337,6 +346,19 @@ import { api } from "./api.js";
     };
   };
 
+  // -----------------------------
+  // Upload mode modal
+  // -----------------------------
+  const openUploadModeModal = () => {
+    if (!uploadModeModal) return;
+    uploadModeModal.classList.remove("hidden");
+  };
+
+  const closeUploadModeModal = () => {
+    if (!uploadModeModal) return;
+    uploadModeModal.classList.add("hidden");
+  };
+
   const performDelete = async (deleteRecord) => {
     const { receiptId, buttonRef } = pendingDelete;
     if (!receiptId) return;
@@ -370,6 +392,7 @@ import { api } from "./api.js";
 
   // Close modal on backdrop click
   deleteModal?.querySelector(".modal-backdrop")?.addEventListener("click", closeDeleteModal);
+  uploadModeModal?.querySelector(".modal-backdrop")?.addEventListener("click", closeUploadModeModal);
 
   // -----------------------------
   // Table actions (download + delete)
@@ -459,7 +482,7 @@ import { api } from "./api.js";
   // -----------------------------
   // Upload logic (sequential)
   // -----------------------------
-  const uploadAll = async () => {
+  const uploadAll = async ({ scanOnly } = {}) => {
     if (!pendingFiles.length || isUploading) return;
 
     setUploadingUI(true);
@@ -467,30 +490,56 @@ import { api } from "./api.js";
     try {
       for (let i = 0; i < pendingFiles.length; i++) {
         const file = pendingFiles[i];
-        setStatus(`Uploading ${i + 1} of ${pendingFiles.length}: ${file.name}…`);
-        await api.receipts.upload(file);
+        if (scanOnly) {
+          setStatus(`Scanning ${i + 1} of ${pendingFiles.length}: ${file.name}…`);
+          await api.receipts.scan(file);
+        } else {
+          setStatus(`Uploading ${i + 1} of ${pendingFiles.length}: ${file.name}…`);
+          await api.receipts.upload(file);
+        }
       }
 
-      setStatus("Upload complete.", "ok");
+      setStatus(scanOnly ? "Scan complete." : "Upload complete.", "ok");
       clearStatusSoon(2000);
 
       pendingFiles = [];
       renderPending();
-      await refreshRecent();
+      if (!scanOnly) await refreshRecent();
     } catch (err) {
-      console.error("Upload error:", err);
-      setStatus(`Upload failed: ${err?.message || "Unknown error"}`, "error");
+      console.error(scanOnly ? "Scan error:" : "Upload error:", err);
+      setStatus(
+        `${scanOnly ? "Scan" : "Upload"} failed: ${err?.message || "Unknown error"}`,
+        "error"
+      );
     } finally {
       setUploadingUI(false);
     }
   };
 
-  uploadBtn?.addEventListener("click", uploadAll);
+  uploadBtn?.addEventListener("click", () => {
+    if (!pendingFiles.length || isUploading) return;
+    openUploadModeModal();
+  });
+
+  btnScanOnly?.addEventListener("click", () => {
+    closeUploadModeModal();
+    uploadAll({ scanOnly: true });
+  });
+
+  btnSaveAndScan?.addEventListener("click", () => {
+    closeUploadModeModal();
+    uploadAll({ scanOnly: false });
+  });
+
+  btnUploadCancel?.addEventListener("click", closeUploadModeModal);
 
   // Close modal with Escape
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && deleteModal && !deleteModal.classList.contains("hidden")) {
       closeDeleteModal();
+    }
+    if (e.key === "Escape" && uploadModeModal && !uploadModeModal.classList.contains("hidden")) {
+      closeUploadModeModal();
     }
   });
 

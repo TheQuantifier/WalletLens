@@ -1,10 +1,15 @@
 // src/routes/receipts.routes.js
 import express from "express";
+import multer from "multer";
 
 import * as controller from "../controllers/receipts.controller.js";
 import auth from "../middleware/auth.js";
 
 const router = express.Router();
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 50 * 1024 * 1024 },
+});
 
 /*
 |--------------------------------------------------------------------------
@@ -17,6 +22,9 @@ const router = express.Router();
 
 // Get a presigned PUT URL + create pending metadata row
 router.post("/presign", auth, controller.presignUpload);
+
+// Scan-only: OCR + AI parse without object storage
+router.post("/scan", auth, upload.single("file"), controller.scanOnly);
 
 // Confirm upload completed (optionally HEAD object) and finalize metadata
 router.post("/:id/confirm", auth, controller.confirmUpload);

@@ -302,6 +302,42 @@ export const budgetSheets = {
     return request(`/budget-sheets${query ? `?${query}` : ""}`);
   },
 
+  /**
+   * Scan-only flow (no object storage, no DB persistence):
+   * 1) POST /receipts/scan (multipart/form-data)
+   * 2) Returns OCR + parsed data
+   */
+  async scan(file) {
+    if (!file) throw new Error("No file provided");
+
+    const form = new FormData();
+    form.append("file", file, file.name);
+
+    const token = getAuthToken();
+    const res = await fetch(`${API_BASE}/receipts/scan`, {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: form,
+    });
+
+    let data = null;
+    try {
+      data = await res.json();
+    } catch {
+      // ignore
+    }
+
+    if (!res.ok) {
+      const message = data?.message || `Request failed (${res.status})`;
+      throw new Error(message);
+    }
+
+    return data;
+  },
+
   lookup({ cadence, period }) {
     const query = new URLSearchParams({ cadence, period }).toString();
     return request(`/budget-sheets/lookup?${query}`);

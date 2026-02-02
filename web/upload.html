@@ -23,7 +23,7 @@
   <main class="main main--upload">
     <section class="upload-hero">
       <h1>Upload Receipts</h1>
-      <p class="subtle">Drop PDFs or images (PNG/JPG) to store the file locally and metadata in MongoDB.</p>
+      <p class="subtle">Drop PDFs or images to scan receipts. You can choose to save files or scan-only.</p>
     </section>
 
     <section class="uploader card">
@@ -46,8 +46,8 @@
       </div>
 
       <ul class="tips">
-        <li>Accepted: PDF, PNG, JPG (up to 50MB)</li>
-        <li>We store the file under <code>uploads/</code> and save metadata in your MongoDB <code>receipts</code> collection.</li>
+        <li>Accepted: PDF, PNG, JPG, HEIC/HEIF, TIFF, BMP, WEBP (up to 50MB)</li>
+        <li>Scan-only skips file storage; Save stores the file and metadata.</li>
       </ul>
 
       <div class="file-list-wrap">
@@ -102,6 +102,22 @@
         <button id="btnDeleteFile" class="btn btn--danger" type="button">Delete Receipt Only</button>
         <button id="btnDeleteBoth" class="btn btn--warning" type="button">Delete Both Receipt & Record</button>
         <button id="btnDeleteCancel" class="btn" type="button">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===================== UPLOAD MODE MODAL ===================== -->
+  <div id="uploadModeModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content">
+      <h3>Upload Options</h3>
+      <p>Would you like to save the file, or just scan it without storing?</p>
+
+      <div class="modal-actions">
+        <button id="btnScanOnly" class="btn btn--warning" type="button">Scan Only</button>
+        <button id="btnSaveAndScan" class="btn btn--primary" type="button">Save & Scan</button>
+        <button id="btnUploadCancel" class="btn" type="button">Cancel</button>
       </div>
     </div>
   </div>

@@ -38,6 +38,10 @@ export const presignUpload = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "filename and contentType are required" });
   }
 
+  if (!env.keepReceiptFiles) {
+    return res.status(403).json({ message: "Saving receipt files is currently disabled" });
+  }
+
   const allowedExt = new Set(["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff", "bmp", "webp"]);
   const allowedMime = new Set([
     "application/pdf",
@@ -182,6 +186,56 @@ export const confirmUpload = asyncHandler(async (req, res) => {
   res.status(200).json({
     receipt: updatedReceipt,
     autoRecord,
+  });
+});
+
+/* ============================================================
+   POST /api/receipts/scan
+   Upload a file directly to the API for OCR + AI parse only
+   (no object storage, no DB persistence)
+   ============================================================ */
+export const scanOnly = asyncHandler(async (req, res) => {
+  const file = req.file;
+  if (!file?.buffer) {
+    return res.status(400).json({ message: "No file uploaded" });
+  }
+
+  const allowedExt = new Set(["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff", "bmp", "webp"]);
+  const allowedMime = new Set([
+    "application/pdf",
+    "image/png",
+    "image/jpeg",
+    "image/heic",
+    "image/heif",
+    "image/tiff",
+    "image/bmp",
+    "image/webp",
+  ]);
+  const ext = String(file.originalname || "").split(".").pop().toLowerCase();
+  const isImage = String(file.mimetype || "").startsWith("image/");
+  if (!allowedMime.has(file.mimetype) && !(isImage && allowedExt.has(ext))) {
+    return res.status(400).json({ message: "Unsupported file type" });
+  }
+
+  let ocrText = "";
+  try {
+    const result = await runOcrBuffer(file.buffer);
+    ocrText = result?.text || "";
+  } catch (err) {
+    console.error("❌ OCR failed:", err);
+  }
+
+  let parsed = null;
+  if (ocrText.trim().length > 5) {
+    parsed = await parseReceiptText(ocrText);
+  }
+
+  const parsedDate = parsed?.date ? parseDateOnly(parsed.date) : null;
+
+  res.status(200).json({
+    ocrText,
+    parsed: parsed || {},
+    parsedDate,
   });
 });
 
