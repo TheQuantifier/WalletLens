@@ -247,8 +247,8 @@ import { api } from "./api.js";
   // -----------------------------
   // Recent table rendering
   // -----------------------------
-  const trashIcon = `<img src="/images/trash.png" alt="Delete" class="icon-trash" />`;
-  const downloadIcon = `<img src="/images/download.png" alt="Download" class="icon-trash" />`;
+  const trashIcon = `<img src="images/trash.png" alt="Delete" class="icon-trash" />`;
+  const downloadIcon = `<img src="images/download.png" alt="Download" class="icon-trash" />`;
 
   const renderRecentRows = (rows) => {
     if (!recentTableBody) return;
