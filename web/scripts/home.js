@@ -901,7 +901,7 @@ import { api } from "./api.js";
       spendingEl.classList.remove("kpi-good", "kpi-warn", "kpi-alert", "kpi-bad");
       const income = Number(comp.total_income) || 0;
       const spending = Number(comp.total_spending) || 0;
-      const ratio = income > 0 ? spending / income : 0;
+      const ratio = income > 0 ? spending / income : spending > 0 ? 1 : 0;
       const clamped = Math.max(0, Math.min(1, ratio));
       let hue = 120;
       if (clamped <= 0.6) {
