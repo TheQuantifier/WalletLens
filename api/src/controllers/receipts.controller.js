@@ -284,6 +284,28 @@ export const scanOnly = asyncHandler(async (req, res) => {
 });
 
 /* ============================================================
+   PATCH /api/receipts/:id/ocr
+   Update OCR text (manual correction)
+   ============================================================ */
+export const updateOcrText = asyncHandler(async (req, res) => {
+  const receiptId = req.params.id;
+  const { ocrText } = req.body || {};
+
+  if (typeof ocrText !== "string") {
+    return res.status(400).json({ message: "ocrText must be a string" });
+  }
+
+  const receipt = await getReceiptById(req.user.id, receiptId);
+  if (!receipt) return res.status(404).json({ message: "Receipt not found" });
+
+  const updated = await updateReceiptParsedData(req.user.id, receiptId, {
+    ocrText,
+  });
+
+  res.json({ receipt: updated });
+});
+
+/* ============================================================
    GET /api/receipts
    ============================================================ */
 export const getAll = asyncHandler(async (req, res) => {

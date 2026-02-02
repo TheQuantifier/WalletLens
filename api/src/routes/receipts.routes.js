@@ -26,6 +26,9 @@ router.post("/presign", auth, controller.presignUpload);
 // Scan-only: OCR + AI parse without object storage
 router.post("/scan", auth, upload.single("file"), controller.scanOnly);
 
+// Update OCR text (manual correction)
+router.patch("/:id/ocr", auth, controller.updateOcrText);
+
 // Confirm upload completed (optionally HEAD object) and finalize metadata
 router.post("/:id/confirm", auth, controller.confirmUpload);
 

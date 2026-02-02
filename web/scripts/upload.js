@@ -40,6 +40,11 @@ import { api } from "./api.js";
   const btnSaveAndScan = document.getElementById("btnSaveAndScan");
   const btnUploadCancel = document.getElementById("btnUploadCancel");
 
+  // OCR review modal
+  const ocrReviewModal = document.getElementById("ocrReviewModal");
+  const ocrReviewText = document.getElementById("ocrReviewText");
+  const btnOcrReviewDone = document.getElementById("btnOcrReviewDone");
+
   if (!dropzone || !fileInput) {
     console.error("upload.js: Missing #dropzone or #fileInput in DOM");
     return;
@@ -364,6 +369,27 @@ import { api } from "./api.js";
     uploadModeModal.classList.add("hidden");
   };
 
+  // -----------------------------
+  // OCR review modal
+  // -----------------------------
+  const openOcrReviewModal = (text) => {
+    if (!ocrReviewModal || !ocrReviewText) return Promise.resolve();
+    ocrReviewText.value = text || "";
+    ocrReviewModal.classList.remove("hidden");
+
+    return new Promise((resolve) => {
+      const done = () => {
+        ocrReviewModal.classList.add("hidden");
+        btnOcrReviewDone?.removeEventListener("click", done);
+        ocrReviewModal?.querySelector(".modal-backdrop")?.removeEventListener("click", done);
+        resolve(ocrReviewText.value || "");
+      };
+
+      btnOcrReviewDone?.addEventListener("click", done);
+      ocrReviewModal?.querySelector(".modal-backdrop")?.addEventListener("click", done);
+    });
+  };
+
   const performDelete = async (deleteRecord) => {
     const { receiptId, buttonRef } = pendingDelete;
     if (!receiptId) return;
@@ -497,10 +523,26 @@ import { api } from "./api.js";
         const file = pendingFiles[i];
         if (scanOnly) {
           setStatus(`Scanning ${i + 1} of ${pendingFiles.length}: ${file.name}…`);
-          await api.receipts.scan(file);
+          const result = await api.receipts.scan(file);
+          const ocrText = result?.ocrText ?? "";
+          const receiptId = result?.receipt?.id || result?.receipt?._id || "";
+          const edited = await openOcrReviewModal(ocrText);
+          if (receiptId) {
+            await api.receipts.updateOcrText(receiptId, edited);
+          }
         } else {
           setStatus(`Uploading ${i + 1} of ${pendingFiles.length}: ${file.name}…`);
-          await api.receipts.upload(file);
+          const result = await api.receipts.upload(file);
+          const ocrText =
+            result?.receipt?.ocr_text ??
+            result?.receipt?.ocrText ??
+            result?.ocrText ??
+            "";
+          const receiptId = result?.receipt?.id || result?.receipt?._id || "";
+          const edited = await openOcrReviewModal(ocrText);
+          if (receiptId) {
+            await api.receipts.updateOcrText(receiptId, edited);
+          }
         }
       }
 
@@ -545,6 +587,9 @@ import { api } from "./api.js";
     }
     if (e.key === "Escape" && uploadModeModal && !uploadModeModal.classList.contains("hidden")) {
       closeUploadModeModal();
+    }
+    if (e.key === "Escape" && ocrReviewModal && !ocrReviewModal.classList.contains("hidden")) {
+      ocrReviewModal.classList.add("hidden");
     }
   });
 

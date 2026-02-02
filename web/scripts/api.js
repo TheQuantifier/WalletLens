@@ -285,6 +285,13 @@ export const receipts = {
     URL.revokeObjectURL(url);
   },
 
+  updateOcrText(id, ocrText) {
+    return request(`/receipts/${id}/ocr`, {
+      method: "PATCH",
+      body: JSON.stringify({ ocrText }),
+    });
+  },
+
   remove(id, deleteRecord) {
     const query =
       deleteRecord === undefined ? "" : `?deleteRecord=${deleteRecord}`;

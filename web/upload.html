@@ -122,6 +122,25 @@
     </div>
   </div>
 
+  <!-- ===================== OCR REVIEW MODAL ===================== -->
+  <div id="ocrReviewModal" class="modal hidden">
+    <div class="modal-backdrop"></div>
+
+    <div class="modal-content">
+      <h3>Parsed Text Review</h3>
+      <p>
+        This is the parsed text from your receipt. Please make sure it is correct.
+        If not, edit it below to correct it.
+      </p>
+
+      <textarea id="ocrReviewText" rows="12" style="width: 100%;" spellcheck="false"></textarea>
+
+      <div class="modal-actions">
+        <button id="btnOcrReviewDone" class="btn btn--primary" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Scripts -->
   <script src="scripts/default.js" type="module" defer></script>
   <script src="scripts/upload.js" type="module" defer></script>
