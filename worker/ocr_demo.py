@@ -12,7 +12,9 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 pillow_heif.register_heif_opener()
 
 
-TESSERACT_CONFIG = "--oem 3 --psm 6 -l eng"
+TESSERACT_LANG = "eng"
+TESSERACT_PSMS = [6, 11]  # 6=single uniform block, 11=sparse text
+TESSERACT_OEM = 3
 
 
 def _preprocess_image(img: Image.Image) -> Image.Image:
@@ -24,29 +26,38 @@ def _preprocess_image(img: Image.Image) -> Image.Image:
 
     img = img.convert("L")
     img = ImageOps.autocontrast(img)
+    img = img.filter(ImageFilter.MedianFilter(size=3))
 
     # Scale up small images for better OCR, cap large images to avoid huge memory use.
     max_side = max(img.size)
-    if max_side < 1000:
-        scale = 1000 / max_side
+    if max_side < 1600:
+        scale = 1600 / max_side
         img = img.resize((int(img.size[0] * scale), int(img.size[1] * scale)), Image.BICUBIC)
-    elif max_side > 3000:
-        scale = 3000 / max_side
+    elif max_side > 4000:
+        scale = 4000 / max_side
         img = img.resize((int(img.size[0] * scale), int(img.size[1] * scale)), Image.BICUBIC)
 
-    img = img.filter(ImageFilter.SHARPEN)
+    img = img.filter(ImageFilter.UnsharpMask(radius=2, percent=150, threshold=3))
     return img
 
 
 def _ocr_image(img: Image.Image) -> str:
     img = _preprocess_image(img)
-    text = pytesseract.image_to_string(img, config=TESSERACT_CONFIG)
-    return text or ""
+    best_text = ""
+    best_score = -1
+    for psm in TESSERACT_PSMS:
+        cfg = f"--oem {TESSERACT_OEM} --psm {psm} -l {TESSERACT_LANG}"
+        text = pytesseract.image_to_string(img, config=cfg) or ""
+        score = sum(ch.isalnum() for ch in text)
+        if score > best_score:
+            best_score = score
+            best_text = text
+    return best_text or ""
 
 
 def _render_page_to_image(page) -> Image.Image:
     # Render PDF page to raster image for OCR fallback.
-    pix = page.get_pixmap(dpi=200)
+    pix = page.get_pixmap(dpi=300)
     mode = "RGB" if pix.alpha == 0 else "RGBA"
     return Image.frombytes(mode, [pix.width, pix.height], pix.samples)
 
