@@ -38,7 +38,7 @@ John's TODO
 
 Atharva's TODO
 
-- check footer section and make necessary changes
+- check footer section and make necessary changes (news and updates, careers, community, tax tips and guides, privacy policy, terms of use)
 
 Testing Phase
 

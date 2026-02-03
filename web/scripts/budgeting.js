@@ -517,44 +517,13 @@ import { api } from "./api.js";
 
   const clamp01 = (value) => Math.min(1, Math.max(0, value));
 
-  const hexToRgb = (hex) => {
-    const cleaned = hex.replace("#", "");
-    if (cleaned.length !== 6) return { r: 0, g: 0, b: 0 };
-    const num = parseInt(cleaned, 16);
-    return {
-      r: (num >> 16) & 255,
-      g: (num >> 8) & 255,
-      b: num & 255,
-    };
-  };
-
-  const rgbToHex = ({ r, g, b }) =>
-    `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
-
-  const mix = (a, b, amount) => {
-    const t = clamp01(amount);
-    return {
-      r: a.r + (b.r - a.r) * t,
-      g: a.g + (b.g - a.g) * t,
-      b: a.b + (b.b - a.b) * t,
-    };
-  };
-
-  const blendHex = (from, to, amount) => {
-    const a = hexToRgb(from);
-    const b = hexToRgb(to);
-    return rgbToHex(mix(a, b, amount));
-  };
-
-  const isDarkTheme = () => document.documentElement.getAttribute("data-theme") === "dark";
-
-  const setSummaryCardGradient = (selector, baseHex) => {
-    const card = document.querySelector(selector);
-    if (!card) return;
-    const bgBase = isDarkTheme() ? blendHex(baseHex, "#0f172a", 0.45) : baseHex;
-    const highlight = blendHex(bgBase, "#ffffff", isDarkTheme() ? 0.08 : 0.35);
-    card.style.background = `linear-gradient(135deg, ${highlight} 0%, ${bgBase} 100%)`;
-    card.style.borderColor = blendHex(bgBase, "#0f172a", 0.25);
+  const resetSummaryCardStyles = () => {
+    document
+      .querySelectorAll(".summary-card")
+      .forEach((card) => {
+        card.style.background = "";
+        card.style.borderColor = "";
+      });
   };
 
   function renderSummary(totals, currency, incomeTotal = null) {
@@ -562,38 +531,7 @@ import { api } from "./api.js";
     $("#summarySpent").textContent = fmtMoney(totals.totalSpent, currency);
     $("#summaryRemaining").textContent = fmtMoney(totals.totalRemaining, currency);
     $("#summaryUnused").textContent = fmtMoney(totals.unused, currency);
-
-    const budget = totals.totalBudget;
-    const spent = totals.totalSpent;
-    const remaining = totals.totalRemaining;
-
-    if (budget > 0) {
-      if (Number.isFinite(incomeTotal) && incomeTotal > 0) {
-        if (budget > incomeTotal) {
-          setSummaryCardGradient(".summary-card--total", "#dc2626");
-        } else {
-          const budgetRatio = clamp01(budget / incomeTotal);
-          const budgetColor = blendHex("#16a34a", "#f59e0b", budgetRatio);
-          setSummaryCardGradient(".summary-card--total", budgetColor);
-        }
-      }
-
-      if (spent > budget) {
-        setSummaryCardGradient(".summary-card--spent", "#dc2626");
-      } else {
-        const spentRatio = clamp01(spent / budget);
-        const spentColor = blendHex("#16a34a", "#f59e0b", spentRatio);
-        setSummaryCardGradient(".summary-card--spent", spentColor);
-      }
-
-      if (remaining < 0) {
-        setSummaryCardGradient(".summary-card--remaining", "#dc2626");
-      } else {
-        const remainRatio = clamp01(remaining / budget);
-        const remainColor = blendHex("#f59e0b", "#16a34a", remainRatio);
-        setSummaryCardGradient(".summary-card--remaining", remainColor);
-      }
-    }
+    resetSummaryCardStyles();
   }
 
   function renderReallocateOptions(categories) {
