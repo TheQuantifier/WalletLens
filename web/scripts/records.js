@@ -36,6 +36,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const statusExpense = document.getElementById("recordsStatusExpense");
   const statusIncome = document.getElementById("recordsStatusIncome");
+  const deleteRecordText = document.getElementById("deleteRecordText");
 
   const expenseCustomList = document.getElementById("expenseCustomCategories");
   const incomeCustomList = document.getElementById("incomeCustomCategories");
@@ -545,6 +546,11 @@ document.addEventListener("DOMContentLoaded", () => {
     pendingDelete = { recordId, linkedReceiptId };
     if (btnDeleteRecordAndReceipt) {
       btnDeleteRecordAndReceipt.style.display = linkedReceiptId ? "block" : "none";
+    }
+    if (deleteRecordText) {
+      deleteRecordText.textContent = linkedReceiptId
+        ? "This record is linked to an uploaded receipt."
+        : "Are you sure you want to delete this record?";
     }
     showModal(deleteRecordModal);
   }
