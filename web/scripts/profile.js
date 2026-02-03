@@ -34,7 +34,6 @@ const editBtn = $("editProfileBtn");
 const form = $("editForm");
 const cancelBtn = $("cancelEditBtn");
 const statusEl = $("profileStatus");
-const copyLinkBtn = $("copyProfileLinkBtn");
 
 // SUMMARY ELEMENTS
 const f = {
@@ -452,36 +451,6 @@ saveAvatarBtn?.addEventListener("click", async () => {
   } catch (err) {
     showStatus("Avatar update failed: " + (err?.message || "Unknown error"), "error");
     clearStatusSoon(3500);
-  }
-});
-
-/* ----------------------------------------
-   COPY PROFILE LINK
----------------------------------------- */
-copyLinkBtn?.addEventListener("click", async () => {
-  const text = location.href;
-  try {
-    await navigator.clipboard.writeText(text);
-    showStatus("Profile link copied.");
-    clearStatusSoon(2000);
-  } catch {
-    // Fallback for some browsers / insecure contexts
-    try {
-      const ta = document.createElement("textarea");
-      ta.value = text;
-      ta.setAttribute("readonly", "");
-      ta.style.position = "fixed";
-      ta.style.opacity = "0";
-      document.body.appendChild(ta);
-      ta.select();
-      document.execCommand("copy");
-      document.body.removeChild(ta);
-      showStatus("Profile link copied.");
-      clearStatusSoon(2000);
-    } catch {
-      showStatus("Could not copy link. Please copy from the address bar.", "error");
-      clearStatusSoon(3000);
-    }
   }
 });
 

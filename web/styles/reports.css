@@ -6,6 +6,10 @@
   margin-bottom: 2rem;
 }
 
+.summary h2 {
+  font-size: 1.8rem;
+}
+
 /* Controls row (range + refresh + status) */
 .reports-controls {
   display: flex;
@@ -137,16 +141,20 @@
 .chart-box {
   min-width: 0;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  height: 360px;
 }
 
 /* ===== RESPONSIVE PIE CHARTS ===== */
 #pieChartExpenses,
 #pieChartIncome {
   width: 100% !important;
-  height: 320px !important;
+  height: 100% !important;
   max-width: 100%;
   display: block;
   margin: 0 auto;
+  flex: 1;
 }
 
 /* ===== LINE CHART (FILL WIDTH) ===== */
@@ -177,7 +185,10 @@
   }
   #pieChartExpenses,
   #pieChartIncome {
-    height: 300px !important;
+    height: 100% !important;
+  }
+  .chart-box {
+    height: 340px;
   }
 }
 

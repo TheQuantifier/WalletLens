@@ -384,7 +384,11 @@ import { api } from "./api.js";
       spent: state.spentMap.get(normalizeName(c.name)) || 0,
     }));
 
-    renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+    renderSummary(
+      computeTotals(state.categories, state.spentMap),
+      CURRENCY_FALLBACK,
+      computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
+    );
     renderReallocateOptions(state.categories);
     renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
   };
@@ -497,11 +501,99 @@ import { api } from "./api.js";
     return totals;
   }
 
-  function renderSummary(totals, currency) {
+  const computeIncomeTotal = (records, start, end) => {
+    if (!Array.isArray(records)) return 0;
+    return records.reduce((sum, r) => {
+      if (r?.type !== "income") return sum;
+      if (start && end) {
+        if (!r.date) return sum;
+        const d = new Date(r.date);
+        if (Number.isNaN(d.getTime())) return sum;
+        if (d < start || d > end) return sum;
+      }
+      return sum + (Number(r.amount) || 0);
+    }, 0);
+  };
+
+  const clamp01 = (value) => Math.min(1, Math.max(0, value));
+
+  const hexToRgb = (hex) => {
+    const cleaned = hex.replace("#", "");
+    if (cleaned.length !== 6) return { r: 0, g: 0, b: 0 };
+    const num = parseInt(cleaned, 16);
+    return {
+      r: (num >> 16) & 255,
+      g: (num >> 8) & 255,
+      b: num & 255,
+    };
+  };
+
+  const rgbToHex = ({ r, g, b }) =>
+    `#${[r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("")}`;
+
+  const mix = (a, b, amount) => {
+    const t = clamp01(amount);
+    return {
+      r: a.r + (b.r - a.r) * t,
+      g: a.g + (b.g - a.g) * t,
+      b: a.b + (b.b - a.b) * t,
+    };
+  };
+
+  const blendHex = (from, to, amount) => {
+    const a = hexToRgb(from);
+    const b = hexToRgb(to);
+    return rgbToHex(mix(a, b, amount));
+  };
+
+  const isDarkTheme = () => document.documentElement.getAttribute("data-theme") === "dark";
+
+  const setSummaryCardGradient = (selector, baseHex) => {
+    const card = document.querySelector(selector);
+    if (!card) return;
+    const bgBase = isDarkTheme() ? blendHex(baseHex, "#0f172a", 0.45) : baseHex;
+    const highlight = blendHex(bgBase, "#ffffff", isDarkTheme() ? 0.08 : 0.35);
+    card.style.background = `linear-gradient(135deg, ${highlight} 0%, ${bgBase} 100%)`;
+    card.style.borderColor = blendHex(bgBase, "#0f172a", 0.25);
+  };
+
+  function renderSummary(totals, currency, incomeTotal = null) {
     $("#summaryTotalBudget").textContent = fmtMoney(totals.totalBudget, currency);
     $("#summarySpent").textContent = fmtMoney(totals.totalSpent, currency);
     $("#summaryRemaining").textContent = fmtMoney(totals.totalRemaining, currency);
     $("#summaryUnused").textContent = fmtMoney(totals.unused, currency);
+
+    const budget = totals.totalBudget;
+    const spent = totals.totalSpent;
+    const remaining = totals.totalRemaining;
+
+    if (budget > 0) {
+      if (Number.isFinite(incomeTotal) && incomeTotal > 0) {
+        if (budget > incomeTotal) {
+          setSummaryCardGradient(".summary-card--total", "#dc2626");
+        } else {
+          const budgetRatio = clamp01(budget / incomeTotal);
+          const budgetColor = blendHex("#16a34a", "#f59e0b", budgetRatio);
+          setSummaryCardGradient(".summary-card--total", budgetColor);
+        }
+      }
+
+      if (spent > budget) {
+        setSummaryCardGradient(".summary-card--spent", "#dc2626");
+      } else {
+        const spentRatio = clamp01(spent / budget);
+        const spentColor = blendHex("#16a34a", "#f59e0b", spentRatio);
+        setSummaryCardGradient(".summary-card--spent", spentColor);
+      }
+
+      if (remaining < 0) {
+        setSummaryCardGradient(".summary-card--remaining", "#dc2626");
+      } else {
+        const remainRatio = clamp01(remaining / budget);
+        const remainColor = blendHex("#f59e0b", "#16a34a", remainRatio);
+        setSummaryCardGradient(".summary-card--remaining", remainColor);
+      }
+    }
   }
 
   function renderReallocateOptions(categories) {
@@ -693,7 +785,11 @@ import { api } from "./api.js";
         spent: state.spentMap.get(normalizeName(c.name)) || 0,
       }));
 
-      renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+      renderSummary(
+        computeTotals(state.categories, state.spentMap),
+        CURRENCY_FALLBACK,
+        computeIncomeTotal(periodRecords)
+      );
       renderReallocateOptions(state.categories);
       renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
     };
@@ -823,7 +919,11 @@ import { api } from "./api.js";
       if (saveBtn) saveBtn.disabled = false;
 
       const updatedTotals = computeTotals(state.categories, state.spentMap);
-      renderSummary(updatedTotals, CURRENCY_FALLBACK);
+      renderSummary(
+        updatedTotals,
+        CURRENCY_FALLBACK,
+        computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
+      );
       const row = target.closest("tr");
       if (row) {
         const category = state.categories[idx];
@@ -884,7 +984,11 @@ import { api } from "./api.js";
         spent: state.spentMap.get(normalizeName(c.name)) || 0,
       }));
 
-      renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+      renderSummary(
+        computeTotals(state.categories, state.spentMap),
+        CURRENCY_FALLBACK,
+        computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
+      );
       renderReallocateOptions(state.categories);
       renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
       showStatus("Budgets reset to defaults.");
@@ -922,7 +1026,11 @@ import { api } from "./api.js";
         spent: state.spentMap.get(normalizeName(c.name)) || 0,
       }));
 
-      renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+      renderSummary(
+        computeTotals(state.categories, state.spentMap),
+        CURRENCY_FALLBACK,
+        computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
+      );
       renderReallocateOptions(state.categories);
       renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
       showStatus(`Moved ${fmtMoney(moved, CURRENCY_FALLBACK)} to Savings.`);
@@ -963,7 +1071,11 @@ import { api } from "./api.js";
         spent: state.spentMap.get(normalizeName(c.name)) || 0,
       }));
 
-      renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+      renderSummary(
+        computeTotals(state.categories, state.spentMap),
+        CURRENCY_FALLBACK,
+        computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
+      );
       renderReallocateOptions(state.categories);
       renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
       showStatus(`Moved ${fmtMoney(moved, CURRENCY_FALLBACK)} to ${target}.`);
@@ -1084,7 +1196,11 @@ import { api } from "./api.js";
         spent: state.spentMap.get(normalizeName(c.name)) || 0,
       }));
 
-      renderSummary(computeTotals(state.categories, state.spentMap), CURRENCY_FALLBACK);
+      renderSummary(
+        computeTotals(state.categories, state.spentMap),
+        CURRENCY_FALLBACK,
+        computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
+      );
       renderReallocateOptions(state.categories);
       renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
       closeCustomModal();

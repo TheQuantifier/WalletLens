@@ -36,28 +36,93 @@
         <h2>Frequently Asked Questions</h2>
 
         <details>
-          <summary>How do I reset my password?</summary>
-          <p>You can reset your password from the Security section on your Profile page.</p>
+          <summary>How do I change my password?</summary>
+          <p>Go to Settings and select Change Password in the Security section.</p>
         </details>
 
         <details>
-          <summary>Where can I view my financial records?</summary>
-          <p>Your records are under the Records tab in the main navigation.</p>
+          <summary>Where do I see my transactions?</summary>
+          <p>Open the Records page to view all expenses and income entries.</p>
         </details>
 
         <details>
-          <summary>How do I export my data?</summary>
-          <p>Go to Records and use the Export option to download a CSV for budgeting, accounting, or taxes.</p>
+          <summary>How do I upload receipts?</summary>
+          <p>Use the Upload Receipts page to drag and drop or browse for files.</p>
+        </details>
+
+        <details>
+          <summary>What file types can I upload?</summary>
+          <p>JPG, PNG, and PDF receipts are supported.</p>
+        </details>
+
+        <details>
+          <summary>How do I edit or delete a transaction?</summary>
+          <p>On the Records page, use the actions menu next to a transaction to edit or delete it.</p>
+        </details>
+
+        <details>
+          <summary>How do I add income records?</summary>
+          <p>In Records, switch to the Income section and use the Add Income button.</p>
+        </details>
+
+        <details>
+          <summary>How do categories work?</summary>
+          <p>Categories help organize spending and are used in reports and budgets.</p>
+        </details>
+
+        <details>
+          <summary>Can I create a custom category?</summary>
+          <p>Yes. Use Add Category when creating or editing a record.</p>
         </details>
 
         <details>
           <summary>Why don’t my charts match my records?</summary>
-          <p>Check your selected date range and filters—charts only reflect the currently filtered records.</p>
+          <p>Charts reflect the selected date range and filters. Update the range to match what you’re viewing.</p>
         </details>
 
         <details>
-          <summary>How do I delete or edit a transaction?</summary>
-          <p>Open Records, select the transaction, and choose Edit or Delete from the actions menu.</p>
+          <summary>How do I export my data?</summary>
+          <p>Go to Records and choose Export to download a CSV.</p>
+        </details>
+
+        <details>
+          <summary>How do budgets work?</summary>
+          <p>Set a budget per category on the Budgeting page and track remaining amounts.</p>
+        </details>
+
+        <details>
+          <summary>What does Budget frequency mean?</summary>
+          <p>Frequency controls the time span for budgets (monthly, quarterly, etc.).</p>
+        </details>
+
+        <details>
+          <summary>How do I change my dashboard view?</summary>
+          <p>Update the Default Dashboard View in Settings to Weekly, Monthly, Yearly, or All Time.</p>
+        </details>
+
+        <details>
+          <summary>How do I change my time zone?</summary>
+          <p>Open Settings and choose your Time Zone under Formatting.</p>
+        </details>
+
+        <details>
+          <summary>How do I update my currency format?</summary>
+          <p>Go to Settings and choose your preferred currency and number format.</p>
+        </details>
+
+        <details>
+          <summary>Are linked accounts supported?</summary>
+          <p>Linked accounts are coming soon. For now, you can manage records manually.</p>
+        </details>
+
+        <details>
+          <summary>How do notifications work?</summary>
+          <p>Enable or disable email and SMS notifications in Settings.</p>
+        </details>
+
+        <details>
+          <summary>How do I delete my account?</summary>
+          <p>Open Settings and use Delete Account. This action is permanent.</p>
         </details>
 
         <details>
@@ -71,14 +136,14 @@
         <h2>Contact Support</h2>
 
         <form id="supportForm" novalidate>
-          <label for="supportEmail">
-            <span class="label">Your Email</span>
+          <label for="supportSubject">
+            <span class="label">Subject</span>
             <input
-              id="supportEmail"
-              name="email"
-              type="email"
-              autocomplete="email"
-              placeholder="you@example.com"
+              id="supportSubject"
+              name="subject"
+              type="text"
+              autocomplete="off"
+              placeholder="What can we help with?"
               required
             />
           </label>

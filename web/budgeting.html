@@ -29,8 +29,8 @@
       <div class="budget-hero-meta">
         <div class="month-controls">
           <div class="month-row">
-            <label class="subtle" for="budgetCadenceSelect">Budget cadence</label>
-            <select id="budgetCadenceSelect" class="month-select" aria-label="Select budget cadence">
+            <label class="subtle" for="budgetCadenceSelect">Budget frequency</label>
+            <select id="budgetCadenceSelect" class="month-select" aria-label="Select budget frequency">
               <option value="weekly">Weekly</option>
               <option value="biweekly">Biweekly</option>
               <option value="monthly">Monthly</option>
@@ -50,19 +50,19 @@
     </section>
 
     <section class="budget-summary" aria-label="Budget summary">
-      <article class="summary-card">
+      <article class="summary-card summary-card--total">
         <h2>Total Budget</h2>
         <p id="summaryTotalBudget">—</p>
       </article>
-      <article class="summary-card">
+      <article class="summary-card summary-card--spent">
         <h2>Spent</h2>
         <p id="summarySpent">—</p>
       </article>
-      <article class="summary-card">
+      <article class="summary-card summary-card--remaining">
         <h2>Remaining</h2>
         <p id="summaryRemaining">—</p>
       </article>
-      <article class="summary-card">
+      <article class="summary-card summary-card--unused">
         <h2>Unused (reallocatable)</h2>
         <p id="summaryUnused">—</p>
       </article>

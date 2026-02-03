@@ -38,22 +38,7 @@ John's TODO
 
 Atharva's TODO
 
-- need to change message for manual delete records
-- implement gradient color system for budgeting page kpi cards
-- be able to filter the records page pie charts
-- change the email on the about page
-- change titles for both co founder and co founder
-- remove copy profile link button
-- hide link accounts and achievements or "coming soon"
-- remove your email text box in help page, replace with subject box
-- update FAQ section
-- records page edit box to be visible better
-- have a default time zone
-- default dash board view to all-time
-- change "cadence" to be a better word
-- sign out and delete account should be swapped
 - check footer section and make necessary changes
-- make sure all the heading text size is the same
 
 Testing Phase
 

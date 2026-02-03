@@ -578,6 +578,36 @@ document.addEventListener("DOMContentLoaded", () => {
     hideModal(customCategoryModal);
   };
 
+  const positionActionsMenu = (menuBtn, menu) => {
+    if (!menuBtn || !menu) return;
+    menu.classList.remove("is-up");
+    const btnRect = menuBtn.getBoundingClientRect();
+    const viewportPad = 8;
+    const menuHeight = menu.offsetHeight;
+    const menuWidth = menu.offsetWidth;
+    const spaceBelow = window.innerHeight - btnRect.bottom;
+    const spaceAbove = btnRect.top;
+    const openUp = menuHeight + 12 > spaceBelow && spaceAbove > spaceBelow;
+
+    menu.style.position = "fixed";
+    menu.style.right = "auto";
+    menu.style.left = "0";
+
+    const desiredLeft = btnRect.right - menuWidth;
+    const clampedLeft = Math.min(
+      Math.max(viewportPad, desiredLeft),
+      window.innerWidth - menuWidth - viewportPad
+    );
+    menu.style.left = `${clampedLeft}px`;
+
+    const top = openUp ? btnRect.top - menuHeight - 6 : btnRect.bottom + 6;
+    const clampedTop = Math.min(
+      Math.max(viewportPad, top),
+      window.innerHeight - menuHeight - viewportPad
+    );
+    menu.style.top = `${clampedTop}px`;
+  };
+
   document.addEventListener("keydown", (e) => {
     if (e.key !== "Escape") return;
     closeAllModals();
@@ -607,6 +637,14 @@ document.addEventListener("DOMContentLoaded", () => {
       document.querySelectorAll(".actions-dropdown").forEach((m) => { if (m !== menu) m.classList.add("hidden"); });
       const isHidden = menu.classList.toggle("hidden");
       menuBtn.setAttribute("aria-expanded", String(!isHidden));
+      if (!isHidden) {
+        positionActionsMenu(menuBtn, menu);
+      } else {
+        menu.style.position = "";
+        menu.style.left = "";
+        menu.style.top = "";
+        menu.style.right = "";
+      }
       return;
     }
 
@@ -688,7 +726,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const minAmt = parseFloat(form.querySelector("input[id^=minAmt]")?.value) || 0;
     const maxAmt = parseFloat(form.querySelector("input[id^=maxAmt]")?.value) || Infinity;
     const sort = form.querySelector("select[id^=sort]")?.value || "";
-    const pageSize = parseInt(form.querySelector("select[id^=pageSize]")?.value, 10) || 25;
+    const pageSize = parseInt(form.querySelector("select[id^=pageSize]")?.value, 10) || 5;
 
     let filtered = records.filter(r => {
       const note = (r.note || "").toLowerCase();
@@ -1067,5 +1105,3 @@ document.addEventListener("DOMContentLoaded", () => {
     loadRecords();
   })();
 });
-
-

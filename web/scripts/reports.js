@@ -133,6 +133,34 @@ import { api } from "./api.js";
   const incomeLineColor = () => (theme() === "dark" ? "#60a5fa" : "#0057b8");
   const expenseLineColor = () => (theme() === "dark" ? "#fca5a5" : "#ef4444");
 
+  const togglePieIndex = (chart, index) => {
+    if (!chart) return;
+    if (typeof chart.toggleDataVisibility === "function") {
+      chart.toggleDataVisibility(index);
+    } else {
+      const meta = chart.getDatasetMeta(0);
+      if (meta?.data?.[index]) {
+        meta.data[index].hidden = !meta.data[index].hidden;
+      }
+    }
+    chart.update();
+  };
+
+  const isPieIndexVisible = (chart, index) => {
+    if (!chart) return true;
+    if (typeof chart.getDataVisibility === "function") {
+      return chart.getDataVisibility(index);
+    }
+    const meta = chart.getDatasetMeta?.(0);
+    return !(meta?.data?.[index]?.hidden);
+  };
+
+  const pieLegend = () => ({
+    position: "bottom",
+    labels: { color: chartText() },
+    onClick: (e, item, legend) => togglePieIndex(legend?.chart, item.index),
+  });
+
   const destroyCharts = () => {
     Object.values(charts).forEach((c) => {
       try {
@@ -262,12 +290,16 @@ import { api } from "./api.js";
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          legend: pieLegend(),
           plugins: {
-            legend: { position: "bottom", labels: { color: chartText() } },
+            legend: pieLegend(),
             datalabels: {
               color: "#fff",
               font: { weight: "bold" },
               formatter: (value, ctx) => {
+                if (!isPieIndexVisible(ctx.chart, ctx.dataIndex)) {
+                  return "";
+                }
                 const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
                 if (!sum) return "0%";
                 return `${((value / sum) * 100).toFixed(1)}%`;
@@ -296,12 +328,16 @@ import { api } from "./api.js";
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          legend: pieLegend(),
           plugins: {
-            legend: { position: "bottom", labels: { color: chartText() } },
+            legend: pieLegend(),
             datalabels: {
               color: "#fff",
               font: { weight: "bold" },
               formatter: (value, ctx) => {
+                if (!isPieIndexVisible(ctx.chart, ctx.dataIndex)) {
+                  return "";
+                }
                 const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
                 if (!sum) return "0%";
                 return `${((value / sum) * 100).toFixed(1)}%`;
@@ -433,5 +469,3 @@ import { api } from "./api.js";
     load();
   });
 })();
-
-

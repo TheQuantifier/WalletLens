@@ -59,7 +59,7 @@
             <option value="UTC-08:00">(UTC-08:00) Pacific Time (US & Canada)</option>
             <option value="UTC-07:00">(UTC-07:00) Mountain Time (US & Canada)</option>
             <option value="UTC-06:00">(UTC-06:00) Central Time (US & Canada)</option>
-            <option value="UTC-05:00">(UTC-05:00) Eastern Time (US & Canada)</option>
+            <option value="America/New_York">(EST) Eastern Time (US & Canada)</option>
             <option value="UTC+00:00">(UTC+00:00) London, Lisbon</option>
             <option value="UTC+01:00">(UTC+01:00) Berlin, Paris, Rome</option>
             <option value="UTC+05:30">(UTC+05:30) India</option>
@@ -97,7 +97,7 @@
             <option value="Weekly">Weekly</option>
             <option value="Monthly">Monthly</option>
             <option value="Yearly">Yearly</option>
-             <option value="All">All Time</option>
+             <option value="All Time">All Time</option>
           </select>
         </div>
 
@@ -148,11 +148,6 @@
         </div>
 
         <div class="settings-row">
-          <label>Delete Account</label>
-          <button class="settings-btn btn--danger" id="deleteAccountBtn" type="button">Delete</button>
-        </div>
-
-        <div class="settings-row">
           <label>Active Sessions</label>
           <div id="sessionsList" class="session-list">
             <p class="subtle">Loading sessions…</p>
@@ -162,6 +157,11 @@
         <div class="settings-row">
           <label>Sign Out All Devices</label>
           <button class="settings-btn btn--danger" id="signOutAllBtn" type="button">Sign Out All</button>
+        </div>
+
+        <div class="settings-row">
+          <label>Delete Account</label>
+          <button class="settings-btn btn--danger" id="deleteAccountBtn" type="button">Delete</button>
         </div>
       </section>
 

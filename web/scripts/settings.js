@@ -235,12 +235,19 @@ import { api } from "./api.js";
         localStorage.setItem("settings_number_format", "US");
         localStorage.setItem("settings_timezone", "America/New_York");
         localStorage.setItem("settings_language", "English");
-        localStorage.setItem("settings_dashboard_view", "Monthly");
+        localStorage.setItem("settings_dashboard_view", "All Time");
         localStorage.setItem("settings_notif_email", "false");
         localStorage.setItem("settings_notif_sms", "false");
         // optional helpful keys
         localStorage.setItem("settings_locale", detectDeviceLocale());
       }
+    }
+
+    if (!localStorage.getItem("settings_timezone")) {
+      localStorage.setItem("settings_timezone", "America/New_York");
+    }
+    if (!localStorage.getItem("settings_dashboard_view")) {
+      localStorage.setItem("settings_dashboard_view", "All Time");
     }
   };
 
