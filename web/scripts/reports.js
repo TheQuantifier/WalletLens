@@ -200,8 +200,17 @@ import { api } from "./api.js";
       const amt = convertCurrency(r.amount, r.currency, displayCur);
       m.set(k, prev + amt);
     });
-    return [...m.entries()].sort((a, b) => b[1] - a[1]);
+    return [...m.entries()];
   };
+
+  const sortCategoriesAlpha = (entries) =>
+    (entries || []).slice().sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }));
+
+  const topCategoryByAmount = (entries) =>
+    (entries || []).reduce(
+      (best, current) => (current[1] > best[1] ? current : best),
+      ["—", 0]
+    );
 
   const monthKey = (iso) => {
     const d = parseISODate(iso);
@@ -270,15 +279,16 @@ import { api } from "./api.js";
     setText(els.monthlyAverage, fmtMoney(avgMonthlyExp, displayCur));
 
     const expCats = groupByCategory(expenses);
-    setText(els.topCategory, expCats[0]?.[0] || "—");
+    setText(els.topCategory, topCategoryByAmount(expCats)[0] || "—");
 
     destroyCharts();
 
     // Pie: Expenses
     if (els.pieExp && window.Chart) {
       const ctx = els.pieExp.getContext("2d");
-      const labels = expCats.map(([k]) => k);
-      const data = expCats.map(([, v]) => v);
+      const expCatsAlpha = sortCategoriesAlpha(expCats);
+      const labels = expCatsAlpha.map(([k]) => k);
+      const data = expCatsAlpha.map(([, v]) => v);
       const colors = labels.map((_, i) => palette()[i % palette().length]);
 
       charts.expPie = new Chart(ctx, {
@@ -315,8 +325,9 @@ import { api } from "./api.js";
     if (els.pieInc && window.Chart) {
       const ctx = els.pieInc.getContext("2d");
       const incCats = groupByCategory(income);
-      const labels = incCats.map(([k]) => k);
-      const data = incCats.map(([, v]) => v);
+      const incCatsAlpha = sortCategoriesAlpha(incCats);
+      const labels = incCatsAlpha.map(([k]) => k);
+      const data = incCatsAlpha.map(([, v]) => v);
       const colors = labels.map((_, i) => palette()[i % palette().length]);
 
       charts.incPie = new Chart(ctx, {

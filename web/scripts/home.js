@@ -374,7 +374,9 @@ import { api } from "./api.js";
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.scale(dpr, dpr);
 
-    const entries = Object.entries(dataObj || {});
+    const entries = Object.entries(dataObj || {}).sort((a, b) =>
+      a[0].localeCompare(b[0], undefined, { sensitivity: "base" })
+    );
     const labels = entries.map((e) => e[0]);
     const values = entries.map((e) => +e[1] || 0);
     const max = Math.max(1, ...values);
@@ -633,7 +635,9 @@ import { api } from "./api.js";
       ? ["#60a5fa", "#38bdf8", "#818cf8", "#22d3ee", "#93c5fd", "#67e8f9", "#a5b4fc"]
       : ["#0057b8", "#00a3e0", "#1e3a8a", "#0ea5e9", "#2563eb", "#0891b2", "#3b82f6"];
 
-    Object.keys(categories || {}).forEach((name, i) => {
+    Object.keys(categories || {})
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }))
+      .forEach((name, i) => {
       const chip = document.createElement("span");
       chip.className = "chip";
       chip.style.color = palette[i % palette.length];
@@ -654,7 +658,7 @@ import { api } from "./api.js";
     const total = Object.values(categories || {}).reduce((a, b) => a + b, 0);
 
     Object.entries(categories || {})
-      .sort((a, b) => b[1] - a[1])
+      .sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }))
       .forEach(([name, amt]) => {
         const pct = total ? Math.round((amt / total) * 100) : 0;
         const li = document.createElement("li");
