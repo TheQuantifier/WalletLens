@@ -1,0 +1,35 @@
+.main--legal {
+  display: grid;
+  gap: var(--space-5);
+}
+
+.legal-hero {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.legal-hero .lead {
+  color: var(--muted);
+  font-size: 1.05rem;
+  max-width: 60ch;
+}
+
+.legal-content {
+  display: grid;
+  gap: var(--space-4);
+}
+
+.legal-content .card {
+  display: grid;
+  gap: var(--space-3);
+}
+
+.legal-placeholder {
+  display: grid;
+  gap: var(--space-2);
+}
+
+.legal-placeholder a {
+  color: var(--primary);
+  font-weight: 600;
+}

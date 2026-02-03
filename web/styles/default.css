@@ -815,3 +815,7 @@ textarea:focus-visible {
   border-color: var(--border);
   color: var(--muted);
 }
+
+:root[data-theme="dark"] .footer-careers {
+  color: #ffffff;
+}
