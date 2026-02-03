@@ -896,22 +896,21 @@ import { api } from "./api.js";
       "Data updated " + new Date(comp.last_updated).toLocaleString()
     );
 
+    const getSpendingHue = (ratio) => {
+      const clamped = Math.max(0, Math.min(1, ratio));
+      if (clamped <= 0.6) return 120;
+      if (clamped >= 0.8) return 0;
+      const t = (clamped - 0.6) / 0.2;
+      return 120 - t * 120;
+    };
+
     const spendingEl = $("#kpiSpending");
     if (spendingEl) {
       spendingEl.classList.remove("kpi-good", "kpi-warn", "kpi-alert", "kpi-bad");
       const income = Number(comp.total_income) || 0;
       const spending = Number(comp.total_spending) || 0;
       const ratio = income > 0 ? spending / income : spending > 0 ? 1 : 0;
-      const clamped = Math.max(0, Math.min(1, ratio));
-      let hue = 120;
-      if (clamped <= 0.6) {
-        hue = 120;
-      } else if (clamped >= 0.8) {
-        hue = 0;
-      } else {
-        const t = (clamped - 0.6) / 0.2;
-        hue = 120 - t * 120;
-      }
+      const hue = getSpendingHue(ratio);
       spendingEl.style.color = `hsl(${hue} 80% 40%)`;
     }
 
@@ -923,19 +922,24 @@ import { api } from "./api.js";
         incomeEl.style.color = "var(--bad)";
       } else if (income > 0) {
         const ratio = income > 0 ? spending / income : 0;
-        const clamped = Math.max(0, Math.min(1, ratio));
-        let hue = 120;
-        if (clamped <= 0.6) {
-          hue = 120;
-        } else if (clamped >= 0.8) {
-          hue = 0;
-        } else {
-          const t = (clamped - 0.6) / 0.2;
-          hue = 120 - t * 120;
-        }
+        const hue = getSpendingHue(ratio);
         incomeEl.style.color = `hsl(${hue} 80% 40%)`;
       } else {
         incomeEl.style.color = "";
+      }
+    }
+
+    const balanceEl = $("#kpiBalance");
+    if (balanceEl) {
+      const income = Number(comp.total_income) || 0;
+      const spending = Number(comp.total_spending) || 0;
+      const netBalance = Number(comp.net_balance) || 0;
+      if (netBalance < 0) {
+        balanceEl.style.color = "var(--bad)";
+      } else {
+        const ratio = income > 0 ? spending / income : spending > 0 ? 1 : 0;
+        const hue = Math.max(30, getSpendingHue(ratio));
+        balanceEl.style.color = `hsl(${hue} 80% 40%)`;
       }
     }
   }
