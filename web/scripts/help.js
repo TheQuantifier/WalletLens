@@ -36,6 +36,12 @@ if (form && subjectInput && messageInput) {
     setStatus("Sending your message...");
 
     try {
+      if (!api?.support?.contact) {
+        throw new Error(
+          "Support service isn't available yet. Please refresh the page or email support."
+        );
+      }
+
       await api.support.contact({ subject, message });
       setStatus("Thanks! Your message has been sent to support.");
       form.reset();
