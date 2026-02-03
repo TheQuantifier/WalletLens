@@ -234,6 +234,17 @@
           <input id="confirmPassword" type="password" autocomplete="new-password" required minlength="8" />
         </label>
 
+        <label class="span-2 is-hidden" id="passwordTwoFaRow">
+          <span class="label">2FA Code</span>
+          <input
+            id="passwordTwoFaCode"
+            type="text"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            placeholder="6-digit code"
+          />
+        </label>
+
         <div class="modal-actions span-2">
           <button type="button" class="btn" id="closePasswordModal">Cancel</button>
           <button type="submit" class="btn btn--primary">Update Password</button>

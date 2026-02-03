@@ -32,6 +32,7 @@ router.put("/me", auth, controller.updateMe);
 // Change password for current user
 // Body: { currentPassword, newPassword }
 router.post("/change-password", auth, controller.changePassword);
+router.post("/2fa/request-password-change", auth, controller.requestTwoFaPasswordChange);
 
 // 2FA (optional) management
 router.post("/2fa/request-enable", auth, controller.requestTwoFaEnable);

@@ -59,6 +59,12 @@ import { api } from "./api.js";
     currentPassword: $("#currentPassword"),
     newPassword: $("#newPassword"),
     confirmPassword: $("#confirmPassword"),
+    passwordTwoFaRow: $("#passwordTwoFaRow"),
+    passwordTwoFaCode: $("#passwordTwoFaCode"),
+  };
+
+  const state = {
+    twoFaEnabled: false,
   };
 
   // ===============================
@@ -399,10 +405,12 @@ import { api } from "./api.js";
     try {
       const { user } = await api.auth.me();
       const enabled = !!user?.two_fa_enabled || !!user?.twoFaEnabled;
+      state.twoFaEnabled = enabled;
       els.twoFaStatus.textContent = enabled ? "Enabled" : "Disabled";
       els.enableTwoFaBtn?.classList.toggle("is-hidden", enabled);
       els.disableTwoFaBtn?.classList.toggle("is-hidden", !enabled);
     } catch {
+      state.twoFaEnabled = false;
       els.twoFaStatus.textContent = "Unavailable";
       els.enableTwoFaBtn?.classList.add("is-hidden");
       els.disableTwoFaBtn?.classList.add("is-hidden");
@@ -627,7 +635,7 @@ import { api } from "./api.js";
   // ===============================
   // CHANGE PASSWORD
   // ===============================
-  const openPasswordModal = () => {
+  const openPasswordModal = async () => {
     if (!els.passwordModal) return;
     if (els.passwordStatus) {
       els.passwordStatus.style.display = "none";
@@ -637,6 +645,24 @@ import { api } from "./api.js";
     if (els.currentPassword) els.currentPassword.value = "";
     if (els.newPassword) els.newPassword.value = "";
     if (els.confirmPassword) els.confirmPassword.value = "";
+    if (els.passwordTwoFaCode) els.passwordTwoFaCode.value = "";
+
+    if (els.passwordTwoFaRow) {
+      els.passwordTwoFaRow.classList.toggle("is-hidden", !state.twoFaEnabled);
+    }
+
+    if (state.twoFaEnabled) {
+      try {
+        await api.auth.requestTwoFaPasswordChange();
+        showStatus(els.passwordStatus, "2FA code sent to your email.");
+      } catch (err) {
+        showStatus(
+          els.passwordStatus,
+          err?.message || "Unable to send 2FA code.",
+          "error"
+        );
+      }
+    }
     showModal(els.passwordModal);
     els.currentPassword?.focus?.();
   };
@@ -648,6 +674,7 @@ import { api } from "./api.js";
     const currentPassword = (els.currentPassword?.value || "").trim();
     const newPassword = (els.newPassword?.value || "").trim();
     const confirmPassword = (els.confirmPassword?.value || "").trim();
+    const twoFaCode = (els.passwordTwoFaCode?.value || "").trim();
 
     if (!currentPassword || !newPassword || !confirmPassword) {
       showStatus(els.passwordStatus, "Fill out all fields.", "error");
@@ -659,12 +686,17 @@ import { api } from "./api.js";
       return;
     }
 
+    if (state.twoFaEnabled && !twoFaCode) {
+      showStatus(els.passwordStatus, "Enter the 2FA code from your email.", "error");
+      return;
+    }
+
     if (els.passwordStatus) {
       showStatus(els.passwordStatus, "Updating password…");
     }
 
     try {
-      await api.auth.changePassword(currentPassword, newPassword);
+      await api.auth.changePassword(currentPassword, newPassword, twoFaCode);
       showStatus(els.passwordStatus, "Password updated.", "ok");
       clearStatusSoon(els.passwordStatus, 1500);
       window.setTimeout(() => closePasswordModal(), 700);

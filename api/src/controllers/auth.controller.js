@@ -364,7 +364,7 @@ export const updateMe = asyncHandler(async (req, res) => {
 ===================================================== */
 export const changePassword = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { currentPassword, newPassword } = req.body;
+  const { currentPassword, newPassword, twoFaCode } = req.body;
 
   if (!currentPassword || !newPassword) {
     return res.status(400).json({ message: "Current and new password are required" });
@@ -376,6 +376,25 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   const user = await findUserAuthById(userId);
   if (!user) return res.status(404).json({ message: "User not found" });
+
+  if (user.two_fa_enabled) {
+    if (!twoFaCode) {
+      return res.status(400).json({ message: "Two-factor code is required" });
+    }
+
+    const codeHash = hashCode(twoFaCode);
+    const match = await findValidTwoFaCode({
+      userId,
+      purpose: "password_change",
+      codeHash,
+    });
+
+    if (!match) {
+      return res.status(401).json({ message: "Invalid or expired two-factor code" });
+    }
+
+    await deleteTwoFaCodeById(match.id);
+  }
 
   const isMatch = await bcrypt.compare(String(currentPassword), user.password_hash);
   if (!isMatch) {
@@ -404,6 +423,38 @@ export const changePassword = asyncHandler(async (req, res) => {
     user: safeUser,
     token,
   });
+});
+
+/* =====================================================
+   2FA: REQUEST PASSWORD CHANGE (email code)
+===================================================== */
+export const requestTwoFaPasswordChange = asyncHandler(async (req, res) => {
+  const user = await findUserById(req.user.id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  if (!user.two_fa_enabled) {
+    return res.status(400).json({ message: "Two-factor authentication is not enabled" });
+  }
+
+  const code = generateSixDigitCode();
+  const codeHash = hashCode(code);
+  const expiresAt = new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000);
+
+  await clearTwoFaCodes(user.id, "password_change");
+  await createTwoFaCode({
+    userId: user.id,
+    purpose: "password_change",
+    codeHash,
+    expiresAt,
+  });
+
+  await sendEmail({
+    to: user.email,
+    subject: "Your WiseWallet password change code",
+    text: `Your password change code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+  });
+
+  res.json({ message: "Verification code sent" });
 });
 
 /* =====================================================

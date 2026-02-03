@@ -155,13 +155,28 @@ EXAMPLE:
 
 
 ------------------------------------------------------------
- auth.changePassword(currentPassword, newPassword)
+auth.changePassword(currentPassword, newPassword, twoFaCode)
 ------------------------------------------------------------
 DESCRIPTION:
   Changes the authenticated user’s password.
 
+ARGUMENTS:
+  currentPassword (string)
+  newPassword (string)
+  twoFaCode (string) — required if 2FA is enabled
+
 EXAMPLE:
-  await api.auth.changePassword("oldPass", "newPass");
+  await api.auth.changePassword("oldPass", "newPass", "123456");
+
+
+------------------------------------------------------------
+ auth.requestTwoFaPasswordChange()
+------------------------------------------------------------
+DESCRIPTION:
+  Sends a 2FA code for password change (only if 2FA is enabled).
+
+EXAMPLE:
+  await api.auth.requestTwoFaPasswordChange();
 
 
 ------------------------------------------------------------
@@ -320,7 +335,7 @@ EXAMPLE:
 
 
 ------------------------------------------------------------
- receipts.getOne(receiptId)
+receipts.getOne(receiptId)
 ------------------------------------------------------------
 DESCRIPTION:
   Fetch one receipt, including:
@@ -330,6 +345,19 @@ DESCRIPTION:
 
 ARGUMENTS:
   receiptId (string | uuid)
+
+EXAMPLE:
+  const receipt = await api.receipts.getOne(id);
+
+
+------------------------------------------------------------
+ receipts.updateOcrText(receiptId, ocrText)
+------------------------------------------------------------
+DESCRIPTION:
+  Updates stored OCR text for a receipt.
+
+EXAMPLE:
+  await api.receipts.updateOcrText(id, "Corrected OCR text");
 
 
 ------------------------------------------------------------
@@ -344,7 +372,7 @@ EXAMPLE:
 
 
 ------------------------------------------------------------
- receipts.downloadToFile(receiptId, filename)
+receipts.downloadToFile(receiptId, filename)
 ------------------------------------------------------------
 DESCRIPTION:
   Downloads the file and triggers a save to disk.
@@ -354,7 +382,7 @@ EXAMPLE:
 
 
 ------------------------------------------------------------
- receipts.remove(receiptId, deleteRecord)
+receipts.remove(receiptId, deleteRecord)
 ------------------------------------------------------------
 DESCRIPTION:
   Deletes a receipt AND optionally its linked record.
@@ -370,8 +398,125 @@ EXAMPLES:
   await api.receipts.remove(id, false);
 
 
+------------------------------------------------------------
+ receipts.scan(file)
+------------------------------------------------------------
+DESCRIPTION:
+  Scan-only OCR + parse flow without persistence.
+
+ARGUMENTS:
+  file (File object)
+
+EXAMPLE:
+  const result = await api.receipts.scan(file);
+
+
 ============================================================
- 4. HELPER FUNCTIONS (UI convenience)
+ 4. BUDGET SHEETS MODULE
+============================================================
+
+------------------------------------------------------------
+ budgetSheets.getAll(params?)
+------------------------------------------------------------
+DESCRIPTION:
+  Returns all budget sheets for the user.
+
+ARGUMENTS:
+  params (object) — optional
+
+EXAMPLE:
+  const sheets = await api.budgetSheets.getAll();
+
+
+------------------------------------------------------------
+ budgetSheets.lookup({ cadence, period })
+------------------------------------------------------------
+DESCRIPTION:
+  Finds a budget sheet by cadence + period.
+
+EXAMPLE:
+  const sheet = await api.budgetSheets.lookup({ cadence: "monthly", period: "2025-02" });
+
+
+------------------------------------------------------------
+ budgetSheets.getOne(sheetId)
+------------------------------------------------------------
+DESCRIPTION:
+  Fetch a single budget sheet by id.
+
+EXAMPLE:
+  const sheet = await api.budgetSheets.getOne(id);
+
+
+------------------------------------------------------------
+ budgetSheets.create({ cadence, period, categories, customCategories })
+------------------------------------------------------------
+DESCRIPTION:
+  Creates a new budget sheet.
+
+EXAMPLE:
+  await api.budgetSheets.create({
+    cadence: "monthly",
+    period: "2025-02",
+    categories: [],
+    customCategories: []
+  });
+
+
+------------------------------------------------------------
+ budgetSheets.update(sheetId, updates)
+------------------------------------------------------------
+DESCRIPTION:
+  Updates a budget sheet by id.
+
+EXAMPLE:
+  await api.budgetSheets.update(id, { categories: [] });
+
+
+============================================================
+ 5. FX RATES MODULE
+============================================================
+
+------------------------------------------------------------
+ fxRates.get(base)
+------------------------------------------------------------
+DESCRIPTION:
+  Fetches FX rates for a base currency.
+
+EXAMPLE:
+  const rates = await api.fxRates.get("USD");
+
+
+============================================================
+ 6. ACTIVITY MODULE
+============================================================
+
+------------------------------------------------------------
+ activity.getRecent(limit)
+------------------------------------------------------------
+DESCRIPTION:
+  Fetches recent activity for the user.
+
+EXAMPLE:
+  const items = await api.activity.getRecent(20);
+
+
+============================================================
+ 7. SUPPORT MODULE
+============================================================
+
+------------------------------------------------------------
+ support.contact({ subject, message })
+------------------------------------------------------------
+DESCRIPTION:
+  Sends a support message (requires login).
+
+EXAMPLE:
+  await api.support.contact({ subject: "Need help", message: "Details here" });
+
+
+============================================================
+ 8. HELPER FUNCTIONS (UI convenience)
 ============================================================
 
 ------------------------------------------------------------

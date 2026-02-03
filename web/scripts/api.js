@@ -127,6 +127,10 @@ export const auth = {
     return request("/auth/2fa/request-enable", { method: "POST" });
   },
 
+  requestTwoFaPasswordChange() {
+    return request("/auth/2fa/request-password-change", { method: "POST" });
+  },
+
   confirmTwoFaEnable(code) {
     return request("/auth/2fa/confirm-enable", {
       method: "POST",
@@ -148,10 +152,10 @@ export const auth = {
     });
   },
 
-  async changePassword(currentPassword, newPassword) {
+  async changePassword(currentPassword, newPassword, twoFaCode) {
     const data = await request("/auth/change-password", {
       method: "POST",
-      body: JSON.stringify({ currentPassword, newPassword }),
+      body: JSON.stringify({ currentPassword, newPassword, twoFaCode }),
     });
     if (data?.token) setAuthToken(data.token);
     return data;
