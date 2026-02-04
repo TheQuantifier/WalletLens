@@ -20,6 +20,9 @@ From the receipt text, extract ONLY the following fields:
 - taxAmount: Tax charged (number)
 - payMethod: One of:
     Cash, Check, Credit Card, Debit Card, Gift Card, Multiple, Other
+- category: Choose ONE expense category from this exact list:
+    Housing, Utilities, Groceries, Transportation, Dining, Health, Entertainment,
+    Shopping, Membership, Miscellaneous, Education, Giving, Savings, Other
 - items: Array of objects [{ "name": string, "price": number }]
 
 Return JSON ONLY in this exact structure:
@@ -31,6 +34,7 @@ Return JSON ONLY in this exact structure:
   "amount": 0,
   "taxAmount": 0,
   "payMethod": "",
+  "category": "",
   "items": []
 }
 
@@ -91,6 +95,7 @@ function normalize(parsed = {}) {
     amount: Number(parsed.amount) || 0,
     taxAmount: Number(parsed.taxAmount) || 0,
     payMethod: parsed.payMethod || "Other",
+    category: parsed.category || "Other",
     items: Array.isArray(parsed.items) ? parsed.items : [],
   };
 }
