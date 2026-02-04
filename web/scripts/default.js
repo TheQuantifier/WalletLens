@@ -376,6 +376,9 @@ function wireDashboardViewSelector() {
 const LIVE_NAV_ENABLED = true;
 const LIVE_PAGE_CONTAINER_ID = "page-content";
 let liveNavInFlight = null;
+const liveNavCache = new Map();
+const liveNavPrefetching = new Set();
+const LIVE_NAV_CACHE_LIMIT = 6;
 
 function initLiveNavigation() {
   if (!LIVE_NAV_ENABLED) return;
@@ -387,6 +390,8 @@ function initLiveNavigation() {
   markInitialPageStyles();
 
   document.addEventListener("click", handleLiveNavClick);
+  document.addEventListener("mouseover", handleLiveNavPrefetch, { passive: true });
+  document.addEventListener("touchstart", handleLiveNavPrefetch, { passive: true });
   window.addEventListener("popstate", () => {
     navigateLive(window.location.href, { pushState: false });
   });
@@ -436,15 +441,57 @@ function handleLiveNavClick(event) {
   navigateLive(url.href, { pushState: true });
 }
 
+function handleLiveNavPrefetch(event) {
+  if (!shouldPrefetch()) return;
+  const link = event.target.closest("a");
+  if (!link) return;
+  if (link.target && link.target !== "_self") return;
+  if (link.hasAttribute("download")) return;
+
+  const href = link.getAttribute("href");
+  if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+    return;
+  }
+
+  const url = new URL(link.href, window.location.href);
+  if (url.origin !== window.location.origin) return;
+  if (!url.pathname.endsWith(".html")) return;
+
+  const key = url.href;
+  if (liveNavCache.has(key) || liveNavPrefetching.has(key)) return;
+  liveNavPrefetching.add(key);
+
+  fetch(key, { cache: "force-cache" })
+    .then((res) => (res.ok ? res.text() : null))
+    .then((html) => {
+      if (html) cacheLiveHtml(key, html);
+    })
+    .catch(() => {})
+    .finally(() => {
+      liveNavPrefetching.delete(key);
+    });
+}
+
 async function navigateLive(targetUrl, { pushState }) {
   if (liveNavInFlight) liveNavInFlight.abort();
   const controller = new AbortController();
   liveNavInFlight = controller;
 
   try {
-    const response = await fetch(targetUrl, { signal: controller.signal });
-    if (!response.ok) throw new Error("Page fetch failed");
-    const html = await response.text();
+    const currentUrl = new URL(window.location.href);
+    const nextUrl = new URL(targetUrl, window.location.href);
+    if (currentUrl.pathname === nextUrl.pathname && currentUrl.search === nextUrl.search && !nextUrl.hash) {
+      if (pushState) window.history.pushState({}, "", targetUrl);
+      return;
+    }
+
+    let html = liveNavCache.get(targetUrl);
+    if (!html) {
+      const response = await fetch(targetUrl, { signal: controller.signal, cache: "force-cache" });
+      if (!response.ok) throw new Error("Page fetch failed");
+      html = await response.text();
+      cacheLiveHtml(targetUrl, html);
+    }
     const parsed = new DOMParser().parseFromString(html, "text/html");
 
     const headerEl = parsed.getElementById("header");
@@ -571,4 +618,23 @@ function syncPageScripts(parsedDoc) {
     newScript.dataset.pageScript = "true";
     document.body.appendChild(newScript);
   });
+}
+
+function cacheLiveHtml(key, html) {
+  if (liveNavCache.has(key)) {
+    liveNavCache.delete(key);
+  }
+  liveNavCache.set(key, html);
+  if (liveNavCache.size > LIVE_NAV_CACHE_LIMIT) {
+    const oldestKey = liveNavCache.keys().next().value;
+    liveNavCache.delete(oldestKey);
+  }
+}
+
+function shouldPrefetch() {
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  if (!connection) return true;
+  if (connection.saveData) return false;
+  const effectiveType = connection.effectiveType || "";
+  return !["slow-2g", "2g"].includes(effectiveType);
 }
