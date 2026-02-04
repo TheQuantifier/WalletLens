@@ -67,6 +67,7 @@ applySavedTheme();
   =============================================== */
 
 document.addEventListener("DOMContentLoaded", () => {
+  cachePageTitle();
   loadHeaderAndFooter();
   initLiveNavigation();
 });
@@ -75,6 +76,31 @@ document.addEventListener("DOMContentLoaded", () => {
 * Fetch and inject header & footer, then init UI
 */
 function loadHeaderAndFooter() {
+  const headerEl = document.getElementById("header");
+  const footerEl = document.getElementById("footer");
+  const cachedHeader = sessionStorage.getItem("cachedHeaderHtml");
+  const cachedFooter = sessionStorage.getItem("cachedFooterHtml");
+
+  if (headerEl && cachedHeader) {
+    if (headerEl.innerHTML !== cachedHeader) {
+      headerEl.innerHTML = cachedHeader;
+    }
+    setActiveNavLink();
+    initMobileNavMenu();
+    initAccountMenu();
+    updateHeaderAuthState();
+    wireLogoutButton();
+    wireDashboardViewSelector();
+    updateMobileNavActiveState();
+  }
+
+  if (footerEl && cachedFooter) {
+    if (footerEl.innerHTML !== cachedFooter) {
+      footerEl.innerHTML = cachedFooter;
+    }
+    setActiveFooterLink();
+  }
+
   // --- Load Header ---
   fetch("components/header.html")
     .then((res) => {
@@ -82,7 +108,10 @@ function loadHeaderAndFooter() {
       return res.text();
     })
     .then((html) => {
-      document.getElementById("header").innerHTML = html;
+      if (headerEl && headerEl.innerHTML !== html) {
+        headerEl.innerHTML = html;
+      }
+      sessionStorage.setItem("cachedHeaderHtml", html);
 
       setActiveNavLink();
       initMobileNavMenu();
@@ -101,13 +130,22 @@ function loadHeaderAndFooter() {
       return res.text();
     })
     .then((html) => {
-      const footerEl = document.getElementById("footer");
-      if (footerEl) {
+      if (!footerEl) return;
+      if (footerEl.innerHTML !== html) {
         footerEl.innerHTML = html;
-        setActiveFooterLink();
       }
+      sessionStorage.setItem("cachedFooterHtml", html);
+      setActiveFooterLink();
     })
     .catch((err) => console.error("Footer load failed:", err));
+}
+
+function cachePageTitle() {
+  const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+  const currentPage = rawPage === "" ? "index.html" : rawPage;
+  if (document.title) {
+    sessionStorage.setItem(`pageTitle:${currentPage}`, document.title);
+  }
 }
 
 
@@ -263,12 +301,30 @@ function applyAccountAvatar(avatarUrl, fallbackName) {
   if (!accountIcon || !avatarLetters) return;
 
   if (avatarUrl) {
-    accountIcon.style.backgroundImage = `url(${avatarUrl})`;
-    accountIcon.classList.add("has-avatar");
-    avatarLetters.textContent = "";
+    if (accountIcon.dataset.avatarUrl === avatarUrl && accountIcon.classList.contains("has-avatar")) {
+      return;
+    }
+    accountIcon.dataset.avatarUrl = avatarUrl;
+    avatarLetters.textContent = getInitials(fallbackName);
+
+    const img = new Image();
+    img.onload = () => {
+      if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
+      accountIcon.style.backgroundImage = `url(${avatarUrl})`;
+      accountIcon.classList.add("has-avatar");
+      avatarLetters.textContent = "";
+    };
+    img.onerror = () => {
+      if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
+      accountIcon.style.backgroundImage = "";
+      accountIcon.classList.remove("has-avatar");
+      avatarLetters.textContent = getInitials(fallbackName);
+    };
+    img.src = avatarUrl;
     return;
   }
 
+  accountIcon.dataset.avatarUrl = "";
   accountIcon.style.backgroundImage = "";
   accountIcon.classList.remove("has-avatar");
   avatarLetters.textContent = getInitials(fallbackName);
@@ -281,6 +337,20 @@ function applyAccountAvatar(avatarUrl, fallbackName) {
 
 async function updateHeaderAuthState() {
   try {
+    const cachedUserRaw = sessionStorage.getItem("cachedUser");
+    if (cachedUserRaw) {
+      try {
+        const cachedUser = JSON.parse(cachedUserRaw);
+        const nameEl = document.getElementById("headerUserName");
+        if (nameEl) {
+          nameEl.textContent = cachedUser.fullName || cachedUser.username || "Account";
+        }
+        applyAccountAvatar(cachedUser.avatarUrl || cachedUser.avatar_url || "", cachedUser.fullName || cachedUser.username);
+      } catch {
+        sessionStorage.removeItem("cachedUser");
+      }
+    }
+
     const { user } = await api.auth.me();
 
     // --- SHOW LOGGED-IN UI ---
@@ -299,6 +369,7 @@ async function updateHeaderAuthState() {
 
     const avatarUrl = user.avatarUrl || user.avatar_url || "";
     applyAccountAvatar(avatarUrl, user.fullName || user.username);
+    sessionStorage.setItem("cachedUser", JSON.stringify(user));
 
   } catch {
     // Not authenticated
@@ -313,7 +384,18 @@ async function updateHeaderAuthState() {
 }
 
 window.addEventListener("avatar:updated", (event) => {
-  applyAccountAvatar(event?.detail?.avatarUrl || "", "");
+  const newUrl = event?.detail?.avatarUrl || "";
+  applyAccountAvatar(newUrl, "");
+  const cachedUserRaw = sessionStorage.getItem("cachedUser");
+  if (cachedUserRaw) {
+    try {
+      const cachedUser = JSON.parse(cachedUserRaw);
+      cachedUser.avatarUrl = newUrl;
+      sessionStorage.setItem("cachedUser", JSON.stringify(cachedUser));
+    } catch {
+      sessionStorage.removeItem("cachedUser");
+    }
+  }
 });
 
 
@@ -373,12 +455,12 @@ function wireDashboardViewSelector() {
   LIVE NAVIGATION (NO HEADER/FOOTER FLICKER)
   =============================================== */
 
-const LIVE_NAV_ENABLED = true;
+const LIVE_NAV_ENABLED = false;
 const LIVE_PAGE_CONTAINER_ID = "page-content";
 let liveNavInFlight = null;
 const liveNavCache = new Map();
 const liveNavPrefetching = new Set();
-const LIVE_NAV_CACHE_LIMIT = 6;
+const LIVE_NAV_CACHE_LIMIT = Infinity;
 
 function initLiveNavigation() {
   if (!LIVE_NAV_ENABLED) return;
@@ -392,6 +474,7 @@ function initLiveNavigation() {
   document.addEventListener("click", handleLiveNavClick);
   document.addEventListener("mouseover", handleLiveNavPrefetch, { passive: true });
   document.addEventListener("touchstart", handleLiveNavPrefetch, { passive: true });
+  prefetchAllLinks();
   window.addEventListener("popstate", () => {
     navigateLive(window.location.href, { pushState: false });
   });
@@ -442,7 +525,6 @@ function handleLiveNavClick(event) {
 }
 
 function handleLiveNavPrefetch(event) {
-  if (!shouldPrefetch()) return;
   const link = event.target.closest("a");
   if (!link) return;
   if (link.target && link.target !== "_self") return;
@@ -464,7 +546,11 @@ function handleLiveNavPrefetch(event) {
   fetch(key, { cache: "force-cache" })
     .then((res) => (res.ok ? res.text() : null))
     .then((html) => {
-      if (html) cacheLiveHtml(key, html);
+      if (!html) return;
+      const parsed = new DOMParser().parseFromString(html, "text/html");
+      const assets = extractPageAssets(parsed);
+      cacheLiveHtml(key, html, assets);
+      preloadAssets(assets);
     })
     .catch(() => {})
     .finally(() => {
@@ -485,12 +571,16 @@ async function navigateLive(targetUrl, { pushState }) {
       return;
     }
 
-    let html = liveNavCache.get(targetUrl);
+    const cached = liveNavCache.get(targetUrl);
+    let html = cached?.html;
     if (!html) {
       const response = await fetch(targetUrl, { signal: controller.signal, cache: "force-cache" });
       if (!response.ok) throw new Error("Page fetch failed");
       html = await response.text();
-      cacheLiveHtml(targetUrl, html);
+      const parsedForCache = new DOMParser().parseFromString(html, "text/html");
+      const assets = extractPageAssets(parsedForCache);
+      cacheLiveHtml(targetUrl, html, assets);
+      preloadAssets(assets);
     }
     const parsed = new DOMParser().parseFromString(html, "text/html");
 
@@ -527,6 +617,7 @@ async function navigateLive(targetUrl, { pushState }) {
     setActiveNavLink();
     setActiveFooterLink();
     updateMobileNavActiveState();
+    prefetchAllLinks();
 
     const targetHash = new URL(targetUrl).hash;
     if (targetHash) {
@@ -620,21 +711,90 @@ function syncPageScripts(parsedDoc) {
   });
 }
 
-function cacheLiveHtml(key, html) {
+function cacheLiveHtml(key, html, assets) {
   if (liveNavCache.has(key)) {
     liveNavCache.delete(key);
   }
-  liveNavCache.set(key, html);
+  liveNavCache.set(key, { html, assets });
   if (liveNavCache.size > LIVE_NAV_CACHE_LIMIT) {
     const oldestKey = liveNavCache.keys().next().value;
     liveNavCache.delete(oldestKey);
   }
 }
 
-function shouldPrefetch() {
-  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  if (!connection) return true;
-  if (connection.saveData) return false;
-  const effectiveType = connection.effectiveType || "";
-  return !["slow-2g", "2g"].includes(effectiveType);
+function extractPageAssets(parsedDoc) {
+  const styles = [];
+  parsedDoc.querySelectorAll('link[rel="stylesheet"]').forEach((link) => {
+    const href = link.getAttribute("href") || "";
+    if (!href || href.endsWith("styles/default.css")) return;
+    styles.push(href);
+  });
+
+  const scripts = [];
+  parsedDoc.querySelectorAll("script[src]").forEach((script) => {
+    const src = script.getAttribute("src") || "";
+    if (!src || src.endsWith("scripts/default.js")) return;
+    scripts.push({ src, type: script.getAttribute("type") || "" });
+  });
+
+  return { styles, scripts };
+}
+
+function preloadAssets(assets) {
+  if (!assets) return;
+
+  assets.styles.forEach((href) => {
+    if (document.querySelector(`link[rel="stylesheet"][href="${href}"]`)) return;
+    if (document.querySelector(`link[rel="preload"][href="${href}"]`)) return;
+    const preload = document.createElement("link");
+    preload.rel = "preload";
+    preload.as = "style";
+    preload.href = href;
+    document.head.appendChild(preload);
+  });
+
+  assets.scripts.forEach(({ src, type }) => {
+    if (document.querySelector(`script[src="${src}"]`)) return;
+    if (document.querySelector(`link[rel="preload"][href="${src}"]`)) return;
+    if (document.querySelector(`link[rel="modulepreload"][href="${src}"]`)) return;
+    const preload = document.createElement("link");
+    preload.rel = type === "module" ? "modulepreload" : "preload";
+    if (preload.rel === "preload") preload.as = "script";
+    preload.href = src;
+    document.head.appendChild(preload);
+  });
+}
+
+function prefetchAllLinks() {
+  document.querySelectorAll("a[href]").forEach((link) => {
+    if (link.target && link.target !== "_self") return;
+    if (link.hasAttribute("download")) return;
+
+    const href = link.getAttribute("href");
+    if (!href || href.startsWith("#") || href.startsWith("mailto:") || href.startsWith("tel:")) {
+      return;
+    }
+
+    const url = new URL(link.href, window.location.href);
+    if (url.origin !== window.location.origin) return;
+    if (!url.pathname.endsWith(".html")) return;
+
+    const key = url.href;
+    if (liveNavCache.has(key) || liveNavPrefetching.has(key)) return;
+    liveNavPrefetching.add(key);
+
+    fetch(key, { cache: "force-cache" })
+      .then((res) => (res.ok ? res.text() : null))
+      .then((html) => {
+        if (!html) return;
+        const parsed = new DOMParser().parseFromString(html, "text/html");
+        const assets = extractPageAssets(parsed);
+        cacheLiveHtml(key, html, assets);
+        preloadAssets(assets);
+      })
+      .catch(() => {})
+      .finally(() => {
+        liveNavPrefetching.delete(key);
+      });
+  });
 }

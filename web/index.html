@@ -1,9 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <script>
+    (function () {
+      const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+      const currentPage = rawPage === "" ? "index.html" : rawPage;
+      const cachedTitle = sessionStorage.getItem(`pageTitle:${currentPage}`);
+      if (cachedTitle) {
+        document.title = cachedTitle;
+      }
+    })();
+  </script>
+
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="images/favicon.png">
-    <title>Redirecting…</title>
+    <title>WiseWallet - Redirecting</title>
     <script>
         window.location.replace("register.html");
     </script>
