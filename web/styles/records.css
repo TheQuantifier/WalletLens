@@ -328,10 +328,20 @@
   width: 110px;
 }
 
+.records-table .txn-table th:nth-child(2) {
+  text-align: left;
+}
+
 /* Category */
 .records-table .txn-table th:nth-child(3),
 .records-table .txn-table td:nth-child(3) {
-  width: 130px;
+  width: 190px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.records-table .txn-table th:nth-child(3) {
+  text-align: left;
 }
 
 /* Amount (right aligned) */
@@ -345,15 +355,19 @@
 /* Notes — flexible width */
 .records-table .txn-table th:nth-child(5),
 .records-table .txn-table td:nth-child(5) {
-  width: auto;
+  width: 180px;
   white-space: normal;
-  word-wrap: break-word;
+  overflow-wrap: anywhere;
 }
 
 /* Origin */
 .records-table .txn-table th:nth-child(6),
 .records-table .txn-table td:nth-child(6) {
-  width: 110px;
+  width: 90px;
+}
+
+.records-table .txn-table th:nth-child(6) {
+  text-align: left;
 }
 
 /* Actions column */
