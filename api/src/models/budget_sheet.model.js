@@ -159,3 +159,15 @@ export async function listBudgetSheets(userId, { cadence, period, limit = 50 } =
   );
   return rows;
 }
+
+export async function deleteBudgetSheet(userId, id) {
+  const { rows } = await query(
+    `
+    DELETE FROM budget_sheets
+    WHERE user_id = $1 AND id = $2
+    RETURNING ${SELECT_FIELDS}
+    `,
+    [userId, id]
+  );
+  return rows[0] || null;
+}

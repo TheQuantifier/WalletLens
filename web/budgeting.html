@@ -27,25 +27,11 @@
         <p class="subtle">Plan your spend, track actuals, and move unused funds to savings or another category.</p>
       </div>
       <div class="budget-hero-meta">
-        <div class="month-controls">
-          <div class="month-row">
-            <label class="subtle" for="budgetCadenceSelect">Budget frequency</label>
-            <select id="budgetCadenceSelect" class="month-select" aria-label="Select budget frequency">
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Biweekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="semi-annually">Semi-Annually</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </div>
-          <div class="month-row">
-            <label class="subtle" for="budgetMonthSelect">Period</label>
-            <select id="budgetMonthSelect" class="month-select" aria-label="Select budget period"></select>
-          </div>
-          <span class="pill" id="budgetPeriod" aria-live="polite">—</span>
+        <div class="budget-selector">
+          <label class="subtle" for="budgetSelector">Budget</label>
+          <select id="budgetSelector" class="month-select" aria-label="Select budget"></select>
         </div>
-        <button class="btn" id="btnResetBudgets" type="button">Reset defaults</button>
+        <button class="btn btn--primary" id="btnAddBudget" type="button">Add budget</button>
       </div>
     </section>
 
@@ -87,7 +73,11 @@
     <section class="budget-table" aria-label="Category budgets">
       <div class="table-header">
         <h2>Categories</h2>
-        <span class="subtle">Edit your budget to update remaining totals.</span>
+        <span class="pill" id="budgetPeriod" aria-live="polite">—</span>
+        <div class="table-header-actions">
+          <span class="subtle">Edit your budget to update remaining totals.</span>
+          <button class="btn" id="btnResetBudgets" type="button">Reset defaults</button>
+        </div>
       </div>
       <div class="table-wrap" role="region" aria-label="Budget table" tabindex="0">
         <table>
@@ -111,6 +101,7 @@
           <span id="budgetSaveStatus" class="status-banner subtle is-hidden budget-save-status" aria-live="polite"></span>
           <button class="btn" id="btnExportBudgetCsv" type="button">Export to CSV</button>
           <button class="btn btn--primary" id="btnSaveBudget" type="button" disabled>Save budget</button>
+          <button class="btn btn--danger" id="btnDeleteBudget" type="button">Delete budget</button>
         </div>
       </div>
     </section>
@@ -119,6 +110,40 @@
   <div id="footer"></div>
 
   <!-- ========== CUSTOM CATEGORY MODAL ========== -->
+  <div id="addBudgetModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="addBudgetTitle">
+    <div class="modal-content card">
+      <h2 id="addBudgetTitle">Add Budget</h2>
+      <p class="subtle">Choose a budget frequency and period.</p>
+
+      <form id="addBudgetForm" class="txn-form">
+        <div class="form-row">
+          <label>
+            <span>Budget frequency</span>
+            <select id="budgetCadenceSelect" class="month-select" aria-label="Select budget frequency">
+              <option value="weekly">Weekly</option>
+              <option value="biweekly">Biweekly</option>
+              <option value="monthly">Monthly</option>
+              <option value="quarterly">Quarterly</option>
+              <option value="semi-annually">Semi-Annually</option>
+              <option value="yearly">Yearly</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-row">
+          <label>
+            <span>Period</span>
+            <select id="budgetMonthSelect" class="month-select" aria-label="Select budget period"></select>
+          </label>
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn--primary">Create budget</button>
+          <button type="button" class="btn" id="cancelAddBudgetBtn">Cancel</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <div id="customCategoryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="customCategoryTitle">
     <div class="modal-content card">
       <h2 id="customCategoryTitle">Add Custom Category</h2>
@@ -137,7 +162,21 @@
     </div>
   </div>
 
+  <!-- ========== DELETE BUDGET MODAL ========== -->
+  <div id="deleteBudgetModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteBudgetTitle">
+    <div class="modal-content card">
+      <h2 id="deleteBudgetTitle">Delete Budget</h2>
+      <p class="subtle" id="deleteBudgetText"></p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn--danger" id="confirmDeleteBudgetBtn">Yes, delete</button>
+        <button type="button" class="btn" id="cancelDeleteBudgetBtn">No</button>
+      </div>
+    </div>
+  </div>
+
   <script src="scripts/default.js" type="module" defer></script>
   <script src="scripts/budgeting.js" type="module" defer></script>
 </body>
 </html>
+

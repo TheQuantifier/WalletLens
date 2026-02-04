@@ -124,6 +124,26 @@ import { api } from "./api.js";
     return d;
   };
 
+  const MONTH_ABBREV = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+
+  const formatMonthDay = (date) => `${MONTH_ABBREV[date.getMonth()]} ${date.getDate()}`;
+
+  const formatMonthDayYear = (date) =>
+    `${MONTH_ABBREV[date.getMonth()]} ${date.getDate()}, ${date.getFullYear()}`;
+
   const formatRangeLabel = (start, end) => {
     const sameMonth =
       start.getMonth() === end.getMonth() &&
@@ -131,41 +151,14 @@ import { api } from "./api.js";
     const sameYear = start.getFullYear() === end.getFullYear();
 
     if (sameMonth) {
-      const left = start.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      });
-      const right = end.toLocaleDateString(undefined, {
-        day: "numeric",
-        year: "numeric",
-      });
-      return `${left}–${right}`;
+      return `${formatMonthDay(start)} - ${end.getDate()}, ${end.getFullYear()}`;
     }
 
     if (sameYear) {
-      const left = start.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-      });
-      const right = end.toLocaleDateString(undefined, {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      });
-      return `${left}–${right}`;
+      return `${formatMonthDay(start)} - ${formatMonthDay(end)}, ${end.getFullYear()}`;
     }
 
-    const left = start.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    const right = end.toLocaleDateString(undefined, {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    return `${left}–${right}`;
+    return `${formatMonthDayYear(start)} - ${formatMonthDayYear(end)}`;
   };
 
   const formatMonthSpanLabel = (start, end) => {
@@ -192,18 +185,34 @@ import { api } from "./api.js";
   const buildPeriodOptions = (cadenceId) => {
     const cadence = CADENCE_LOOKUP.get(cadenceId) || CADENCE_LOOKUP.get("monthly");
     const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const options = [];
     let count = 12;
+    const yearsAhead = cadence.days
+      ? 1
+      : cadence.months >= 3
+        ? 5
+        : 1;
+    const horizonEnd = new Date(
+      now.getFullYear() + yearsAhead,
+      now.getMonth(),
+      now.getDate(),
+      23,
+      59,
+      59,
+      999
+    );
 
     if (cadence.days) {
-      count = cadence.days === 7 ? 52 : 26;
+      count = 15;
       const baseStart = startOfWeek(now);
       for (let i = 0; i < count; i += 1) {
         const start = new Date(baseStart);
-        start.setDate(start.getDate() - i * cadence.days);
+        start.setDate(start.getDate() + i * cadence.days);
         const end = new Date(start);
         end.setDate(end.getDate() + cadence.days - 1);
         end.setHours(23, 59, 59, 999);
+        if (start > horizonEnd) break;
         options.push({
           start,
           end,
@@ -211,23 +220,27 @@ import { api } from "./api.js";
           key: formatDateKey(start),
         });
       }
-      return options;
+      return options
+        .filter((opt) => opt.end >= today)
+        .sort((a, b) => a.start.getTime() - b.start.getTime());
     }
 
     const span = cadence.months || 1;
     const alignedMonth =
       span >= 3 ? Math.floor(now.getMonth() / span) * span : now.getMonth();
     const baseStart = new Date(now.getFullYear(), alignedMonth, 1);
-    count = Math.max(1, Math.ceil(12 / span));
-    if (span === 12) count += 1;
+    count = 15;
     for (let i = 0; i < count; i += 1) {
       const start = new Date(baseStart);
-      start.setMonth(start.getMonth() - i * span);
+      start.setMonth(start.getMonth() + i * span);
       const end = new Date(start.getFullYear(), start.getMonth() + span, 0, 23, 59, 59, 999);
+      if (start > horizonEnd) break;
       const label =
         span === 1
           ? start.toLocaleDateString(undefined, { month: "long", year: "numeric" })
-          : formatMonthSpanLabel(start, end);
+          : span === 12
+            ? String(start.getFullYear())
+            : formatMonthSpanLabel(start, end);
       options.push({
         start,
         end,
@@ -235,11 +248,97 @@ import { api } from "./api.js";
         key: formatMonthKey(start),
       });
     }
-    return options;
+    return options
+      .filter((opt) => opt.end >= today)
+      .sort((a, b) => a.start.getTime() - b.start.getTime());
   };
 
   const getCadenceLabel = (cadenceId) =>
     CADENCE_LOOKUP.get(cadenceId)?.label || "Monthly";
+
+  const makeBudgetKey = (cadenceId, periodKey) => `${cadenceId}__${periodKey}`;
+
+  const parseBudgetKey = (value) => {
+    if (!value) return null;
+    const parts = String(value).split("__");
+    if (parts.length < 2) return null;
+    return {
+      cadence: parts[0],
+      periodKey: parts.slice(1).join("__"),
+    };
+  };
+
+  const getPeriodLabel = (cadenceId, periodKey) => {
+    const options = buildPeriodOptions(cadenceId);
+    const match = options.find((opt) => opt.key === periodKey);
+    return match ? match.label : periodKey;
+  };
+
+  const buildBudgetLabel = (cadenceId, periodKey) =>
+    `${getCadenceLabel(cadenceId)} - ${getPeriodLabel(cadenceId, periodKey)}`;
+
+  const getSavedBudgetsFromStorage = () => {
+    const entries = [];
+    const prefix = `${STORAGE_KEY}_`;
+    for (let i = 0; i < localStorage.length; i += 1) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith(prefix)) continue;
+      const remainder = key.slice(prefix.length);
+      const underscoreIndex = remainder.indexOf("_");
+      let cadence = "";
+      let periodKey = "";
+      if (underscoreIndex < 0) {
+        cadence = "monthly";
+        periodKey = remainder;
+      } else {
+        cadence = remainder.slice(0, underscoreIndex);
+        periodKey = remainder.slice(underscoreIndex + 1);
+      }
+      if (!CADENCE_LOOKUP.has(cadence) || !periodKey) continue;
+      entries.push({ cadence, periodKey });
+    }
+    return entries;
+  };
+
+  const orderBudgetEntries = (entries) => {
+    const cadenceIndex = new Map(CADENCE_OPTIONS.map((c, idx) => [c.id, idx]));
+    const periodOrderMaps = new Map();
+    const getOrderMap = (cadenceId) => {
+      if (!periodOrderMaps.has(cadenceId)) {
+        const options = buildPeriodOptions(cadenceId);
+        periodOrderMaps.set(
+          cadenceId,
+          new Map(options.map((opt, idx) => [opt.key, idx]))
+        );
+      }
+      return periodOrderMaps.get(cadenceId);
+    };
+
+    return [...entries].sort((a, b) => {
+      const cadenceDiff =
+        (cadenceIndex.get(a.cadence) ?? 999) - (cadenceIndex.get(b.cadence) ?? 999);
+      if (cadenceDiff !== 0) return cadenceDiff;
+      const orderMap = getOrderMap(a.cadence);
+      const aIndex = orderMap?.get(a.periodKey) ?? 999;
+      const bIndex = orderMap?.get(b.periodKey) ?? 999;
+      return aIndex - bIndex;
+    });
+  };
+
+  const populatePeriodSelect = (selectEl, cadenceId, selectedKey) => {
+    if (!selectEl) return null;
+    const options = buildPeriodOptions(cadenceId);
+    selectEl.innerHTML = "";
+    options.forEach((opt) => {
+      const option = document.createElement("option");
+      option.value = opt.key;
+      option.textContent = opt.label;
+      selectEl.appendChild(option);
+    });
+    const selected = options.find((opt) => opt.key === selectedKey) || options[0];
+    selectEl.value = selected.key;
+    return selected;
+  };
 
   const loadUserCustomCategories = async () => {
     try {
@@ -663,6 +762,7 @@ import { api } from "./api.js";
       showStatus("Could not load records. Budgets shown without spending data.", "error");
     }
 
+    const budgetSelect = $("#budgetSelector");
     const cadenceSelect = $("#budgetCadenceSelect");
     const periodSelect = $("#budgetMonthSelect");
     const getSavedCadence = () => {
@@ -671,28 +771,69 @@ import { api } from "./api.js";
     };
 
     let periodOptions = [];
+    let budgetEntries = [];
 
-    const setPeriodOptions = (cadenceId) => {
+    const setPeriodOptions = (cadenceId, selectedKey) => {
       periodOptions = buildPeriodOptions(cadenceId);
-      if (periodSelect) {
-        periodSelect.innerHTML = "";
-        periodOptions.forEach((opt) => {
-          const option = document.createElement("option");
-          option.value = opt.key;
-          option.textContent = opt.label;
-          periodSelect.appendChild(option);
-        });
-      }
-
-      const savedKey = localStorage.getItem(`${PERIOD_STORAGE_PREFIX}${cadenceId}`);
-      const selected = periodOptions.find((p) => p.key === savedKey) || periodOptions[0];
-      if (periodSelect) periodSelect.value = selected.key;
+      const selected = periodOptions.find((p) => p.key === selectedKey) || periodOptions[0];
       return selected;
     };
 
+    const renderBudgetSelector = (entries, selectedKey) => {
+      if (!budgetSelect) return;
+      budgetSelect.innerHTML = "";
+      if (!entries.length) {
+        const option = document.createElement("option");
+        option.value = "";
+        option.textContent = "No budgets yet";
+        option.disabled = true;
+        option.selected = true;
+        budgetSelect.appendChild(option);
+        budgetSelect.disabled = true;
+        const deleteBtn = $("#btnDeleteBudget");
+        if (deleteBtn) deleteBtn.disabled = true;
+        return;
+      }
+      budgetSelect.disabled = false;
+      const deleteBtn = $("#btnDeleteBudget");
+      if (deleteBtn) deleteBtn.disabled = false;
+      entries.forEach((entry) => {
+        const option = document.createElement("option");
+        option.value = makeBudgetKey(entry.cadence, entry.periodKey);
+        option.textContent = buildBudgetLabel(entry.cadence, entry.periodKey);
+        budgetSelect.appendChild(option);
+      });
+      if (selectedKey) budgetSelect.value = selectedKey;
+    };
+
+    const ensureBudgetEntry = (cadenceId, periodKey) => {
+      if (!cadenceId || !periodKey) return;
+      const exists = budgetEntries.some(
+        (entry) => entry.cadence === cadenceId && entry.periodKey === periodKey
+      );
+      if (!exists) budgetEntries.push({ cadence: cadenceId, periodKey });
+    };
+
+    let allowEmptyBudgets = false;
+
+    const syncBudgetSelector = (cadenceId, periodKey) => {
+      if (allowEmptyBudgets && budgetEntries.length === 0) {
+        renderBudgetSelector([], null);
+        return;
+      }
+      ensureBudgetEntry(cadenceId, periodKey);
+      const ordered = orderBudgetEntries(budgetEntries);
+      renderBudgetSelector(ordered, makeBudgetKey(cadenceId, periodKey));
+    };
+
     const initialCadence = getSavedCadence();
+    const savedKey = localStorage.getItem(`${PERIOD_STORAGE_PREFIX}${initialCadence}`);
     if (cadenceSelect) cadenceSelect.value = initialCadence;
-    const initialPeriod = setPeriodOptions(initialCadence);
+    const initialPeriod = setPeriodOptions(initialCadence, savedKey);
+    populatePeriodSelect(periodSelect, initialCadence, initialPeriod.key);
+
+    budgetEntries = getSavedBudgetsFromStorage();
+    syncBudgetSelector(initialCadence, initialPeriod.key);
 
     let state = {
       cadence: initialCadence,
@@ -816,23 +957,26 @@ import { api } from "./api.js";
       if (saveBtn) saveBtn.disabled = true;
       refreshView();
       await loadBudgetSheet();
+      syncBudgetSelector(state.cadence, state.periodKey);
     };
 
     await renderForPeriod(state.periodKey);
 
-    cadenceSelect?.addEventListener("change", async (e) => {
-      const next = e.target.value;
-      state.cadence = CADENCE_LOOKUP.has(next) ? next : "monthly";
+    const changeBudgetSelection = async (cadenceId, periodKey) => {
+      allowEmptyBudgets = false;
+      state.cadence = CADENCE_LOOKUP.has(cadenceId) ? cadenceId : "monthly";
       localStorage.setItem(CADENCE_STORAGE_KEY, state.cadence);
-      const selected = setPeriodOptions(state.cadence);
+      const selected = setPeriodOptions(state.cadence, periodKey);
       await renderForPeriod(selected.key);
+      if (cadenceSelect) cadenceSelect.value = state.cadence;
+      populatePeriodSelect(periodSelect, state.cadence, state.periodKey);
       hideStatus();
-    });
+    };
 
-    periodSelect?.addEventListener("change", async (e) => {
-      const next = e.target.value;
-      await renderForPeriod(next);
-      hideStatus();
+    budgetSelect?.addEventListener("change", async (e) => {
+      const selected = parseBudgetKey(e.target.value);
+      if (!selected) return;
+      await changeBudgetSelection(selected.cadence, selected.periodKey);
     });
 
     $("#budgetTbody")?.addEventListener("input", (e) => {
@@ -1045,6 +1189,132 @@ import { api } from "./api.js";
       showStatus("Export started.", "ok");
     });
 
+    const addBudgetModal = $("#addBudgetModal");
+    const addBudgetForm = $("#addBudgetForm");
+    const addBudgetCadenceSelect = $("#budgetCadenceSelect");
+    const addBudgetPeriodSelect = $("#budgetMonthSelect");
+    const btnAddBudget = $("#btnAddBudget");
+    const cancelAddBudgetBtn = $("#cancelAddBudgetBtn");
+    const deleteBudgetModal = $("#deleteBudgetModal");
+    const deleteBudgetText = $("#deleteBudgetText");
+    const btnDeleteBudget = $("#btnDeleteBudget");
+    const confirmDeleteBudgetBtn = $("#confirmDeleteBudgetBtn");
+    const cancelDeleteBudgetBtn = $("#cancelDeleteBudgetBtn");
+
+    const openAddBudgetModal = () => {
+      addBudgetModal?.classList.remove("hidden");
+      if (addBudgetCadenceSelect) addBudgetCadenceSelect.value = state.cadence;
+      populatePeriodSelect(addBudgetPeriodSelect, state.cadence, state.periodKey);
+      addBudgetCadenceSelect?.focus();
+    };
+
+    const closeAddBudgetModal = () => {
+      addBudgetModal?.classList.add("hidden");
+    };
+
+    btnAddBudget?.addEventListener("click", openAddBudgetModal);
+    cancelAddBudgetBtn?.addEventListener("click", closeAddBudgetModal);
+    addBudgetModal?.addEventListener("click", (e) => {
+      if (e.target === addBudgetModal) closeAddBudgetModal();
+    });
+
+    addBudgetCadenceSelect?.addEventListener("change", (e) => {
+      const next = e.target.value;
+      populatePeriodSelect(addBudgetPeriodSelect, next);
+    });
+
+    addBudgetForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const cadenceId = addBudgetCadenceSelect?.value || "monthly";
+      const periodKey = addBudgetPeriodSelect?.value;
+      await changeBudgetSelection(cadenceId, periodKey);
+      closeAddBudgetModal();
+    });
+
+    const deleteBudgetFromDb = async () => {
+      let sheetId = state.sheetId;
+      if (!sheetId) {
+        try {
+          const sheet = await api.budgetSheets.lookup({
+            cadence: state.cadence,
+            period: state.periodKey,
+          });
+          sheetId = sheet?.id || null;
+        } catch (err) {
+          if (err?.message?.includes("not found")) return null;
+          throw err;
+        }
+      }
+
+      if (!sheetId) return null;
+      await api.budgetSheets.delete(sheetId);
+      if (state.sheetId === sheetId) state.sheetId = null;
+      return sheetId;
+    };
+
+    const openDeleteBudgetModal = () => {
+      const label = buildBudgetLabel(state.cadence, state.periodKey);
+      if (deleteBudgetText) {
+        deleteBudgetText.textContent = "Are you sure you want to delete the budget for ";
+        const strong = document.createElement("strong");
+        strong.textContent = label;
+        deleteBudgetText.appendChild(strong);
+        deleteBudgetText.appendChild(document.createTextNode("?"));
+      }
+      deleteBudgetModal?.classList.remove("hidden");
+      confirmDeleteBudgetBtn?.focus();
+    };
+
+    const closeDeleteBudgetModal = () => {
+      deleteBudgetModal?.classList.add("hidden");
+    };
+
+    btnDeleteBudget?.addEventListener("click", openDeleteBudgetModal);
+    cancelDeleteBudgetBtn?.addEventListener("click", closeDeleteBudgetModal);
+    deleteBudgetModal?.addEventListener("click", (e) => {
+      if (e.target === deleteBudgetModal) closeDeleteBudgetModal();
+    });
+
+    confirmDeleteBudgetBtn?.addEventListener("click", async () => {
+      try {
+        await deleteBudgetFromDb();
+      } catch (err) {
+        showStatus("Failed to delete budget from server.", "error");
+        return;
+      }
+
+      const deleteCadence = state.cadence;
+      const deletePeriod = state.periodKey;
+      localStorage.removeItem(`${STORAGE_KEY}_${deleteCadence}_${deletePeriod}`);
+      if (deleteCadence === "monthly") {
+        localStorage.removeItem(`${STORAGE_KEY}_${deletePeriod}`);
+      }
+
+      budgetEntries = budgetEntries.filter(
+        (entry) => !(entry.cadence === deleteCadence && entry.periodKey === deletePeriod)
+      );
+
+      closeDeleteBudgetModal();
+
+      if (budgetEntries.length > 0) {
+        const ordered = orderBudgetEntries(budgetEntries);
+        const next = ordered[0];
+        await changeBudgetSelection(next.cadence, next.periodKey);
+        showStatus("Budget deleted.", "ok");
+        return;
+      }
+
+      allowEmptyBudgets = true;
+      renderBudgetSelector([], null);
+      state.sheetId = null;
+      state.categories = getBudgetCategoryNames().map((name) => ({ name, budget: null }));
+      state.isDirty = false;
+      const saveBtn = $("#btnSaveBudget");
+      if (saveBtn) saveBtn.disabled = true;
+      refreshView();
+      showStatus("Budget deleted. Add a budget to continue.", "ok");
+    });
+
     const customCategoryModal = $("#customCategoryModal");
     const customCategoryForm = $("#customCategoryForm");
     const customCategoryInput = $("#customCategoryInput");
@@ -1068,7 +1338,16 @@ import { api } from "./api.js";
     });
 
     document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && customCategoryModal && !customCategoryModal.classList.contains("hidden")) {
+      if (e.key !== "Escape") return;
+      if (deleteBudgetModal && !deleteBudgetModal.classList.contains("hidden")) {
+        closeDeleteBudgetModal();
+        return;
+      }
+      if (addBudgetModal && !addBudgetModal.classList.contains("hidden")) {
+        closeAddBudgetModal();
+        return;
+      }
+      if (customCategoryModal && !customCategoryModal.classList.contains("hidden")) {
         closeCustomModal();
       }
     });

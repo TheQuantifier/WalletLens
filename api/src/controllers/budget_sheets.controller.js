@@ -7,6 +7,7 @@ import {
   getBudgetSheetById,
   findBudgetSheetByCadencePeriod,
   listBudgetSheets,
+  deleteBudgetSheet,
 } from "../models/budget_sheet.model.js";
 import { logActivity } from "../services/activity.service.js";
 
@@ -149,4 +150,23 @@ export const update = asyncHandler(async (req, res) => {
     req,
   });
   res.json(sheet);
+});
+
+// ==========================================================
+// DELETE /api/budget-sheets/:id
+// ==========================================================
+export const remove = asyncHandler(async (req, res) => {
+  const sheet = await deleteBudgetSheet(req.user.id, req.params.id);
+  if (!sheet) return res.status(404).json({ message: "Budget sheet not found" });
+
+  await logActivity({
+    userId: req.user.id,
+    action: "budget_sheet_delete",
+    entityType: "budget_sheet",
+    entityId: sheet.id,
+    metadata: { cadence: sheet.cadence, period: sheet.period },
+    req,
+  });
+
+  res.json({ success: true });
 });

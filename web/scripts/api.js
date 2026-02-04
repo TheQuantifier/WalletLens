@@ -371,6 +371,12 @@ export const budgetSheets = {
       body: JSON.stringify(updates),
     });
   },
+
+  delete(id) {
+    return request(`/budget-sheets/${id}`, {
+      method: "DELETE",
+    });
+  },
 };
 
 // ======================================================================

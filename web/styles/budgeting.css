@@ -15,22 +15,21 @@
 .budget-hero-meta {
   display: flex;
   gap: 0.75rem;
-  align-items: center;
+  align-items: flex-end;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
-.month-controls {
+.budget-selector {
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: flex-start;
   gap: 0.35rem;
+  min-width: 260px;
 }
 
-.month-row {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.5rem;
+.budget-selector .month-select {
+  min-width: 260px;
 }
 
 .month-select {
@@ -51,6 +50,7 @@
   color: var(--primary);
   font-weight: 600;
   font-size: 0.9rem;
+  white-space: nowrap;
 }
 
 .budget-summary {
@@ -178,10 +178,19 @@
 
 .budget-table .table-header {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: space-between;
   margin-bottom: 0.75rem;
   gap: 1rem;
+}
+
+.table-header-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  text-align: right;
 }
 
 .budget-table-actions {
