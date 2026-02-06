@@ -15,6 +15,9 @@ import { api } from "./api.js";
 
 // Set to false while developing pages to bypass login requirement
 const AUTH_GUARD_ENABLED = true;
+const DEFAULT_APP_NAME = "WiseWallet";
+const APP_NAME_REGEX = /WiseWallet|WalletWise/g;
+const APP_NAME_TEST = /WiseWallet|WalletWise/;
 
 /**
  * Pages that do NOT require authentication
@@ -70,6 +73,7 @@ document.addEventListener("DOMContentLoaded", () => {
   cachePageTitle();
   loadHeaderAndFooter();
   initLiveNavigation();
+  applyCachedAppName();
 });
 
 /**
@@ -400,16 +404,83 @@ async function updateAppName() {
   const cached = sessionStorage.getItem("appName");
   if (cached) {
     nameEl.textContent = cached;
+    applyAppName(cached);
   }
 
   try {
     const data = await api.appSettings.getPublic();
-    const nextName = data?.appName || "WiseWallet";
+    const nextName = data?.appName || DEFAULT_APP_NAME;
     nameEl.textContent = nextName;
     sessionStorage.setItem("appName", nextName);
+    applyAppName(nextName);
   } catch {
     // ignore public settings failure
   }
+}
+
+function applyCachedAppName() {
+  const cached = sessionStorage.getItem("appName");
+  if (cached) {
+    applyAppName(cached);
+  }
+}
+
+function applyAppName(appName) {
+  if (!appName) return;
+
+  // Title
+  if (document.title && APP_NAME_TEST.test(document.title)) {
+    document.title = document.title.replace(APP_NAME_REGEX, appName);
+  }
+
+  // Header brand
+  const nameEl = document.getElementById("appName");
+  if (nameEl) {
+    nameEl.textContent = appName;
+  }
+
+  // Meta tags
+  const metaDescription = document.querySelector("meta[name='description']");
+  if (metaDescription?.content && APP_NAME_TEST.test(metaDescription.content)) {
+    metaDescription.content = metaDescription.content.replace(APP_NAME_REGEX, appName);
+  }
+
+  const metaAuthor = document.querySelector("meta[name='author']");
+  if (metaAuthor?.content && APP_NAME_TEST.test(metaAuthor.content)) {
+    metaAuthor.content = metaAuthor.content.replace(APP_NAME_REGEX, appName);
+  }
+
+  // Attributes
+  const attrTargets = ["title", "placeholder", "aria-label", "alt", "content"];
+  document.querySelectorAll("*").forEach((el) => {
+    attrTargets.forEach((attr) => {
+      const val = el.getAttribute(attr);
+      if (val && APP_NAME_TEST.test(val)) {
+        el.setAttribute(attr, val.replace(APP_NAME_REGEX, appName));
+      }
+    });
+  });
+
+  // Text nodes in body
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let node = walker.nextNode();
+  while (node) {
+    nodes.push(node);
+    node = walker.nextNode();
+  }
+
+  nodes.forEach((textNode) => {
+    const parent = textNode.parentElement;
+    if (!parent) return;
+    const tag = parent.tagName;
+    if (["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT"].includes(tag)) return;
+
+    const value = textNode.nodeValue;
+    if (value && APP_NAME_TEST.test(value)) {
+      textNode.nodeValue = value.replace(APP_NAME_REGEX, appName);
+    }
+  });
 }
 
 window.addEventListener("avatar:updated", (event) => {

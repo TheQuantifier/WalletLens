@@ -5,7 +5,8 @@ import { query } from "../config/db.js";
  * Expected Postgres table: users
  * Columns:
  * id (uuid), username, email, password_hash, full_name, location, role, phone_number, bio,
- * avatar_url, custom_expense_categories, custom_income_categories, created_at, updated_at
+ * avatar_url, custom_expense_categories, custom_income_categories, address, employer, income_range,
+ * created_at, updated_at
  */
 
 export function normalizeIdentifier(value) {
@@ -22,18 +23,22 @@ export async function createUser({
   phoneNumber = "",
   bio = "",
   avatarUrl = "",
+  address = "",
+  employer = "",
+  incomeRange = "",
   customExpenseCategories = [],
   customIncomeCategories = [],
 }) {
   const { rows } = await query(
     `
     INSERT INTO users
-      (username, email, password_hash, full_name, location, role, phone_number, bio, avatar_url, custom_expense_categories, custom_income_categories)
+      (username, email, password_hash, full_name, location, role, phone_number, bio, avatar_url, address, employer, income_range,
+       custom_expense_categories, custom_income_categories)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
     RETURNING
       id, username, email, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     `,
     [
@@ -46,6 +51,9 @@ export async function createUser({
       phoneNumber,
       bio,
       avatarUrl,
+      address,
+      employer,
+      incomeRange,
       customExpenseCategories,
       customIncomeCategories,
     ]
@@ -58,7 +66,7 @@ export async function findUserById(id) {
     `
     SELECT
       id, username, email, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
     FROM users
@@ -76,7 +84,7 @@ export async function findUserAuthById(id) {
     `
     SELECT
       id, username, email, password_hash, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
     FROM users
@@ -95,7 +103,7 @@ export async function findUserAuthByIdentifier(identifier) {
     `
     SELECT
       id, username, email, password_hash, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
     FROM users
@@ -118,6 +126,9 @@ export async function updateUserById(id, changes = {}) {
     phoneNumber: "phone_number",
     bio: "bio",
     avatarUrl: "avatar_url",
+    address: "address",
+    employer: "employer",
+    incomeRange: "income_range",
     customExpenseCategories: "custom_expense_categories",
     customIncomeCategories: "custom_income_categories",
   };
@@ -147,7 +158,7 @@ export async function updateUserById(id, changes = {}) {
     WHERE id = $${i}
     RETURNING
       id, username, email, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     `,
     values
@@ -204,7 +215,7 @@ export async function listUsers({ limit = 50, offset = 0, queryText = "" } = {})
     `
     SELECT
       id, username, email, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     FROM users
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}

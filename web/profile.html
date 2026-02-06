@@ -98,6 +98,12 @@
         <button id="editProfileBtn" class="btn btn--primary" type="button">
           Edit Profile
         </button>
+        <button id="cancelEditBtn" class="btn is-hidden" type="button">
+          Cancel
+        </button>
+        <button id="saveProfileBtn" class="btn btn--primary is-hidden" type="submit" form="editForm">
+          Save Changes
+        </button>
       </div>
     </section>
 
@@ -108,42 +114,46 @@
         <div class="avatar-block">
           <div class="avatar"></div>
           <div class="identity">
-            <h3 class="name" id="fullName">—</h3>
-            <p class="subtle" id="username">@—</p>
+            <h3 class="name" id="fullName">&mdash;</h3>
+            <p class="subtle" id="username">@&mdash;</p>
+          </div>
+          <div class="avatar-actions">
+            <button class="btn is-hidden" id="changeAvatarBtn" type="button">Change Avatar</button>
           </div>
         </div>
 
-        <dl class="meta">
-          <div><dt>Email</dt><dd id="email">—</dd></div>
-          <div><dt>Phone</dt><dd id="phoneNumber">—</dd></div>
-          <div><dt>Location</dt><dd id="location">—</dd></div>
-          <div><dt>Role</dt><dd id="role">—</dd></div>
-          <div><dt>Member Since</dt><dd id="createdAt">—</dd></div>
-          <div><dt>Bio</dt><dd id="bio">—</dd></div>
+        <dl id="profileSummary" class="meta">
+          <div><dt>Email</dt><dd id="email">&mdash;</dd></div>
+          <div><dt>Phone</dt><dd id="phoneNumber">&mdash;</dd></div>
+          <div><dt>Location</dt><dd id="location">&mdash;</dd></div>
+          <div><dt>Role</dt><dd id="role">&mdash;</dd></div>
+          <div><dt>Member Since</dt><dd id="createdAt">&mdash;</dd></div>
+          <div><dt>Bio</dt><dd id="bio">&mdash;</dd></div>
         </dl>
 
         <!-- EDIT FORM -->
         <form id="editForm" class="edit-form" hidden>
+          <div class="edit-form-header">
+            <h3>Edit Profile</h3>
+            <p class="subtle">Update your contact details and profile info.</p>
+          </div>
           <div class="form-grid">
             <label><span class="label">Full Name</span><input id="input_fullName" name="fullName" type="text" autocomplete="name" required></label>
             <label><span class="label">Username</span><input id="input_username" name="username" type="text" autocomplete="username" required></label>
             <label><span class="label">Email</span><input id="input_email" name="email" type="email" autocomplete="email" required></label>
             <label><span class="label">Phone Number</span><input id="input_phoneNumber" name="phoneNumber" type="tel" autocomplete="tel"></label>
             <label><span class="label">Location</span><input id="input_location" name="location" type="text" autocomplete="address-level2"></label>
-            <label><span class="label">Role</span><input id="input_role" name="role" type="text" autocomplete="organization-title" readonly></label>
             <label class="span-2"><span class="label">Bio</span><textarea id="input_bio" name="bio" rows="4" autocomplete="off"></textarea></label>
           </div>
 
           <div class="form-actions">
-            <button type="button" id="cancelEditBtn" class="btn">Cancel</button>
-            <button type="submit" class="btn btn--primary">Save Changes</button>
+            <button type="button" id="changeAvatarBtn" class="btn">Change Avatar</button>
           </div>
         </form>
 
         <p id="profileStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
 
         <div class="actions">
-          <button class="btn" id="changeAvatarBtn" type="button">Change Avatar</button>
           <input id="avatarInput" type="file" accept="image/*" hidden />
         </div>
       </section>
@@ -164,42 +174,47 @@
           </div>
         </div>
       </div>
-
       <!-- IDENTITY + STATS -->
       <section class="card security">
-        <h2>Identity & Stats</h2>
+        <div class="security-header">
+          <h2>Identity & Stats</h2>
+        </div>
 
-        <div class="security-rows">
-          <div class="security-row">
-            <div class="sr-left"><p class="label">Legal Name</p></div>
-            <div class="sr-right align-right" id="identityName">—</div>
-          </div>
-
+        <div id="identityDisplay" class="security-rows">
           <div class="security-row">
             <div class="sr-left"><p class="label">Address</p></div>
-            <div class="sr-right align-right" id="identityAddress">—</div>
+            <div class="sr-right align-right" id="identityAddress">&mdash;</div>
           </div>
 
           <div class="security-row">
             <div class="sr-left"><p class="label">Employer</p></div>
-            <div class="sr-right align-right" id="identityEmployer">—</div>
+            <div class="sr-right align-right" id="identityEmployer">&mdash;</div>
           </div>
 
           <div class="security-row">
             <div class="sr-left"><p class="label">Income Range</p></div>
-            <div class="sr-right align-right" id="identityIncome">—</div>
+            <div class="sr-right align-right" id="identityIncome">&mdash;</div>
           </div>
+        </div>
 
+        <form id="identityForm" class="edit-form edit-form--identity" hidden>
+          <div class="form-grid">
+            <label><span class="label">Address</span><input id="input_identityAddress" name="identityAddress" type="text" autocomplete="street-address"></label>
+            <label><span class="label">Employer</span><input id="input_identityEmployer" name="identityEmployer" type="text" autocomplete="organization"></label>
+            <label><span class="label">Income Range</span><input id="input_identityIncome" name="identityIncome" type="text" autocomplete="off" placeholder="e.g., $50k–$75k"></label>
+          </div>
+        </form>
+
+        <div class="security-rows stats-rows">
           <div class="security-row">
             <div class="sr-left"><p class="label">Last Login</p></div>
-            <div class="sr-right align-right" id="stat_lastLogin">—</div>
+            <div class="sr-right align-right" id="stat_lastLogin">&mdash;</div>
           </div>
 
           <div class="security-row">
             <div class="sr-left"><p class="label">Records Uploaded</p></div>
-            <div class="sr-right align-right" id="stat_uploads">—</div>
+            <div class="sr-right align-right" id="stat_uploads">&mdash;</div>
           </div>
-
         </div>
       </section>
 
@@ -316,3 +331,6 @@
   <script src="scripts/profile.js" type="module"></script>
 </body>
 </html>
+
+
+

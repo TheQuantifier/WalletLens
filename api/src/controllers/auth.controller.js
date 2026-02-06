@@ -288,6 +288,9 @@ export const updateMe = asyncHandler(async (req, res) => {
     "phoneNumber",
     "bio",
     "avatarUrl",
+    "address",
+    "employer",
+    "incomeRange",
     "customExpenseCategories",
     "customIncomeCategories",
   ];
