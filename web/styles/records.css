@@ -314,6 +314,31 @@
   table-layout: fixed;
 }
 
+.records-sort-btn {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.records-sort-btn--num {
+  margin-left: auto;
+}
+
+.records-sort-btn:hover {
+  text-decoration: underline;
+}
+
+.sort-arrow {
+  font-size: 0.85em;
+}
+
 /* ----- COLUMN WIDTHS ----- */
 
 /* Date */

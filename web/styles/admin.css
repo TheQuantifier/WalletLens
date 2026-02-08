@@ -118,6 +118,32 @@
   color: var(--text);
 }
 
+.admin-sort-btn {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.admin-sort-btn--num {
+  margin-left: auto;
+}
+
+.admin-sort-btn:hover {
+  text-decoration: underline;
+}
+
+.sort-arrow {
+  font-size: 0.85em;
+  opacity: 0.9;
+}
+
 .admin-table .num {
   text-align: right;
 }

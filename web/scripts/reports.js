@@ -24,6 +24,7 @@ import { api } from "./api.js";
 
   let cache = [];
   let charts = { expPie: null, incPie: null, monthly: null };
+  const PAGE_SIZE = 500;
 
   const debounce = (fn, delay = 200) => {
     let t;
@@ -170,15 +171,57 @@ import { api } from "./api.js";
     charts = { expPie: null, incPie: null, monthly: null };
   };
 
-  const withinRange = (iso, rangeVal) => {
-    if (!iso) return false;
-    if (rangeVal === "all") return true;
+  const startOfDay = (d) => {
+    const out = new Date(d);
+    out.setHours(0, 0, 0, 0);
+    return out;
+  };
+
+  const endOfDay = (d) => {
+    const out = new Date(d);
+    out.setHours(23, 59, 59, 999);
+    return out;
+  };
+
+  const dateKey = (d) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  };
+
+  const getRangeWindow = (records, rangeVal) => {
+    const validDates = (records || [])
+      .map((r) => parseISODate(r?.date))
+      .filter((d) => d && !Number.isNaN(d.getTime()));
+
+    if (rangeVal === "all") {
+      if (!validDates.length) {
+        const now = new Date();
+        return { start: startOfDay(now), end: endOfDay(now) };
+      }
+      const minDate = new Date(Math.min(...validDates.map((d) => d.getTime())));
+      const maxDate = new Date(Math.max(...validDates.map((d) => d.getTime())));
+      return { start: startOfDay(minDate), end: endOfDay(maxDate) };
+    }
+
     const days = Number(rangeVal);
-    if (!Number.isFinite(days) || days <= 0) return true;
+    if (!Number.isFinite(days) || days <= 0) {
+      const now = new Date();
+      return { start: startOfDay(now), end: endOfDay(now) };
+    }
+
+    const end = endOfDay(new Date());
+    const start = startOfDay(new Date(end));
+    start.setDate(start.getDate() - days + 1);
+    return { start, end };
+  };
+
+  const withinWindow = (iso, window) => {
+    if (!iso || !window?.start || !window?.end) return false;
     const d = parseISODate(iso);
-    const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - days);
-    return d >= cutoff;
+    if (!d || Number.isNaN(d.getTime())) return false;
+    return d >= window.start && d <= window.end;
   };
 
   const normalize = (records) =>
@@ -212,22 +255,61 @@ import { api } from "./api.js";
       ["—", 0]
     );
 
-  const monthKey = (iso) => {
-    const d = parseISODate(iso);
+  const monthKeyFromDate = (d) => {
     if (!d || Number.isNaN(d.getTime())) return "";
     const y = d.getFullYear();
     const m = String(d.getMonth() + 1).padStart(2, "0");
     return `${y}-${m}`;
   };
 
-  const buildMonthlySeries = (records) => {
+  const getSeriesBounds = (records, rangeWindow) => {
+    const validDates = (records || [])
+      .map((r) => parseISODate(r?.date))
+      .filter((d) => d && !Number.isNaN(d.getTime()));
+
+    if (!validDates.length) {
+      return { start: new Date(rangeWindow.start), end: new Date(rangeWindow.end) };
+    }
+
+    const minDate = new Date(Math.min(...validDates.map((d) => d.getTime())));
+    const maxDate = new Date(Math.max(...validDates.map((d) => d.getTime())));
+    return { start: startOfDay(minDate), end: endOfDay(maxDate) };
+  };
+
+  const pickTimeGranularity = (start, end) => {
+    const dayMs = 24 * 60 * 60 * 1000;
+    const spanDays = Math.max(1, Math.floor((end - start) / dayMs) + 1);
+    return spanDays <= 120 ? "day" : "month";
+  };
+
+  const buildTimeSeries = (records, rangeWindow) => {
     const displayCur = getDisplayCurrency();
+    const bounds = getSeriesBounds(records, rangeWindow);
+    const granularity = pickTimeGranularity(bounds.start, bounds.end);
     const m = new Map();
+
+    if (granularity === "day") {
+      const cursor = new Date(bounds.start);
+      while (cursor <= bounds.end) {
+        m.set(dateKey(cursor), { income: 0, expense: 0, date: new Date(cursor) });
+        cursor.setDate(cursor.getDate() + 1);
+      }
+    } else {
+      const cursor = new Date(bounds.start.getFullYear(), bounds.start.getMonth(), 1);
+      const endMonth = new Date(bounds.end.getFullYear(), bounds.end.getMonth(), 1);
+      while (cursor <= endMonth) {
+        m.set(monthKeyFromDate(cursor), { income: 0, expense: 0, date: new Date(cursor) });
+        cursor.setMonth(cursor.getMonth() + 1);
+      }
+    }
+
     records.forEach((r) => {
       if (!r.date) return;
-      const key = monthKey(r.date);
+      const d = parseISODate(r.date);
+      if (!d || Number.isNaN(d.getTime())) return;
+      const key = granularity === "day" ? dateKey(d) : monthKeyFromDate(d);
       if (!key) return;
-      const prev = m.get(key) || { income: 0, expense: 0 };
+      const prev = m.get(key) || { income: 0, expense: 0, date: d };
       const amt = convertCurrency(r.amount, r.currency, displayCur);
       if (r.type === "income") prev.income += amt;
       else prev.expense += amt;
@@ -235,17 +317,31 @@ import { api } from "./api.js";
     });
 
     const keys = [...m.keys()].sort();
-    const labels = keys.map((k) => {
-      const [y, mm] = k.split("-");
-      const d = new Date(Number(y), Number(mm) - 1, 1);
-      return d.toLocaleDateString(undefined, { year: "numeric", month: "short" });
-    });
+    const labels = keys.map((k) =>
+      m.get(k).date.toLocaleDateString(
+        undefined,
+        granularity === "day"
+          ? { month: "short", day: "numeric" }
+          : { year: "numeric", month: "short" }
+      )
+    );
 
     return {
       labels,
       income: keys.map((k) => m.get(k).income),
       expense: keys.map((k) => m.get(k).expense),
+      granularity,
     };
+  };
+
+  const countDistinctMonths = (records) => {
+    const months = new Set();
+    (records || []).forEach((r) => {
+      const d = parseISODate(r?.date);
+      const key = monthKeyFromDate(d);
+      if (key) months.add(key);
+    });
+    return months.size;
   };
 
   const setText = (el, text) => {
@@ -255,7 +351,9 @@ import { api } from "./api.js";
 
   const computeAndRender = () => {
     const rangeVal = els.range?.value || "all";
-    const records = normalize(cache).filter((r) => withinRange(r.date, rangeVal));
+    const normalized = normalize(cache);
+    const rangeWindow = getRangeWindow(normalized, rangeVal);
+    const records = normalized.filter((r) => withinWindow(r.date, rangeWindow));
 
     const expenses = records.filter((r) => r.type === "expense");
     const income = records.filter((r) => r.type === "income");
@@ -273,9 +371,9 @@ import { api } from "./api.js";
     setText(els.totalExpenses, fmtMoney(totalExp, displayCur));
     setText(els.totalIncome, fmtMoney(totalInc, displayCur));
 
-    const monthly = buildMonthlySeries(records);
-    const monthsCount = Math.max(1, monthly.labels.length);
-    const avgMonthlyExp = monthly.expense.reduce((a, b) => a + b, 0) / monthsCount;
+    const timeSeries = buildTimeSeries(records, rangeWindow);
+    const monthsCount = Math.max(1, countDistinctMonths(records));
+    const avgMonthlyExp = totalExp / monthsCount;
     setText(els.monthlyAverage, fmtMoney(avgMonthlyExp, displayCur));
 
     const expCats = groupByCategory(expenses);
@@ -369,25 +467,31 @@ import { api } from "./api.js";
       charts.monthly = new Chart(ctx, {
         type: "line",
         data: {
-          labels: monthly.labels,
+          labels: timeSeries.labels,
           datasets: [
             {
               label: "Expenses",
-              data: monthly.expense,
+              data: timeSeries.expense,
               hidden: !showExp,
               borderColor: expenseLineColor(),
               backgroundColor: expenseLineColor(),
               pointBackgroundColor: expenseLineColor(),
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointHitRadius: 16,
               borderWidth: 2,
               tension: 0.25,
             },
             {
               label: "Income",
-              data: monthly.income,
+              data: timeSeries.income,
               hidden: !showInc,
               borderColor: incomeLineColor(),
               backgroundColor: incomeLineColor(),
               pointBackgroundColor: incomeLineColor(),
+              pointRadius: 3,
+              pointHoverRadius: 6,
+              pointHitRadius: 16,
               borderWidth: 2,
               tension: 0.25,
             },
@@ -396,18 +500,34 @@ import { api } from "./api.js";
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          interaction: {
+            mode: "index",
+            intersect: false,
+          },
           plugins: {
             legend: { labels: { color: chartText() } },
             tooltip: {
               callbacks: {
                 label: (ctx) => `${ctx.dataset.label}: ${fmtMoney(ctx.parsed.y, displayCur)}`,
+                footer: (items) => {
+                  const total = (items || []).reduce(
+                    (sum, item) => sum + (Number(item?.parsed?.y) || 0),
+                    0
+                  );
+                  return `Total: ${fmtMoney(total, displayCur)}`;
+                },
               },
             },
           },
           scales: {
-            x: { ticks: { color: chartText() }, grid: { color: chartGrid() } },
+            x: {
+              title: { display: true, text: "Time", color: chartText() },
+              ticks: { color: chartText() },
+              grid: { color: chartGrid() },
+            },
             y: {
               beginAtZero: true,
+              title: { display: true, text: "Amount", color: chartText() },
               ticks: {
                 color: chartText(),
                 callback: (v) => {
@@ -444,9 +564,15 @@ import { api } from "./api.js";
 
   const load = async () => {
     try {
-      showStatus("Loading reports…");
-      const res = await api.records.getAll();
-      cache = Array.isArray(res) ? res : (res?.records || res?.data || []);
+      showStatus("Loading reports...");
+      const all = [];
+      for (let offset = 0; ; offset += PAGE_SIZE) {
+        const batch = await api.records.getAll({ limit: PAGE_SIZE, offset });
+        const rows = Array.isArray(batch) ? batch : (batch?.records || batch?.data || []);
+        all.push(...rows);
+        if (!Array.isArray(rows) || rows.length < PAGE_SIZE) break;
+      }
+      cache = all;
       computeAndRender();
     } catch (err) {
       console.error("Error loading reports:", err);
@@ -480,3 +606,4 @@ import { api } from "./api.js";
     load();
   });
 })();
+

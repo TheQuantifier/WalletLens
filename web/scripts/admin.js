@@ -41,6 +41,10 @@ const els = {
 const state = {
   users: [],
   records: [],
+  sorts: {
+    users: { key: "", dir: "" },
+    records: { key: "", dir: "" },
+  },
 };
 
 function setStatus(el, message, variant = "info") {
@@ -97,14 +101,84 @@ function formatDate(value) {
   return dt.toISOString().slice(0, 10);
 }
 
+function normalizeText(value) {
+  return String(value || "").toLowerCase().trim();
+}
+
+function getSortableValue(table, row, key) {
+  if (table === "users") {
+    if (key === "name") return normalizeText(row.full_name || row.fullName || row.username || "");
+    if (key === "email") return normalizeText(row.email);
+    if (key === "role") return normalizeText(row.role);
+    if (key === "created") return new Date(row.created_at || row.createdAt || 0).getTime() || 0;
+  }
+
+  if (table === "records") {
+    if (key === "date") return new Date(row.date || 0).getTime() || 0;
+    if (key === "userName") {
+      return normalizeText(row.user_name || row.full_name || row.username || row.email || row.user_id);
+    }
+    if (key === "type") return normalizeText(row.type);
+    if (key === "category") return normalizeText(row.category);
+    if (key === "amount") return Number(row.amount || 0);
+  }
+
+  return "";
+}
+
+function sortRows(table, rows) {
+  const cfg = state.sorts[table];
+  if (!cfg?.key || !cfg?.dir) return rows;
+
+  const dir = cfg.dir === "desc" ? -1 : 1;
+  return [...rows].sort((a, b) => {
+    const av = getSortableValue(table, a, cfg.key);
+    const bv = getSortableValue(table, b, cfg.key);
+
+    if (av < bv) return -1 * dir;
+    if (av > bv) return 1 * dir;
+    return 0;
+  });
+}
+
+function updateSortArrows() {
+  document.querySelectorAll(".sort-arrow[data-arrow-for]").forEach((el) => {
+    const token = el.getAttribute("data-arrow-for") || "";
+    const [table, key] = token.split(":");
+    const cfg = state.sorts[table];
+    if (!cfg || cfg.key !== key) {
+      el.textContent = "↕";
+      return;
+    }
+    el.textContent = cfg.dir === "asc" ? "↑" : "↓";
+  });
+}
+
+function toggleSort(table, key) {
+  const cfg = state.sorts[table];
+  if (!cfg) return;
+
+  if (cfg.key !== key) {
+    cfg.key = key;
+    cfg.dir = "asc";
+  } else {
+    cfg.dir = cfg.dir === "asc" ? "desc" : "asc";
+  }
+
+  updateSortArrows();
+  if (table === "users") renderUsers();
+  if (table === "records") renderRecords();
+}
+
 function renderUsers() {
   if (!els.usersTbody) return;
-  if (!state.users.length) {
+  const rows = sortRows("users", state.users);
+  if (!rows.length) {
     els.usersTbody.innerHTML = `<tr><td colspan="5" class="subtle">No users found.</td></tr>`;
     return;
   }
 
-  els.usersTbody.innerHTML = state.users
+  els.usersTbody.innerHTML = rows
     .map(
       (user) => `
         <tr>
@@ -170,12 +244,13 @@ async function saveUser(event) {
 
 function renderRecords() {
   if (!els.recordsTbody) return;
-  if (!state.records.length) {
+  const rows = sortRows("records", state.records);
+  if (!rows.length) {
     els.recordsTbody.innerHTML = `<tr><td colspan="6" class="subtle">No records found.</td></tr>`;
     return;
   }
 
-  els.recordsTbody.innerHTML = state.records
+  els.recordsTbody.innerHTML = rows
     .map(
       (record) => `
         <tr>
@@ -304,6 +379,12 @@ async function saveSettings(event) {
 }
 
 function bindEvents() {
+  document.querySelectorAll(".admin-sort-btn[data-table][data-key]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      toggleSort(btn.dataset.table, btn.dataset.key);
+    });
+  });
+
   if (els.userSearchBtn) {
     els.userSearchBtn.addEventListener("click", loadUsers);
   }
@@ -361,6 +442,7 @@ async function init() {
   if (!ok) return;
   bindModalClose();
   bindEvents();
+  updateSortArrows();
   await loadUsers();
   await loadRecords();
   await loadSettings();

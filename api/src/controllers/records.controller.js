@@ -42,7 +42,17 @@ export const getOne = asyncHandler(async (req, res) => {
 // GET /api/records
 // ==========================================================
 export const getAll = asyncHandler(async (req, res) => {
-  const records = await listRecords(req.user.id);
+  const type = req.query.type ? String(req.query.type) : undefined;
+  const parsedLimit = Number.parseInt(String(req.query.limit ?? ""), 10);
+  const parsedOffset = Number.parseInt(String(req.query.offset ?? ""), 10);
+  const limit =
+    Number.isFinite(parsedLimit) && parsedLimit > 0
+      ? Math.min(parsedLimit, 1000)
+      : 200;
+  const offset =
+    Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+
+  const records = await listRecords(req.user.id, { type, limit, offset });
   res.json(records);
 });
 
