@@ -122,6 +122,19 @@
           <button type="submit" id="registerBtn" class="nf-btn">Create Account</button>
 
           <p id="registerMessage" class="form-message is-hidden" aria-live="polite"></p>
+
+          <div class="auth-alt">
+            <p class="auth-alt-label">Or Register with</p>
+            <button type="button" id="googleRegisterBtn" class="google-auth-btn" aria-label="Register with Google">
+              <svg class="google-auth-icon" viewBox="0 0 533.5 544.3" aria-hidden="true" focusable="false">
+                <path fill="#4285F4" d="M533.5 278.4c0-18.5-1.5-36.2-4.7-53.3H272v100.9h146.9c-6.3 34-25 62.9-53.2 82.2v68h86.1c50.4-46.4 81.7-114.9 81.7-197.8z"></path>
+                <path fill="#34A853" d="M272 544.3c72.7 0 133.8-24.1 178.4-65.5l-86.1-68c-24 16.1-54.7 25.5-92.3 25.5-71 0-131.2-47.9-152.7-112.4h-88.9v70.1C74.6 482.9 166.1 544.3 272 544.3z"></path>
+                <path fill="#FBBC05" d="M119.3 323.9c-10.9-32.8-10.9-68.3 0-101.1v-70.1h-88.9c-36.8 73.3-36.8 168 0 241.3l88.9-70.1z"></path>
+                <path fill="#EA4335" d="M272 107.7c39.5-.6 77.7 14 106 40.8l79-79C411.7 24.6 343.4-.3 272 0 166.1 0 74.6 61.4 30.4 152.7l88.9 70.1C140.8 155.6 201 107.7 272 107.7z"></path>
+              </svg>
+              <span>Google</span>
+            </button>
+          </div>
         </form>
 
         <div class="auth-links">
@@ -179,6 +192,10 @@
       </div>
       <div class="nf-modal-body" id="legalModalBody">
         <p class="subtle">Loadingâ€¦</p>
+      </div>
+      <div class="nf-modal-footer is-hidden" id="legalConsentActions">
+        <button type="button" class="nf-modal-action-disagree" id="legalDisagreeBtn">Disagree</button>
+        <button type="button" class="nf-modal-action-agree" id="legalAgreeBtn">Agree</button>
       </div>
     </div>
   </div>

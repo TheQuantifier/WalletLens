@@ -6,12 +6,27 @@ document.addEventListener("DOMContentLoaded", () => {
   const form = document.getElementById("registerForm");
   const msg = document.getElementById("registerMessage");
   const btn = document.getElementById("registerBtn");
+  const googleRegisterBtn = document.getElementById("googleRegisterBtn");
   const passwordInput = document.getElementById("password");
   const confirmInput = document.getElementById("confirmPassword");
   const legalModal = document.getElementById("legalModal");
   const legalModalTitle = document.getElementById("legalModalTitle");
   const legalModalBody = document.getElementById("legalModalBody");
+  const legalConsentActions = document.getElementById("legalConsentActions");
+  const legalDisagreeBtn = document.getElementById("legalDisagreeBtn");
+  const legalAgreeBtn = document.getElementById("legalAgreeBtn");
+  const agreeCheckbox = document.getElementById("agree");
   const legalCache = new Map();
+  const legalSequence = ["terms", "privacy"];
+  let legalFlowActive = false;
+  let legalFlowStepIndex = 0;
+  let suppressAgreeEvent = false;
+
+  const googleRedirect = api.auth.consumeGoogleRedirect();
+  if (googleRedirect?.token || googleRedirect?.success) {
+    window.location.href = "home.html";
+    return;
+  }
 
   const setPasswordStyle = (input, isValid) => {
     if (!input) return;
@@ -64,15 +79,31 @@ document.addEventListener("DOMContentLoaded", () => {
     msg.style.color = "";
   };
 
+  if (googleRedirect?.error) {
+    showMsg(googleRedirect.error, "error");
+  }
+
   const setLegalModalOpen = (open) => {
     if (!legalModal) return;
     legalModal.classList.toggle("hidden", !open);
     document.body.style.overflow = open ? "hidden" : "";
   };
 
+  const showLegalConsentActions = (show) => {
+    if (!legalConsentActions) return;
+    legalConsentActions.classList.toggle("is-hidden", !show);
+  };
+
+  const setAgreeCheckbox = (checked) => {
+    if (!agreeCheckbox) return;
+    suppressAgreeEvent = true;
+    agreeCheckbox.checked = checked;
+    suppressAgreeEvent = false;
+  };
+
   const loadLegalContent = async (kind) => {
     const config = {
-      terms: { title: "Terms of Use", url: "terms.html" },
+      terms: { title: "Terms of Service", url: "terms.html" },
       privacy: { title: "Privacy Policy", url: "privacy.html" },
     }[kind];
 
@@ -102,11 +133,38 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
+  const closeLegalFlowAsDisagree = () => {
+    legalFlowActive = false;
+    legalFlowStepIndex = 0;
+    setAgreeCheckbox(false);
+    showLegalConsentActions(false);
+    setLegalModalOpen(false);
+  };
+
+  const loadLegalFlowStep = async () => {
+    const kind = legalSequence[legalFlowStepIndex] || legalSequence[0];
+    await loadLegalContent(kind);
+    if (legalAgreeBtn) {
+      legalAgreeBtn.textContent =
+        legalFlowStepIndex < legalSequence.length - 1 ? "Agree & Continue" : "Agree";
+    }
+  };
+
+  const startLegalFlow = async () => {
+    legalFlowActive = true;
+    legalFlowStepIndex = 0;
+    showLegalConsentActions(true);
+    setLegalModalOpen(true);
+    await loadLegalFlowStep();
+  };
+
   document.querySelectorAll(".legal-link").forEach((link) => {
     link.addEventListener("click", (e) => {
       const kind = link.dataset.legal;
       if (!kind || !legalModal) return;
       e.preventDefault();
+      legalFlowActive = false;
+      showLegalConsentActions(false);
       setLegalModalOpen(true);
       loadLegalContent(kind);
     });
@@ -114,19 +172,80 @@ document.addEventListener("DOMContentLoaded", () => {
 
   legalModal?.addEventListener("click", (e) => {
     if (e.target?.matches("[data-legal-close]")) {
+      if (legalFlowActive) {
+        closeLegalFlowAsDisagree();
+        return;
+      }
       setLegalModalOpen(false);
     }
   });
 
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && legalModal && !legalModal.classList.contains("hidden")) {
+      if (legalFlowActive) {
+        closeLegalFlowAsDisagree();
+        return;
+      }
       setLegalModalOpen(false);
     }
+  });
+
+  legalDisagreeBtn?.addEventListener("click", () => {
+    closeLegalFlowAsDisagree();
+  });
+
+  legalAgreeBtn?.addEventListener("click", async () => {
+    if (!legalFlowActive) {
+      setLegalModalOpen(false);
+      return;
+    }
+
+    if (legalFlowStepIndex < legalSequence.length - 1) {
+      legalFlowStepIndex += 1;
+      await loadLegalFlowStep();
+      return;
+    }
+
+    legalFlowActive = false;
+    legalFlowStepIndex = 0;
+    setAgreeCheckbox(true);
+    showLegalConsentActions(false);
+    setLegalModalOpen(false);
   });
 
   if (!form) {
     console.error("❌ registerForm not found on page.");
     return;
+  }
+
+  agreeCheckbox?.addEventListener("change", async () => {
+    if (suppressAgreeEvent) return;
+    if (agreeCheckbox.checked) {
+      setAgreeCheckbox(false);
+      clearMsg();
+      await startLegalFlow();
+    }
+  });
+
+  if (googleRegisterBtn) {
+    (async () => {
+      try {
+        const cfg = await api.auth.googleConfig();
+        if (!cfg?.enabled) {
+          googleRegisterBtn.disabled = true;
+          googleRegisterBtn.title = "Google registration is not configured yet.";
+          return;
+        }
+        googleRegisterBtn.addEventListener("click", () => {
+          clearMsg();
+          api.auth.beginGoogleAuth("register", window.location.href);
+        });
+      } catch (err) {
+        console.error("Google config error:", err);
+        googleRegisterBtn.disabled = true;
+        googleRegisterBtn.title = "Google registration is unavailable.";
+      }
+    })();
   }
 
   updatePasswordStyles();

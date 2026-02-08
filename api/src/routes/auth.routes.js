@@ -3,20 +3,29 @@ import express from "express";
 
 import * as controller from "../controllers/auth.controller.js";
 import auth from "../middleware/auth.js";
+import { createRateLimiter } from "../middleware/rateLimit.js";
 
 const router = express.Router();
+const registerLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 8 });
+const loginLimiter = createRateLimiter({ windowMs: 15 * 60 * 1000, max: 12 });
+const twoFaLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 10 });
+const oauthLimiter = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 40 });
 
 // --------------------------------------------------
 // PUBLIC ROUTES
 // --------------------------------------------------
-router.post("/register", controller.register);
+router.get("/google/config", controller.googleConfig);
+router.get("/google/start", oauthLimiter, controller.googleStart);
+router.get("/google/callback", oauthLimiter, controller.googleCallback);
+
+router.post("/register", registerLimiter, controller.register);
 
 // Login expects: { identifier, password }
 // Controller supports username OR email
-router.post("/login", controller.login);
+router.post("/login", loginLimiter, controller.login);
 
 // 2FA login verify
-router.post("/2fa/verify-login", controller.verifyTwoFaLogin);
+router.post("/2fa/verify-login", twoFaLimiter, controller.verifyTwoFaLogin);
 
 // --------------------------------------------------
 // PROTECTED LOGOUT (requires auth)

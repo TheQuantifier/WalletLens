@@ -71,6 +71,10 @@ async function request(path, options = {}) {
 // AUTH MODULE
 // ======================================================================
 export const auth = {
+  setToken(token) {
+    setAuthToken(token);
+  },
+
   async register(email, password, fullName) {
     const data = await request("/auth/register", {
       method: "POST",
@@ -163,6 +167,40 @@ export const auth = {
 
   deleteAccount() {
     return request("/auth/me", { method: "DELETE" });
+  },
+
+  googleConfig() {
+    return request("/auth/google/config");
+  },
+
+  beginGoogleAuth(mode = "login", returnTo = window.location.href) {
+    const normalizedMode = mode === "register" ? "register" : "login";
+    const url = new URL(`${API_BASE}/auth/google/start`);
+    url.searchParams.set("mode", normalizedMode);
+    url.searchParams.set("returnTo", returnTo);
+    window.location.href = url.toString();
+  },
+
+  consumeGoogleRedirect() {
+    const currentUrl = new URL(window.location.href);
+    const token = currentUrl.searchParams.get("auth_token") || "";
+    const success = currentUrl.searchParams.get("auth_success") === "1";
+    const error = currentUrl.searchParams.get("auth_error") || "";
+    const mode = currentUrl.searchParams.get("auth_mode") || "";
+
+    if (token) {
+      setAuthToken(token);
+    }
+
+    if (token || success || error || mode) {
+      currentUrl.searchParams.delete("auth_token");
+      currentUrl.searchParams.delete("auth_success");
+      currentUrl.searchParams.delete("auth_error");
+      currentUrl.searchParams.delete("auth_mode");
+      window.history.replaceState({}, document.title, currentUrl.toString());
+    }
+
+    return { token, success, error, mode };
   },
 };
 

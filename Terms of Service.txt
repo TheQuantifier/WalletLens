@@ -1,0 +1,108 @@
+WiseWallet Terms of Service
+Effective Date: February 8, 2026
+
+These Terms of Service ("Terms") govern your access to and use of WiseWallet ("WiseWallet," "we," "us," or "our"). By creating an account, accessing, or using WiseWallet, you agree to these Terms.
+
+1. Eligibility and Account
+
+You must be legally able to enter into a binding agreement to use WiseWallet.
+You are responsible for:
+- Providing accurate account information.
+- Maintaining the confidentiality of your login credentials.
+- All activity that occurs under your account.
+
+You must promptly notify us if you suspect unauthorized account access.
+
+2. Services Provided
+
+WiseWallet is a personal finance tool that may include:
+- Expense and income tracking.
+- Receipt/document upload and OCR extraction.
+- AI-assisted parsing and categorization.
+- Budgeting and reporting features.
+- Account security tools, including optional two-factor authentication.
+
+We may update, improve, suspend, or discontinue features at any time.
+
+3. Google Sign-In and Third-Party Services
+
+WiseWallet may allow sign-in through Google. By using Google Sign-In, you authorize us to receive basic account information from Google for authentication and account linking.
+WiseWallet may also rely on third-party providers for hosting, storage, email, OCR, AI, and other infrastructure. Use of those services is subject to their own terms and policies.
+
+4. Your Content and Data
+
+You retain ownership of the content and data you submit to WiseWallet (such as receipts, financial records, and account profile information).
+You grant us a limited license to host, process, transmit, and display your data solely to operate and improve WiseWallet and provide support/security functions.
+
+You represent that:
+- You have rights to submit the content you upload.
+- Your content does not violate law or third-party rights.
+
+5. Acceptable Use
+
+You agree not to:
+- Use WiseWallet for unlawful, fraudulent, or abusive purposes.
+- Attempt to gain unauthorized access to systems or accounts.
+- Interfere with service operation, availability, or security.
+- Upload malware or malicious code.
+- Reverse engineer or attempt to extract source code except where allowed by law.
+
+We may suspend or terminate accounts that violate these Terms.
+
+6. Financial and Tax Disclaimer
+
+WiseWallet is an informational and organizational tool only. It does not provide legal, tax, accounting, or financial advisory services.
+You are solely responsible for:
+- Verifying all financial, OCR, and AI-generated outputs.
+- Any decisions or filings made using WiseWallet data.
+
+7. Privacy
+
+Your use of WiseWallet is also governed by our Privacy Policy.
+
+8. Intellectual Property
+
+WiseWallet software, branding, and related materials are owned by us or our licensors and are protected by applicable intellectual property laws.
+Except for rights expressly granted in these Terms, no rights are transferred to you.
+
+9. Termination
+
+You may stop using WiseWallet at any time and may request account deletion through available account tools.
+We may suspend or terminate access immediately if:
+- Required by law.
+- Needed to protect WiseWallet, users, or third parties.
+- You violate these Terms.
+
+Termination does not affect provisions that should survive by nature, including ownership, disclaimers, limitations of liability, and dispute terms.
+
+10. Disclaimers
+
+WiseWallet is provided on an "as is" and "as available" basis, without warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement.
+We do not warrant uninterrupted, error-free, or fully secure operation at all times.
+
+11. Limitation of Liability
+
+To the maximum extent permitted by law, WiseWallet and its affiliates, officers, employees, and licensors will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, revenues, data, or goodwill arising from or related to your use of the service.
+
+To the maximum extent permitted by law, our total liability for any claim arising out of or related to WiseWallet will not exceed the greater of:
+- The amount you paid us for WiseWallet in the 12 months before the claim, or
+- USD $100.
+
+12. Indemnification
+
+You agree to defend, indemnify, and hold harmless WiseWallet and its affiliates, officers, employees, and licensors from claims, damages, liabilities, losses, and expenses (including reasonable legal fees) arising from:
+- Your use of WiseWallet.
+- Your content.
+- Your violation of these Terms or applicable law.
+
+13. Governing Law
+
+These Terms are governed by applicable laws of the jurisdiction in which WiseWallet operates, without regard to conflict of law principles, unless otherwise required by law.
+
+14. Changes to Terms
+
+We may update these Terms from time to time. If we make material changes, we may provide notice in the app, site, or by other reasonable means. Continued use after changes become effective means you accept the updated Terms.
+
+15. Contact
+
+For questions about these Terms, contact us through WiseWallet support channels.

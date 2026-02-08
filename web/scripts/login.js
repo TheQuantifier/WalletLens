@@ -11,6 +11,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const twoFactorWrap = document.getElementById("twoFactorWrap");
   const twoFactorCode = document.getElementById("twoFactorCode");
   const verifyTwoFactorBtn = document.getElementById("verifyTwoFactorBtn");
+  const googleLoginBtn = document.getElementById("googleLoginBtn");
 
   if (!form) {
     console.error("❌ loginForm not found.");
@@ -21,6 +22,15 @@ document.addEventListener("DOMContentLoaded", () => {
   if (redirectMsg && errorEl) {
     errorEl.textContent = redirectMsg;
     sessionStorage.removeItem("authRedirectMessage");
+  }
+
+  const googleRedirect = api.auth.consumeGoogleRedirect();
+  if (googleRedirect?.token || googleRedirect?.success) {
+    window.location.href = "home.html";
+    return;
+  }
+  if (googleRedirect?.error && errorEl) {
+    errorEl.textContent = googleRedirect.error;
   }
 
   const showTwoFactor = (token) => {
@@ -97,4 +107,24 @@ document.addEventListener("DOMContentLoaded", () => {
       errorEl.textContent = err.message || "Verification failed.";
     }
   });
+
+  if (googleLoginBtn) {
+    (async () => {
+      try {
+        const cfg = await api.auth.googleConfig();
+        if (!cfg?.enabled) {
+          googleLoginBtn.disabled = true;
+          googleLoginBtn.title = "Google login is not configured yet.";
+          return;
+        }
+        googleLoginBtn.addEventListener("click", () => {
+          api.auth.beginGoogleAuth("login", window.location.href);
+        });
+      } catch (err) {
+        console.error("Google config error:", err);
+        googleLoginBtn.disabled = true;
+        googleLoginBtn.title = "Google login is unavailable.";
+      }
+    })();
+  }
 });

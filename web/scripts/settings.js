@@ -61,10 +61,15 @@ import { api } from "./api.js";
     confirmPassword: $("#confirmPassword"),
     passwordTwoFaRow: $("#passwordTwoFaRow"),
     passwordTwoFaCode: $("#passwordTwoFaCode"),
+
+    googleConnectRow: $("#googleConnectRow"),
+    googleConnectStatus: $("#googleConnectStatus"),
+    connectGoogleBtn: $("#connectGoogleBtn"),
   };
 
   const state = {
     twoFaEnabled: false,
+    googleEnabled: false,
   };
 
   // ===============================
@@ -401,7 +406,7 @@ import { api } from "./api.js";
   // TWO-FACTOR AUTH
   // ===============================
   const updateTwoFaUI = async () => {
-    if (!els.twoFaStatus) return;
+    if (!els.twoFaStatus) return null;
     try {
       const { user } = await api.auth.me();
       const enabled = !!user?.two_fa_enabled || !!user?.twoFaEnabled;
@@ -409,12 +414,57 @@ import { api } from "./api.js";
       els.twoFaStatus.textContent = enabled ? "Enabled" : "Disabled";
       els.enableTwoFaBtn?.classList.toggle("is-hidden", enabled);
       els.disableTwoFaBtn?.classList.toggle("is-hidden", !enabled);
+      return user || null;
     } catch {
       state.twoFaEnabled = false;
       els.twoFaStatus.textContent = "Unavailable";
       els.enableTwoFaBtn?.classList.add("is-hidden");
       els.disableTwoFaBtn?.classList.add("is-hidden");
+      return null;
     }
+  };
+
+  const updateGoogleConnectUI = (user) => {
+    const hasPassword = !!(user?.has_password || user?.hasPassword);
+    const hasGoogle = !!(user?.google_id || user?.googleId);
+
+    if (!hasPassword) {
+      els.googleConnectRow?.classList.add("is-hidden");
+      return;
+    }
+
+    els.googleConnectRow?.classList.remove("is-hidden");
+
+    if (!els.googleConnectStatus || !els.connectGoogleBtn) return;
+
+    if (hasGoogle) {
+      els.googleConnectStatus.textContent = "Connected";
+      els.connectGoogleBtn.disabled = true;
+      els.connectGoogleBtn.textContent = "Connected";
+      return;
+    }
+
+    els.googleConnectStatus.textContent = state.googleEnabled ? "Not connected" : "Unavailable";
+    els.connectGoogleBtn.disabled = !state.googleEnabled;
+    els.connectGoogleBtn.textContent = "Connect Google";
+  };
+
+  const loadGoogleAvailability = async () => {
+    try {
+      const cfg = await api.auth.googleConfig();
+      state.googleEnabled = !!cfg?.enabled;
+    } catch {
+      state.googleEnabled = false;
+    }
+  };
+
+  const connectGoogleAccount = () => {
+    if (!state.googleEnabled) {
+      showStatus(els.status, "Google login is not configured.", "error");
+      clearStatusSoon(els.status, 2200);
+      return;
+    }
+    api.auth.beginGoogleAuth("login", window.location.href);
   };
 
   const openEnableTwoFaModal = () => {
@@ -772,6 +822,9 @@ import { api } from "./api.js";
     els.closePasswordModal?.addEventListener("click", closePasswordModal);
     els.passwordForm?.addEventListener("submit", submitPasswordChange);
 
+    // Connect Google account
+    els.connectGoogleBtn?.addEventListener("click", connectGoogleAccount);
+
     els.passwordModal?.addEventListener("click", (e) => {
       if (e.target.classList.contains("modal")) closePasswordModal();
     });
@@ -793,12 +846,25 @@ import { api } from "./api.js";
   // INIT
   // ===============================
   document.addEventListener("DOMContentLoaded", async () => {
+    const redirectResult = api.auth.consumeGoogleRedirect();
     ensureFirstRunDefaults();
     initTheme();
     await loadCurrencyOptions();
     loadSettingsIntoUI();
+    await loadGoogleAvailability();
+    const user = await updateTwoFaUI();
+    updateGoogleConnectUI(user);
     loadSessions();
-    updateTwoFaUI();
     wire();
+
+    if (redirectResult?.token || redirectResult?.success) {
+      showStatus(els.status, "Google account connected.", "ok");
+      clearStatusSoon(els.status, 2200);
+      const refreshed = await updateTwoFaUI();
+      updateGoogleConnectUI(refreshed);
+    } else if (redirectResult?.error) {
+      showStatus(els.status, redirectResult.error, "error");
+      clearStatusSoon(els.status, 3200);
+    }
   });
 })();

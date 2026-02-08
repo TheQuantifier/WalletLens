@@ -5,6 +5,7 @@ WiseWallet is a full-stack personal finance web app for tracking income/expenses
 ## What the app includes
 
 - Authentication with JWT + session tracking
+- Google OAuth login/registration option
 - Optional email-based 2FA (enable/disable from Settings)
 - Home dashboard with KPI cards, category chart, recent transactions, and net-worth snapshot
 - Receipt uploads (PDF/images), OCR extraction, AI parsing, and auto-created expense records
@@ -73,6 +74,9 @@ SESSION_IDLE_DAYS=1
 SESSION_CLEANUP_DAYS=30
 TWO_FA_CODE_MINUTES=10
 TWO_FA_TRUSTED_DAYS=10
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:4000/api/auth/google/callback
 
 CORS_ORIGIN=http://localhost:5500,http://127.0.0.1:5500
 

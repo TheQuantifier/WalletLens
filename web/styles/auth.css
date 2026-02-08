@@ -329,6 +329,45 @@ body.landing-light {
   border-radius: 0;
 }
 
+.nf-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.nf-modal-footer.is-hidden {
+  display: none;
+}
+
+.nf-modal-action-disagree,
+.nf-modal-action-agree {
+  min-width: 120px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nf-modal-action-disagree {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.nf-modal-action-agree {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.nf-modal-action-disagree:hover,
+.nf-modal-action-agree:hover {
+  filter: brightness(0.92);
+}
+
 :root[data-theme="dark"] .nf-modal {
   background: rgba(2, 6, 23, 0.72);
 }
@@ -418,6 +457,53 @@ body.landing-light {
   gap: 0.65rem;
 }
 
+.auth-alt {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.auth-alt-label {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.google-auth-btn {
+  width: 50%;
+  min-width: 190px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.google-auth-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-sm);
+}
+
+.google-auth-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.google-auth-icon {
+  width: 18px;
+  height: 18px;
+}
+
 /* =========================================================
    ⭐ FIX AUTOFILL — MOVED HERE BELOW INPUT RULES
    ========================================================= */
@@ -467,6 +553,17 @@ input:-webkit-autofill {
 
 :root[data-theme="dark"] .nf-btn:hover {
   background: var(--accent);
+}
+
+:root[data-theme="dark"] .google-auth-btn {
+  background: #111418;
+  color: #f3f4f6;
+  border-color: #2a2e35;
+}
+
+:root[data-theme="dark"] .google-auth-btn:hover {
+  background: #1c1f26;
+  border-color: #3b4250;
 }
 
 :root[data-theme="dark"] .nf-about {
