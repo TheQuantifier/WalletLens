@@ -488,10 +488,21 @@ body.landing-light {
   transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
 }
 
+.auth-form .google-auth-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #1f2937;
+}
+
 .google-auth-btn:hover {
   background: #f8fafc;
   border-color: #cbd5e1;
   box-shadow: var(--shadow-sm);
+}
+
+.auth-form .google-auth-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
 }
 
 .google-auth-btn:disabled {
