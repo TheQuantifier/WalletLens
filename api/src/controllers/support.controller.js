@@ -1,6 +1,7 @@
 // src/controllers/support.controller.js
 import asyncHandler from "../middleware/async.js";
 import { sendEmail } from "../services/email.service.js";
+import env from "../config/env.js";
 
 const SUPPORT_EMAIL =
   process.env.SUPPORT_EMAIL || "support.wisewallet@manuswebworks.org";
@@ -12,6 +13,57 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 function normalizeString(value) {
   return typeof value === "string" ? value.trim() : "";
+}
+
+export function validatePublicSupportPayload(payload = {}) {
+  const subject = normalizeString(payload?.subject);
+  const message = normalizeString(payload?.message);
+  const name = normalizeString(payload?.name);
+  const email = normalizeString(payload?.email).toLowerCase();
+  const website = normalizeString(payload?.website);
+
+  if (website) return { ok: false, message: "Invalid request." };
+  if (!name || !subject || !message || !email) {
+    return { ok: false, message: "Name, email, subject, and message are required." };
+  }
+  if (name.length > MAX_NAME_LENGTH) {
+    return { ok: false, message: `Name must be ${MAX_NAME_LENGTH} characters or fewer.` };
+  }
+  if (!EMAIL_REGEX.test(email)) {
+    return { ok: false, message: "Please provide a valid email address." };
+  }
+  if (subject.length > MAX_SUBJECT_LENGTH) {
+    return { ok: false, message: `Subject must be ${MAX_SUBJECT_LENGTH} characters or fewer.` };
+  }
+  if (message.length > MAX_MESSAGE_LENGTH) {
+    return { ok: false, message: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer.` };
+  }
+
+  return { ok: true, subject, message, name, email };
+}
+
+async function verifyTurnstile(token, remoteip) {
+  if (!env.turnstileSecretKey) return { ok: true };
+  if (!token) {
+    return { ok: false, message: "Captcha token is required." };
+  }
+
+  const body = new URLSearchParams({
+    secret: env.turnstileSecretKey,
+    response: String(token),
+    remoteip: String(remoteip || ""),
+  });
+
+  const res = await fetch(env.turnstileVerifyUrl, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok || !data?.success) {
+    return { ok: false, message: "Captcha verification failed." };
+  }
+  return { ok: true };
 }
 
 export const contactSupport = asyncHandler(async (req, res) => {
@@ -78,40 +130,15 @@ export const contactSupport = asyncHandler(async (req, res) => {
 });
 
 export const contactSupportPublic = asyncHandler(async (req, res) => {
-  const subject = normalizeString(req.body?.subject);
-  const message = normalizeString(req.body?.message);
-  const name = normalizeString(req.body?.name);
-  const email = normalizeString(req.body?.email).toLowerCase();
-  const website = normalizeString(req.body?.website); // honeypot
-
-  if (website) {
-    return res.status(400).json({ message: "Invalid request." });
+  const validation = validatePublicSupportPayload(req.body || {});
+  if (!validation.ok) {
+    return res.status(400).json({ message: validation.message });
   }
-
-  if (!name || !subject || !message || !email) {
-    return res.status(400).json({ message: "Name, email, subject, and message are required." });
-  }
-
-  if (name.length > MAX_NAME_LENGTH) {
-    return res.status(400).json({
-      message: `Name must be ${MAX_NAME_LENGTH} characters or fewer.`,
-    });
-  }
-
-  if (!EMAIL_REGEX.test(email)) {
-    return res.status(400).json({ message: "Please provide a valid email address." });
-  }
-
-  if (subject.length > MAX_SUBJECT_LENGTH) {
-    return res.status(400).json({
-      message: `Subject must be ${MAX_SUBJECT_LENGTH} characters or fewer.`,
-    });
-  }
-
-  if (message.length > MAX_MESSAGE_LENGTH) {
-    return res.status(400).json({
-      message: `Message must be ${MAX_MESSAGE_LENGTH} characters or fewer.`,
-    });
+  const { subject, message, name, email } = validation;
+  const captchaToken = normalizeString(req.body?.captchaToken || req.body?.turnstileToken);
+  const captcha = await verifyTurnstile(captchaToken, req.ip);
+  if (!captcha.ok) {
+    return res.status(400).json({ message: captcha.message });
   }
 
   const metaLines = [

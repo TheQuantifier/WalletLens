@@ -186,9 +186,25 @@ Google OAuth routes:
 cd api
 npm run dev                 # run API with nodemon
 npm start                   # run API with node
+npm run worker              # run dedicated receipt job worker
+npm run migrate             # apply SQL migrations in order (tracked)
+npm test                    # run API tests (node:test)
 npm run cleanup:sessions    # cleanup expired/stale sessions
 npm run replace:categories  # category replacement utility
 ```
+
+## Production hardening notes
+
+- Run migrations in every environment before deploy:
+  - `cd api && npm run migrate`
+- Dedicated receipt worker setup (recommended):
+  - API: set `RUN_RECEIPT_WORKER_IN_API=false`
+  - Worker process: run `npm run worker`
+- Optional automatic migrations on startup:
+  - set `AUTO_RUN_MIGRATIONS=true`
+- Optional captcha on public support endpoint:
+  - set `TURNSTILE_SECRET_KEY=<secret>`
+  - frontend should send `captchaToken` to `POST /api/support/public`
 
 ## Deployment notes
 

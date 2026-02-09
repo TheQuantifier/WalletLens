@@ -7,6 +7,9 @@
   "scripts": {
     "start": "node src/server.js",
     "dev": "nodemon src/server.js",
+    "worker": "node src/worker.js",
+    "migrate": "node src/db/runMigrations.js",
+    "test": "node --test src/tests/**/*.test.js",
     "seed": "node src/db/seed.js",
     "cleanup:sessions": "node src/jobs/cleanupSessions.js",
     "replace:categories": "node scripts/replaceCategories.js"

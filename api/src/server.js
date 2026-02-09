@@ -4,16 +4,22 @@ import app from "./app.js";
 import env from "./config/env.js";
 import { connectDb, closeDb } from "./config/db.js";
 import { startReceiptJobWorker, stopReceiptJobWorker } from "./jobs/receiptJobWorker.js";
+import { runMigrations } from "./db/runMigrations.js";
 
 const server = http.createServer(app);
 
 const start = async () => {
   try {
     await connectDb();
+    if (env.autoRunMigrations) {
+      await runMigrations();
+    }
 
     server.listen(env.port, () => {
       console.log(`🚀 API server listening on port ${env.port}`);
-      startReceiptJobWorker();
+      if (env.runReceiptWorkerInApi) {
+        startReceiptJobWorker();
+      }
     });
   } catch (err) {
     console.error("❌ Failed to start server:", err);

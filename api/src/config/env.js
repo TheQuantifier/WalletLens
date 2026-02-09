@@ -47,6 +47,9 @@ const env = {
     .map((o) => o.trim())
     .filter(Boolean),
 
+  autoRunMigrations: boolFromEnv(process.env.AUTO_RUN_MIGRATIONS, false),
+  runReceiptWorkerInApi: boolFromEnv(process.env.RUN_RECEIPT_WORKER_IN_API, true),
+
   // OCR
   ocrEnabled: boolFromEnv(process.env.OCR_ENABLED, true),
   ocrWorkerScript: process.env.OCR_WORKER_SCRIPT
@@ -71,6 +74,9 @@ const env = {
     region: process.env.OBJECT_STORE_REGION || "auto",
     forcePathStyle: boolFromEnv(process.env.OBJECT_STORE_FORCE_PATH_STYLE, true),
   },
+
+  turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || "",
+  turnstileVerifyUrl: process.env.TURNSTILE_VERIFY_URL || "https://challenges.cloudflare.com/turnstile/v0/siteverify",
 };
 
 export default env;

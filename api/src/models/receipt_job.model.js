@@ -1,5 +1,11 @@
 import { query } from "../config/db.js";
 
+export function computeRetryDecision({ attempts, maxAttempts }) {
+  const safeAttempts = Number.isFinite(Number(attempts)) ? Number(attempts) : 0;
+  const safeMaxAttempts = Number.isFinite(Number(maxAttempts)) ? Number(maxAttempts) : 0;
+  return safeAttempts < safeMaxAttempts ? "queued" : "failed";
+}
+
 export async function enqueueReceiptJob({
   userId,
   receiptId,

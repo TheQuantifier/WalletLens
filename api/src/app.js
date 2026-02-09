@@ -7,6 +7,7 @@ import morgan from "morgan";
 import env from "./config/env.js";
 import apiRouter from "./routes/index.js";
 import { errorHandler } from "./middleware/error.js";
+import securityHeaders from "./middleware/securityHeaders.js";
 
 const app = express();
 
@@ -22,6 +23,7 @@ if (env.nodeEnv !== "test") {
 // --------------------------------------------------
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use(securityHeaders);
 
 // --------------------------------------------------
 // Cookies

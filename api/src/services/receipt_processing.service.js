@@ -16,6 +16,23 @@ const ALLOWED_PAY_METHODS = new Set([
   "Other",
 ]);
 
+export const RECEIPT_PROCESSING_STAGES = [
+  "verifying_upload",
+  "extracting_text",
+  "parsing_ai",
+  "updating_records",
+  "completed",
+  "failed",
+];
+
+export function nextReceiptStage(currentStage, outcome = "success") {
+  if (outcome === "failed") return "failed";
+  const index = RECEIPT_PROCESSING_STAGES.indexOf(currentStage);
+  if (index === -1) return "verifying_upload";
+  if (currentStage === "completed" || currentStage === "failed") return currentStage;
+  return RECEIPT_PROCESSING_STAGES[Math.min(index + 1, RECEIPT_PROCESSING_STAGES.length - 2)];
+}
+
 const ALLOWED_CATEGORIES = new Set([
   "Housing",
   "Utilities",
