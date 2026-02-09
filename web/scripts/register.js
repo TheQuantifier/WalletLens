@@ -3,6 +3,7 @@
 import { api } from "./api.js";
 
 document.addEventListener("DOMContentLoaded", () => {
+  const year = document.getElementById("year");
   const form = document.getElementById("registerForm");
   const msg = document.getElementById("registerMessage");
   const btn = document.getElementById("registerBtn");
@@ -16,11 +17,20 @@ document.addEventListener("DOMContentLoaded", () => {
   const legalDisagreeBtn = document.getElementById("legalDisagreeBtn");
   const legalAgreeBtn = document.getElementById("legalAgreeBtn");
   const agreeCheckbox = document.getElementById("agree");
+  const contactModal = document.getElementById("contactModal");
+  const contactForm = document.getElementById("authContactForm");
+  const contactStatus = document.getElementById("contactStatus");
+  const contactSubmitBtn = document.getElementById("contactSubmitBtn");
+  const contactSubject = document.getElementById("contactSubject");
+  const contactMessage = document.getElementById("contactMessage");
+  const contactOpeners = document.querySelectorAll("[data-contact-open='true']");
   const legalCache = new Map();
   const legalSequence = ["terms", "privacy"];
   let legalFlowActive = false;
   let legalFlowStepIndex = 0;
   let suppressAgreeEvent = false;
+
+  if (year) year.textContent = new Date().getFullYear();
 
   const googleRedirect = api.auth.consumeGoogleRedirect();
   if (googleRedirect?.token || googleRedirect?.success) {
@@ -83,10 +93,39 @@ document.addEventListener("DOMContentLoaded", () => {
     showMsg(googleRedirect.error, "error");
   }
 
+  const syncModalScrollLock = () => {
+    const legalOpen = legalModal && !legalModal.classList.contains("hidden");
+    const contactOpen = contactModal && !contactModal.classList.contains("hidden");
+    document.body.style.overflow = legalOpen || contactOpen ? "hidden" : "";
+  };
+
   const setLegalModalOpen = (open) => {
     if (!legalModal) return;
     legalModal.classList.toggle("hidden", !open);
-    document.body.style.overflow = open ? "hidden" : "";
+    syncModalScrollLock();
+  };
+
+  const setContactModalOpen = (open) => {
+    if (!contactModal) return;
+    contactModal.classList.toggle("hidden", !open);
+    syncModalScrollLock();
+    if (open) {
+      contactSubject?.focus();
+    }
+  };
+
+  const setContactStatus = (text, kind = "info") => {
+    if (!contactStatus) return;
+    if (!text) {
+      contactStatus.textContent = "";
+      contactStatus.classList.add("is-hidden");
+      contactStatus.style.color = "";
+      return;
+    }
+    contactStatus.textContent = text;
+    contactStatus.classList.remove("is-hidden");
+    contactStatus.style.color =
+      kind === "error" ? "#b91c1c" : kind === "ok" ? "#166534" : "";
   };
 
   const showLegalConsentActions = (show) => {
@@ -180,6 +219,19 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  contactOpeners.forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      setContactStatus("");
+      setContactModalOpen(true);
+    });
+  });
+
+  contactModal?.addEventListener("click", (e) => {
+    if (e.target?.matches("[data-contact-close]")) {
+      setContactModalOpen(false);
+    }
+  });
+
   document.addEventListener("keydown", (e) => {
     if (e.key === "Escape" && legalModal && !legalModal.classList.contains("hidden")) {
       if (legalFlowActive) {
@@ -187,6 +239,10 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
       setLegalModalOpen(false);
+      return;
+    }
+    if (e.key === "Escape" && contactModal && !contactModal.classList.contains("hidden")) {
+      setContactModalOpen(false);
     }
   });
 
@@ -224,6 +280,42 @@ document.addEventListener("DOMContentLoaded", () => {
       setAgreeCheckbox(false);
       clearMsg();
       await startLegalFlow();
+    }
+  });
+
+  contactForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const subject = contactSubject?.value?.trim() || "";
+    const message = contactMessage?.value?.trim() || "";
+
+    if (!subject || !message) {
+      setContactStatus("Please add both a subject and a message.", "error");
+      return;
+    }
+
+    if (contactSubmitBtn) {
+      contactSubmitBtn.disabled = true;
+      contactSubmitBtn.textContent = "Sending...";
+    }
+    setContactStatus("Sending your message...");
+
+    try {
+      await api.support.contact({ subject, message });
+      setContactStatus("Thanks! Your message has been sent to support.", "ok");
+      contactForm.reset();
+    } catch (err) {
+      const fallback = "Unable to send message right now.";
+      const raw = err?.message || fallback;
+      const friendly = /logged in|unauthorized|401/i.test(raw)
+        ? "Please log in first to send a support message."
+        : raw;
+      setContactStatus(friendly, "error");
+    } finally {
+      if (contactSubmitBtn) {
+        contactSubmitBtn.disabled = false;
+        contactSubmitBtn.textContent = "Send Message";
+      }
     }
   });
 

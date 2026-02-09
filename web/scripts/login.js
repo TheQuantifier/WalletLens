@@ -12,6 +12,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const twoFactorCode = document.getElementById("twoFactorCode");
   const verifyTwoFactorBtn = document.getElementById("verifyTwoFactorBtn");
   const googleLoginBtn = document.getElementById("googleLoginBtn");
+  const contactModal = document.getElementById("contactModal");
+  const contactForm = document.getElementById("authContactForm");
+  const contactOpeners = document.querySelectorAll("[data-contact-open='true']");
+  const contactStatus = document.getElementById("contactStatus");
+  const contactSubmitBtn = document.getElementById("contactSubmitBtn");
+  const contactSubject = document.getElementById("contactSubject");
+  const contactMessage = document.getElementById("contactMessage");
 
   if (!form) {
     console.error("❌ loginForm not found.");
@@ -127,4 +134,82 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     })();
   }
+
+  const setContactModalOpen = (open) => {
+    if (!contactModal) return;
+    contactModal.classList.toggle("hidden", !open);
+    document.body.style.overflow = open ? "hidden" : "";
+    if (open) {
+      contactSubject?.focus();
+    }
+  };
+
+  const setContactStatus = (message, kind = "info") => {
+    if (!contactStatus) return;
+    if (!message) {
+      contactStatus.textContent = "";
+      contactStatus.classList.add("is-hidden");
+      contactStatus.style.color = "";
+      return;
+    }
+    contactStatus.textContent = message;
+    contactStatus.classList.remove("is-hidden");
+    contactStatus.style.color =
+      kind === "error" ? "#b91c1c" : kind === "ok" ? "#166534" : "";
+  };
+
+  contactOpeners.forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      setContactStatus("");
+      setContactModalOpen(true);
+    });
+  });
+
+  contactModal?.addEventListener("click", (e) => {
+    if (e.target?.matches("[data-contact-close]")) {
+      setContactModalOpen(false);
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && contactModal && !contactModal.classList.contains("hidden")) {
+      setContactModalOpen(false);
+    }
+  });
+
+  contactForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const subject = contactSubject?.value?.trim() || "";
+    const message = contactMessage?.value?.trim() || "";
+
+    if (!subject || !message) {
+      setContactStatus("Please add both a subject and a message.", "error");
+      return;
+    }
+
+    if (contactSubmitBtn) {
+      contactSubmitBtn.disabled = true;
+      contactSubmitBtn.textContent = "Sending...";
+    }
+    setContactStatus("Sending your message...");
+
+    try {
+      await api.support.contact({ subject, message });
+      setContactStatus("Thanks! Your message has been sent to support.", "ok");
+      contactForm.reset();
+    } catch (err) {
+      const fallback = "Unable to send message right now.";
+      const raw = err?.message || fallback;
+      const friendly = /logged in|unauthorized|401/i.test(raw)
+        ? "Please log in first to send a support message."
+        : raw;
+      setContactStatus(friendly, "error");
+    } finally {
+      if (contactSubmitBtn) {
+        contactSubmitBtn.disabled = false;
+        contactSubmitBtn.textContent = "Send Message";
+      }
+    }
+  });
 });

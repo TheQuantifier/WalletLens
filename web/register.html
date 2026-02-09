@@ -179,9 +179,9 @@
     <div class="nf-footer-inner">
       <p>&copy; <span id="year"></span> WiseWallet. All rights reserved.</p>
       <nav class="nf-legal" aria-label="Footer">
-        <a href="privacy.html" class="legal-link" data-legal="privacy">Privacy</a><span class="sep">•</span>
-        <a href="terms.html" class="legal-link" data-legal="terms">Terms</a><span class="sep">•</span>
-        <a href="contact.html">Contact</a>
+        <a href="privacy.html" class="legal-link nf-legal-link" data-legal="privacy">Privacy</a><span class="sep">&bull;</span>
+        <a href="terms.html" class="legal-link nf-legal-link" data-legal="terms">Terms</a><span class="sep">&bull;</span>
+        <button type="button" class="nf-legal-link" data-contact-open="true">Contact</button>
       </nav>
     </div>
   </footer>
@@ -199,6 +199,46 @@
       <div class="nf-modal-footer is-hidden" id="legalConsentActions">
         <button type="button" class="nf-modal-action-disagree" id="legalDisagreeBtn">Disagree</button>
         <button type="button" class="nf-modal-action-agree" id="legalAgreeBtn">Agree</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="contactModal" class="nf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+    <div class="nf-modal-backdrop" data-contact-close="true"></div>
+    <div class="nf-modal-content nf-contact-modal-content" role="document">
+      <div class="nf-modal-header">
+        <h2 id="contactModalTitle">Contact Support</h2>
+        <button type="button" class="nf-modal-close" data-contact-close="true" aria-label="Close contact modal">Close</button>
+      </div>
+      <div class="nf-modal-body">
+        <form id="authContactForm" class="nf-contact-form" novalidate>
+          <label for="contactSubject">
+            <span class="label">Subject</span>
+            <input
+              id="contactSubject"
+              name="subject"
+              type="text"
+              autocomplete="off"
+              placeholder="What can we help with?"
+              required
+            />
+          </label>
+
+          <label for="contactMessage">
+            <span class="label">Message</span>
+            <textarea
+              id="contactMessage"
+              name="message"
+              rows="5"
+              placeholder="Tell us what happened (include steps to reproduce and any error messages)."
+              required
+            ></textarea>
+          </label>
+
+          <p id="contactStatus" class="subtle is-hidden" aria-live="polite"></p>
+
+          <button type="submit" id="contactSubmitBtn" class="nf-btn">Send Message</button>
+        </form>
       </div>
     </div>
   </div>
