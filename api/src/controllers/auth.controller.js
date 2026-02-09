@@ -496,7 +496,7 @@ export const login = asyncHandler(async (req, res) => {
 
     await sendEmail({
       to: user.email,
-      subject: "Your WiseWallet login code",
+      subject: "Your <AppName> login code",
       text: `Your login code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
     });
 
@@ -734,7 +734,7 @@ export const requestTwoFaPasswordChange = asyncHandler(async (req, res) => {
 
   await sendEmail({
     to: user.email,
-    subject: "Your WiseWallet password change code",
+    subject: "Your <AppName> password change code",
     text: `Your password change code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
   });
 
@@ -766,7 +766,7 @@ export const requestTwoFaEnable = asyncHandler(async (req, res) => {
 
   await sendEmail({
     to: user.email,
-    subject: "Your WiseWallet verification code",
+    subject: "Your <AppName> verification code",
     text: `Your verification code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
   });
 

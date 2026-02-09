@@ -1,5 +1,5 @@
 /* ===============================================
-WalletWise – default.js
+<AppName> – default.js
 Shared script for all pages.
 Loads header/footer, sets active nav link,
 manages account dropdown, updates auth state,
@@ -15,14 +15,24 @@ import { api } from "./api.js";
 
 // Set to false while developing pages to bypass login requirement
 const AUTH_GUARD_ENABLED = true;
-const DEFAULT_APP_NAME = "WiseWallet";
-const APP_NAME_REGEX = /WiseWallet|WalletWise/g;
-const APP_NAME_TEST = /WiseWallet|WalletWise/;
+const DEFAULT_APP_NAME = "<AppName>";
+const APP_NAME_REGEX = /<AppName>/g;
+const APP_NAME_TEST = /<AppName>/;
 
 /**
  * Pages that do NOT require authentication
  */
-const PUBLIC_PAGES = ["index.html", "login.html", "register.html", ""];
+const PUBLIC_PAGES = [
+  "index.html",
+  "login.html",
+  "register.html",
+  "privacy.html",
+  "terms.html",
+  "about.html",
+  "careers.html",
+  "help.html",
+  "",
+];
 
 /**
  * If the page is not public, check login status BEFORE loading anything else.
@@ -74,6 +84,7 @@ document.addEventListener("DOMContentLoaded", () => {
   loadHeaderAndFooter();
   initLiveNavigation();
   applyCachedAppName();
+  updateAppName();
 });
 
 /**
@@ -398,19 +409,18 @@ function setAdminVisibility(isAdmin) {
 }
 
 async function updateAppName() {
-  const nameEl = document.getElementById("appName");
-  if (!nameEl) return;
-
   const cached = sessionStorage.getItem("appName");
   if (cached) {
-    nameEl.textContent = cached;
+    const nameEl = document.getElementById("appName");
+    if (nameEl) nameEl.textContent = cached;
     applyAppName(cached);
   }
 
   try {
     const data = await api.appSettings.getPublic();
     const nextName = data?.appName || DEFAULT_APP_NAME;
-    nameEl.textContent = nextName;
+    const nameEl = document.getElementById("appName");
+    if (nameEl) nameEl.textContent = nextName;
     sessionStorage.setItem("appName", nextName);
     applyAppName(nextName);
   } catch {
@@ -482,6 +492,14 @@ function applyAppName(appName) {
     }
   });
 }
+
+window.addEventListener("appName:updated", (event) => {
+  const nextName = event?.detail?.appName || sessionStorage.getItem("appName");
+  if (nextName) {
+    sessionStorage.setItem("appName", nextName);
+    applyAppName(nextName);
+  }
+});
 
 window.addEventListener("avatar:updated", (event) => {
   const newUrl = event?.detail?.avatarUrl || "";

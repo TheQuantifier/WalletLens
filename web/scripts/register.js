@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const legalModal = document.getElementById("legalModal");
   const legalModalTitle = document.getElementById("legalModalTitle");
   const legalModalBody = document.getElementById("legalModalBody");
+  const termsTemplate = document.getElementById("termsTemplate");
+  const privacyTemplate = document.getElementById("privacyTemplate");
   const legalConsentActions = document.getElementById("legalConsentActions");
   const legalDisagreeBtn = document.getElementById("legalDisagreeBtn");
   const legalAgreeBtn = document.getElementById("legalAgreeBtn");
@@ -27,6 +29,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const contactOpeners = document.querySelectorAll("[data-contact-open='true']");
   const legalCache = new Map();
   const legalSequence = ["terms", "privacy"];
+  const APP_NAME_PLACEHOLDER = "<AppName>";
   let legalFlowActive = false;
   let legalFlowStepIndex = 0;
   let suppressAgreeEvent = false;
@@ -141,6 +144,20 @@ document.addEventListener("DOMContentLoaded", () => {
     suppressAgreeEvent = false;
   };
 
+  const replaceAppNamePlaceholders = (html) => {
+    if (!html) return html;
+    const hasPlaceholder =
+      html.includes(APP_NAME_PLACEHOLDER) || html.includes("&lt;AppName&gt;");
+    if (!hasPlaceholder) return html;
+    const appName = sessionStorage.getItem("appName");
+    if (!appName || appName === APP_NAME_PLACEHOLDER) return html;
+    return html
+      .split(APP_NAME_PLACEHOLDER)
+      .join(appName)
+      .split("&lt;AppName&gt;")
+      .join(appName);
+  };
+
   const loadLegalContent = async (kind) => {
     const config = {
       terms: { title: "Terms of Service", url: "terms.html" },
@@ -150,7 +167,17 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!config || !legalModalBody || !legalModalTitle) return;
 
     legalModalTitle.textContent = config.title;
-    legalModalBody.innerHTML = `<p class="subtle">Loadingâ€¦</p>`;
+    legalModalBody.innerHTML = `<p class="subtle">Loading...</p>`;
+
+    const template =
+      kind === "terms" ? termsTemplate : kind === "privacy" ? privacyTemplate : null;
+
+    if (template?.innerHTML?.trim()) {
+      const resolved = replaceAppNamePlaceholders(template.innerHTML);
+      legalCache.set(kind, resolved);
+      legalModalBody.innerHTML = resolved;
+      return;
+    }
 
     if (legalCache.has(kind)) {
       legalModalBody.innerHTML = legalCache.get(kind);
@@ -165,8 +192,9 @@ document.addEventListener("DOMContentLoaded", () => {
       const main =
         parsed.querySelector("main.main--legal") || parsed.querySelector("main");
       const content = main ? main.innerHTML : "<p>Content unavailable.</p>";
-      legalCache.set(kind, content);
-      legalModalBody.innerHTML = content;
+      const resolved = replaceAppNamePlaceholders(content);
+      legalCache.set(kind, resolved);
+      legalModalBody.innerHTML = resolved;
     } catch (err) {
       console.error("Legal modal load failed:", err);
       legalModalBody.innerHTML = "<p>Could not load content. Please try again.</p>";

@@ -5,7 +5,7 @@ import { logActivity } from "../services/activity.service.js";
 
 export const getPublic = asyncHandler(async (_req, res) => {
   const settings = await getAppSettings();
-  res.json({ appName: settings?.app_name || "WiseWallet" });
+  res.json({ appName: settings?.app_name || "<AppName>" });
 });
 
 export const getAdmin = asyncHandler(async (_req, res) => {

@@ -345,7 +345,7 @@ async function loadSettings() {
   try {
     const { settings } = await api.admin.getSettings();
     if (els.appNameInput) {
-      els.appNameInput.value = settings?.app_name || settings?.appName || "WiseWallet";
+      els.appNameInput.value = settings?.app_name || settings?.appName || "<AppName>";
     }
     if (els.receiptKeepFilesInput) {
       const keep = settings?.receipt_keep_files;
@@ -371,6 +371,8 @@ async function saveSettings(event) {
       appName,
       receiptKeepFiles: Boolean(els.receiptKeepFilesInput?.checked),
     });
+    sessionStorage.setItem("appName", appName);
+    window.dispatchEvent(new CustomEvent("appName:updated", { detail: { appName } }));
     setStatus(els.settingsStatus, "Settings updated.", "ok");
   } catch (err) {
     console.error(err);
@@ -449,4 +451,3 @@ async function init() {
 }
 
 init();
-

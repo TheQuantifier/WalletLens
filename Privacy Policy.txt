@@ -1,7 +1,7 @@
-WiseWallet Privacy Policy
+<AppName> Privacy Policy
 Effective Date: February 8, 2026
 
-WiseWallet ("we," "us," or "our") values your privacy. This Privacy Policy explains what information we collect, how we use it, how we share it, and your choices when you use WiseWallet.
+<AppName> ("we," "us," or "our") values your privacy. This Privacy Policy explains what information we collect, how we use it, how we share it, and your choices when you use <AppName>.
 
 1. Information We Collect
 
@@ -16,7 +16,7 @@ We may collect:
 2. How We Use Information
 
 We use information to:
-- Provide and operate WiseWallet features.
+- Provide and operate <AppName> features.
 - Authenticate users and secure accounts.
 - Process receipt uploads, OCR, and AI-assisted parsing.
 - Store and show your financial records and reports.
@@ -26,7 +26,7 @@ We use information to:
 
 3. Google Sign-In
 
-If you use Google Sign-In, we receive basic profile data from Google such as your Google account ID, email, and profile name. We use this information only to authenticate your account and link it to WiseWallet.
+If you use Google Sign-In, we receive basic profile data from Google such as your Google account ID, email, and profile name. We use this information only to authenticate your account and link it to <AppName>.
 
 4. How We Share Information
 
@@ -44,12 +44,12 @@ We use reasonable administrative, technical, and organizational safeguards to pr
 
 7. Your Choices and Rights
 
-Depending on your location, you may have rights to access, correct, delete, or export personal information. You can also manage some account settings directly in WiseWallet.
+Depending on your location, you may have rights to access, correct, delete, or export personal information. You can also manage some account settings directly in <AppName>.
 To request privacy-related actions, contact us using the support details provided by the app.
 
 8. Children's Privacy
 
-WiseWallet is not intended for children under 13 (or the applicable age in your region), and we do not knowingly collect personal data from children.
+<AppName> is not intended for children under 13 (or the applicable age in your region), and we do not knowingly collect personal data from children.
 
 9. International Data Transfers
 
@@ -61,5 +61,5 @@ We may update this Privacy Policy from time to time. We will update the Effectiv
 
 11. Contact
 
-If you have questions about this Privacy Policy, contact us through WiseWallet support channels.
+If you have questions about this Privacy Policy, contact us through <AppName> support channels.
 
