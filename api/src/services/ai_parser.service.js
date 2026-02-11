@@ -1,4 +1,4 @@
-// src/services/aiParser.service.js
+// src/services/ai_parser.service.js
 import env from "../config/env.js";
 import { GoogleGenAI } from "@google/genai";
 

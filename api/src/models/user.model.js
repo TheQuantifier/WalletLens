@@ -4,8 +4,9 @@ import { query } from "../config/db.js";
 /**
  * Expected Postgres table: users
  * Columns:
- * id (uuid), username, email, password_hash, full_name, location, role, phone_number, bio,
- * avatar_url, custom_expense_categories, custom_income_categories, created_at, updated_at
+ * id (uuid), username, email, password_hash (nullable for Google-only users), full_name, location, role, phone_number, bio,
+ * avatar_url, custom_expense_categories, custom_income_categories, address, employer, income_range,
+ * created_at, updated_at
  */
 
 export function normalizeIdentifier(value) {
@@ -16,36 +17,46 @@ export async function createUser({
   username,
   email,
   passwordHash,
+  googleId = null,
   fullName,
   location = "",
   role = "user",
   phoneNumber = "",
   bio = "",
   avatarUrl = "",
+  address = "",
+  employer = "",
+  incomeRange = "",
   customExpenseCategories = [],
   customIncomeCategories = [],
 }) {
   const { rows } = await query(
     `
     INSERT INTO users
-      (username, email, password_hash, full_name, location, role, phone_number, bio, avatar_url, custom_expense_categories, custom_income_categories)
+      (username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url, address, employer, income_range,
+       custom_expense_categories, custom_income_categories)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
     RETURNING
-      id, username, email, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
+      full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     `,
     [
       normalizeIdentifier(username),
       normalizeIdentifier(email),
       passwordHash,
+      googleId,
       fullName,
       location,
       role,
       phoneNumber,
       bio,
       avatarUrl,
+      address,
+      employer,
+      incomeRange,
       customExpenseCategories,
       customIncomeCategories,
     ]
@@ -57,8 +68,9 @@ export async function findUserById(id) {
   const { rows } = await query(
     `
     SELECT
-      id, username, email, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
+      full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
     FROM users
@@ -75,8 +87,8 @@ export async function findUserAuthById(id) {
   const { rows } = await query(
     `
     SELECT
-      id, username, email, password_hash, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
     FROM users
@@ -94,8 +106,8 @@ export async function findUserAuthByIdentifier(identifier) {
   const { rows } = await query(
     `
     SELECT
-      id, username, email, password_hash, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
     FROM users
@@ -103,6 +115,41 @@ export async function findUserAuthByIdentifier(identifier) {
     LIMIT 1
     `,
     [ident]
+  );
+  return rows[0] || null;
+}
+
+export async function findUserAuthByGoogleId(googleId) {
+  const { rows } = await query(
+    `
+    SELECT
+      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
+      two_fa_enabled, two_fa_method, two_fa_confirmed_at,
+      created_at, updated_at
+    FROM users
+    WHERE google_id = $1
+    LIMIT 1
+    `,
+    [googleId]
+  );
+  return rows[0] || null;
+}
+
+export async function linkUserGoogleId(id, googleId) {
+  const { rows } = await query(
+    `
+    UPDATE users
+    SET google_id = $1,
+        updated_at = now()
+    WHERE id = $2
+    RETURNING
+      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
+      two_fa_enabled, two_fa_method, two_fa_confirmed_at,
+      created_at, updated_at
+    `,
+    [googleId, id]
   );
   return rows[0] || null;
 }
@@ -118,6 +165,9 @@ export async function updateUserById(id, changes = {}) {
     phoneNumber: "phone_number",
     bio: "bio",
     avatarUrl: "avatar_url",
+    address: "address",
+    employer: "employer",
+    incomeRange: "income_range",
     customExpenseCategories: "custom_expense_categories",
     customIncomeCategories: "custom_income_categories",
   };
@@ -146,8 +196,9 @@ export async function updateUserById(id, changes = {}) {
         updated_at = now()
     WHERE id = $${i}
     RETURNING
-      id, username, email, full_name, location, role, phone_number, bio, avatar_url,
-      custom_expense_categories, custom_income_categories,
+      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
+      full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     `,
     values
@@ -180,4 +231,39 @@ export async function deleteUserById(id) {
     [id]
   );
   return rows[0] || null;
+}
+
+export async function listUsers({ limit = 50, offset = 0, queryText = "" } = {}) {
+  const params = [];
+  const where = [];
+  let i = 1;
+
+  if (queryText) {
+    where.push(`(
+      username ILIKE $${i}
+      OR email ILIKE $${i}
+      OR full_name ILIKE $${i}
+    )`);
+    params.push(`%${queryText}%`);
+    i += 1;
+  }
+
+  params.push(limit);
+  params.push(offset);
+
+  const { rows } = await query(
+    `
+    SELECT
+      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
+      full_name, location, role, phone_number, bio, avatar_url,
+      address, employer, income_range, custom_expense_categories, custom_income_categories,
+      created_at, updated_at
+    FROM users
+    ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+    ORDER BY created_at DESC
+    LIMIT $${i++} OFFSET $${i++}
+    `,
+    params
+  );
+  return rows;
 }

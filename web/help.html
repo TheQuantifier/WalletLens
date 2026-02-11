@@ -14,7 +14,7 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WiseWallet - Help</title>
+  <title>&lt;AppName&gt; - Help</title>
 
   <link rel="icon" type="image/png" href="images/favicon.png" />
 
@@ -31,61 +31,6 @@
 <body>
 
   <div id="header"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedHeaderHtml");
-      if (!cached) return;
-      const el = document.getElementById("header");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-
-      const cachedUserRaw = sessionStorage.getItem("cachedUser");
-      if (!cachedUserRaw) return;
-      try {
-        const cachedUser = JSON.parse(cachedUserRaw);
-        const name = cachedUser.fullName || cachedUser.username || "Account";
-        const nameEl = document.getElementById("headerUserName");
-        if (nameEl) nameEl.textContent = name;
-
-        const accountIcon = document.getElementById("account-icon");
-        const avatarLetters = document.getElementById("avatarLetters");
-        if (!accountIcon || !avatarLetters) return;
-
-        const parts = name.trim().split(/\s+/).filter(Boolean);
-        const initials = parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : (parts[0] ? parts[0][0].toUpperCase() : "?");
-
-        const avatarUrl = cachedUser.avatarUrl || cachedUser.avatar_url || "";
-        avatarLetters.textContent = initials;
-        accountIcon.dataset.avatarUrl = avatarUrl;
-
-        if (!avatarUrl) {
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          return;
-        }
-
-        const img = new Image();
-        img.onload = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = `url(${avatarUrl})`;
-          accountIcon.classList.add("has-avatar");
-          avatarLetters.textContent = "";
-        };
-        img.onerror = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          avatarLetters.textContent = initials;
-        };
-        img.src = avatarUrl;
-      } catch {
-        sessionStorage.removeItem("cachedUser");
-      }
-    })();
-  </script>
 
 
   <main class="main main--profile">
@@ -255,3 +200,5 @@
 
 </body>
 </html>
+
+

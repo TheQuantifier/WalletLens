@@ -12,20 +12,27 @@
     })();
   </script>
 
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/png" href="images/favicon.png">
-    <title>WiseWallet - Redirecting</title>
-    <script>
-        window.location.replace("register.html");
-    </script>
+  <meta charset="UTF-8" />
+  <link rel="icon" type="image/png" href="images/favicon.png">
+  <title>&lt;AppName&gt; - Redirecting</title>
+  <script>
+    setTimeout(() => {
+      window.location.replace("register.html");
+    }, 3500);
+  </script>
 
-    <script>
-        const savedTheme = localStorage.getItem("theme") || "light";
-        document.documentElement.setAttribute("data-theme", savedTheme);
-    </script>
-    
+  <script>
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+  </script>
 </head>
 <body>
-    <p>Redirecting… If nothing happens, <a href="register.html">click here</a>.</p>
+  <div style="min-height: 100vh; display: flex; align-items: center; justify-content: center; text-align: center; padding: 1rem;">
+    <div>
+      <p>This app is in production and in testing. Please keep that in mind when entering data.</p>
+      <p>Redirecting... If nothing happens, <a href="register.html">click here</a>.</p>
+    </div>
+  </div>
+  <script src="scripts/default.js" type="module" defer></script>
 </body>
 </html>

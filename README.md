@@ -5,15 +5,17 @@ WiseWallet is a full-stack personal finance web app for tracking income/expenses
 ## What the app includes
 
 - Authentication with JWT + session tracking
+- Google OAuth login/registration option
 - Optional email-based 2FA (enable/disable from Settings)
 - Home dashboard with KPI cards, category chart, recent transactions, and net-worth snapshot
 - Receipt uploads (PDF/images), OCR extraction, AI parsing, and auto-created expense records
-- Records management for both expenses and income (search, filter, sort, paginate, export CSV)
+- Records management for both expenses and income (search across row content, filter, column-header sort, paginate, export CSV)
 - Budgeting by cadence/period with saved budget sheets and custom categories
-- Reports with date ranges, category breakdowns, monthly trends, and currency conversion support
+- Reports with date ranges, category breakdowns, time-series trends (time on X-axis, amount on Y-axis), and currency conversion support
 - Profile management (editable profile, avatar picker, activity feed)
 - Settings for theme, currency, timezone, dashboard defaults, password change, and account/session controls
 - Help/support form wired to backend email delivery
+- Legal pages included: `web/privacy.html` and `web/terms.html`
 
 ## Tech stack
 
@@ -73,6 +75,9 @@ SESSION_IDLE_DAYS=1
 SESSION_CLEANUP_DAYS=30
 TWO_FA_CODE_MINUTES=10
 TWO_FA_TRUSTED_DAYS=10
+GOOGLE_CLIENT_ID=your_google_oauth_client_id
+GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
+GOOGLE_REDIRECT_URI=http://localhost:4000/api/auth/google/callback
 
 CORS_ORIGIN=http://localhost:5500,http://127.0.0.1:5500
 
@@ -96,7 +101,7 @@ OBJECT_STORE_FORCE_PATH_STYLE=true
 
 # Optional email settings (for support + 2FA emails)
 EMAIL_FROM=no-reply@wisewallet.local
-SUPPORT_EMAIL=support.wisewallet@manuswebworks.org
+SUPPORT_EMAIL=support@example.com
 # SMTP_HOST=
 # SMTP_PORT=
 # SMTP_USER=
@@ -105,6 +110,21 @@ SUPPORT_EMAIL=support.wisewallet@manuswebworks.org
 # BREVO_API_KEY=
 # BREVO_API_URL=https://api.brevo.com/v3/smtp/email
 ```
+
+### Google OAuth checklist
+
+1. In Google Cloud Console, create/select a project.
+2. Configure OAuth consent screen.
+3. Create an OAuth client of type `Web application`.
+4. Add authorized JavaScript origins for your frontend, for example:
+   - `http://localhost:5500`
+   - your production frontend origin (e.g. `https://yourdomain.com`)
+5. Add authorized redirect URIs, for example:
+   - `http://localhost:4000/api/auth/google/callback`
+   - your production API callback URL (e.g. `https://api.yourdomain.com/api/auth/google/callback`)
+6. Set `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, and `GOOGLE_REDIRECT_URI` in `api/.env`.
+
+Note: If your OAuth app is in Google "Testing" mode, only listed test users can sign in. For any Google account to sign in, publish the app to production in Google Cloud.
 
 ### 4) Run database migrations
 
@@ -154,15 +174,37 @@ Open: `http://localhost:5500`
 - `/api/activity`
 - `/api/support`
 
+Google OAuth routes:
+
+- `GET /api/auth/google/config`
+- `GET /api/auth/google/start`
+- `GET /api/auth/google/callback`
+
 ## Useful scripts
 
 ```bash
 cd api
 npm run dev                 # run API with nodemon
 npm start                   # run API with node
+npm run worker              # run dedicated receipt job worker
+npm run migrate             # apply SQL migrations in order (tracked)
+npm test                    # run API tests (node:test)
 npm run cleanup:sessions    # cleanup expired/stale sessions
 npm run replace:categories  # category replacement utility
 ```
+
+## Production hardening notes
+
+- Run migrations in every environment before deploy:
+  - `cd api && npm run migrate`
+- Dedicated receipt worker setup (recommended):
+  - API: set `RUN_RECEIPT_WORKER_IN_API=false`
+  - Worker process: run `npm run worker`
+- Optional automatic migrations on startup:
+  - set `AUTO_RUN_MIGRATIONS=true`
+- Optional captcha on public support endpoint:
+  - set `TURNSTILE_SECRET_KEY=<secret>`
+  - frontend should send `captchaToken` to `POST /api/support/public`
 
 ## Deployment notes
 

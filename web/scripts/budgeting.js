@@ -772,9 +772,38 @@ import { api } from "./api.js";
         return d >= state.periodStart && d <= state.periodEnd;
       });
 
-    const refreshView = () => {
+    const loadSpentMapFromServer = async () => {
+      if (!api?.budgetSheets?.summary) return false;
+      try {
+        const summary = await api.budgetSheets.summary({
+          cadence: state.cadence,
+          period: state.periodKey,
+        });
+        const map = new Map();
+        const standard = summary?.totals?.standard || {};
+        Object.entries(standard).forEach(([column, spent]) => {
+          const categoryName = COLUMN_CATEGORY_MAP.get(column);
+          if (!categoryName) return;
+          map.set(normalizeName(categoryName), Number(spent || 0));
+        });
+        (summary?.totals?.custom || []).forEach((entry) => {
+          const category = String(entry?.category || "").trim();
+          if (!category) return;
+          map.set(normalizeName(category), Number(entry?.spent || 0));
+        });
+        state.spentMap = map;
+        return true;
+      } catch (err) {
+        console.warn("Falling back to local budget aggregation:", err);
+        return false;
+      }
+    };
+
+    const refreshView = ({ forceLocal = false } = {}) => {
       const periodRecords = getPeriodRecords();
-      state.spentMap = buildSpentMap(periodRecords, state.categories);
+      if (forceLocal || !state.spentMap || state.spentMap.size === 0) {
+        state.spentMap = buildSpentMap(periodRecords, state.categories);
+      }
       state.categories = state.categories.map((c) => ({
         ...c,
         spent: state.spentMap.get(normalizeName(c.name)) || 0,
@@ -874,7 +903,8 @@ import { api } from "./api.js";
       state.isDirty = false;
       const saveBtn = $("#btnSaveBudget");
       if (saveBtn) saveBtn.disabled = true;
-      refreshView();
+      const usedServer = await loadSpentMapFromServer();
+      refreshView({ forceLocal: !usedServer });
       await loadBudgetSheet();
       syncBudgetSelector(state.cadence, state.periodKey);
     };

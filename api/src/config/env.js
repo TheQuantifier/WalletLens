@@ -37,12 +37,18 @@ const env = {
   sessionCleanupDays: Number(process.env.SESSION_CLEANUP_DAYS || 30),
   twoFaCodeMinutes: Number(process.env.TWO_FA_CODE_MINUTES || 10),
   twoFaTrustedDays: Number(process.env.TWO_FA_TRUSTED_DAYS || 10),
+  googleClientId: process.env.GOOGLE_CLIENT_ID || "",
+  googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
+  googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
 
   // CORS
   clientOrigins: (process.env.CORS_ORIGIN || "http://localhost:5500")
     .split(",")
     .map((o) => o.trim())
     .filter(Boolean),
+
+  autoRunMigrations: boolFromEnv(process.env.AUTO_RUN_MIGRATIONS, false),
+  runReceiptWorkerInApi: boolFromEnv(process.env.RUN_RECEIPT_WORKER_IN_API, true),
 
   // OCR
   ocrEnabled: boolFromEnv(process.env.OCR_ENABLED, true),
@@ -68,6 +74,9 @@ const env = {
     region: process.env.OBJECT_STORE_REGION || "auto",
     forcePathStyle: boolFromEnv(process.env.OBJECT_STORE_FORCE_PATH_STYLE, true),
   },
+
+  turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || "",
+  turnstileVerifyUrl: process.env.TURNSTILE_VERIFY_URL || "https://challenges.cloudflare.com/turnstile/v0/siteverify",
 };
 
 export default env;

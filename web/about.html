@@ -14,11 +14,11 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WiseWallet - About</title>
+  <title>&lt;AppName&gt; - About</title>
 
   <!-- Meta -->
-  <meta name="description" content="Learn more about the WiseWallet mission, features, and development team." />
-  <meta name="author" content="WiseWallet" />
+  <meta name="description" content="Learn more about the &lt;AppName&gt; mission, features, and development team." />
+  <meta name="author" content="&lt;AppName&gt;" />
   <link rel="icon" type="image/png" href="images/favicon.png" />
 
   <!-- Styles -->
@@ -35,70 +35,15 @@
 <body>
   <!-- Header injected by default.js -->
   <div id="header"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedHeaderHtml");
-      if (!cached) return;
-      const el = document.getElementById("header");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-
-      const cachedUserRaw = sessionStorage.getItem("cachedUser");
-      if (!cachedUserRaw) return;
-      try {
-        const cachedUser = JSON.parse(cachedUserRaw);
-        const name = cachedUser.fullName || cachedUser.username || "Account";
-        const nameEl = document.getElementById("headerUserName");
-        if (nameEl) nameEl.textContent = name;
-
-        const accountIcon = document.getElementById("account-icon");
-        const avatarLetters = document.getElementById("avatarLetters");
-        if (!accountIcon || !avatarLetters) return;
-
-        const parts = name.trim().split(/\s+/).filter(Boolean);
-        const initials = parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : (parts[0] ? parts[0][0].toUpperCase() : "?");
-
-        const avatarUrl = cachedUser.avatarUrl || cachedUser.avatar_url || "";
-        avatarLetters.textContent = initials;
-        accountIcon.dataset.avatarUrl = avatarUrl;
-
-        if (!avatarUrl) {
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          return;
-        }
-
-        const img = new Image();
-        img.onload = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = `url(${avatarUrl})`;
-          accountIcon.classList.add("has-avatar");
-          avatarLetters.textContent = "";
-        };
-        img.onerror = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          avatarLetters.textContent = initials;
-        };
-        img.src = avatarUrl;
-      } catch {
-        sessionStorage.removeItem("cachedUser");
-      }
-    })();
-  </script>
 
 
   <!-- ==================== MAIN ==================== -->
   <main class="main main--about">
     <section class="about-hero">
-      <h1>About WiseWallet</h1>
+      <h1>About &lt;AppName&gt;</h1>
       <p class="lead">
-        WiseWallet transforms everyday receipts and transactions into structured, actionable financial intelligence.
-        Built for individuals and small teams, WiseWallet reduces financial friction by automating expense tracking, 
+        &lt;AppName&gt; transforms everyday receipts and transactions into structured, actionable financial intelligence.
+        Built for individuals and small teams, &lt;AppName&gt; reduces financial friction by automating expense tracking, 
         categorization, and reporting—helping users make faster, smarter financial decisions with less effort.
       </p>
     </section>
@@ -107,7 +52,7 @@
       <article class="card">
         <h2>Our Mission</h2>
         <p>
-          Our mission is to remove complexity from personal and small-business finance. WiseWallet exists to 
+          Our mission is to remove complexity from personal and small-business finance. &lt;AppName&gt; exists to 
           replace manual tracking, fragmented tools, and error-prone workflows with a single, intelligent 
           platform that delivers clarity, accuracy, and confidence at scale.
 
@@ -130,19 +75,19 @@
       <article class="card">
         <h2>Our Story</h2>
         <p>
-          WiseWallet was built by developers and data-driven problem solvers who experienced firsthand 
+          &lt;AppName&gt; was built by developers and data-driven problem solvers who experienced firsthand 
           how inefficient financial tracking can be. Existing tools were either overly manual, fragmented, 
           or unintuitive—forcing users to spend more time managing money than understanding it.
 
           We set out to build a modern alternative: a product that combines automation, thoughtful UX, 
-          and intelligent data handling to turn financial noise into usable insight. WiseWallet is the 
+          and intelligent data handling to turn financial noise into usable insight. &lt;AppName&gt; is the 
           result—a focused platform built to scale with users as their financial needs grow.
         </p>
       </article>
 
       <article class="card">
         <h2>Meet the Team</h2>
-        <p>WiseWallet is developed by a small, execution-focused team with strengths across software engineering, frontend UX, and data systems.</p>
+        <p>&lt;AppName&gt; is developed by a small, execution-focused team with strengths across software engineering, frontend UX, and data systems.</p>
         <div class="team">
           <div class="member">
             <img src="images/team-john.jpg" alt="John Hand – Developer" />
@@ -189,3 +134,5 @@
   <script src="scripts/default.js" type="module" defer></script>
 </body>
 </html>
+
+

@@ -1,5 +1,5 @@
 /* ===============================================
-WalletWise – default.js
+<AppName> – default.js
 Shared script for all pages.
 Loads header/footer, sets active nav link,
 manages account dropdown, updates auth state,
@@ -15,11 +15,24 @@ import { api } from "./api.js";
 
 // Set to false while developing pages to bypass login requirement
 const AUTH_GUARD_ENABLED = true;
+const DEFAULT_APP_NAME = "<AppName>";
+const APP_NAME_REGEX = /<AppName>/g;
+const APP_NAME_TEST = /<AppName>/;
 
 /**
  * Pages that do NOT require authentication
  */
-const PUBLIC_PAGES = ["index.html", "login.html", "register.html", ""];
+const PUBLIC_PAGES = [
+  "index.html",
+  "login.html",
+  "register.html",
+  "privacy.html",
+  "terms.html",
+  "about.html",
+  "careers.html",
+  "help.html",
+  "",
+];
 
 /**
  * If the page is not public, check login status BEFORE loading anything else.
@@ -70,6 +83,8 @@ document.addEventListener("DOMContentLoaded", () => {
   cachePageTitle();
   loadHeaderAndFooter();
   initLiveNavigation();
+  applyCachedAppName();
+  updateAppName();
 });
 
 /**
@@ -89,6 +104,7 @@ function loadHeaderAndFooter() {
     initMobileNavMenu();
     initAccountMenu();
     updateHeaderAuthState();
+    updateAppName();
     wireLogoutButton();
     wireDashboardViewSelector();
     updateMobileNavActiveState();
@@ -117,6 +133,7 @@ function loadHeaderAndFooter() {
       initMobileNavMenu();
       initAccountMenu();
       updateHeaderAuthState();
+      updateAppName();
       wireLogoutButton();
       wireDashboardViewSelector(); // NEW: Wire dashboard view selector
       updateMobileNavActiveState();
@@ -290,7 +307,8 @@ function initAccountMenu() {
 
 function getInitials(name) {
   if (!name) return "?";
-  const parts = name.trim().split(" ");
+  const parts = String(name).trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return "?";
   if (parts.length === 1) return parts[0][0].toUpperCase();
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
@@ -343,9 +361,12 @@ async function updateHeaderAuthState() {
         const cachedUser = JSON.parse(cachedUserRaw);
         const nameEl = document.getElementById("headerUserName");
         if (nameEl) {
-          nameEl.textContent = cachedUser.fullName || cachedUser.username || "Account";
+          nameEl.textContent = cachedUser.fullName || cachedUser.full_name || cachedUser.username || "Account";
         }
-        applyAccountAvatar(cachedUser.avatarUrl || cachedUser.avatar_url || "", cachedUser.fullName || cachedUser.username);
+        applyAccountAvatar(
+          cachedUser.avatarUrl || cachedUser.avatar_url || "",
+          cachedUser.fullName || cachedUser.full_name || cachedUser.username || ""
+        );
       } catch {
         sessionStorage.removeItem("cachedUser");
       }
@@ -364,12 +385,13 @@ async function updateHeaderAuthState() {
     // --- Username in dropdown ---
     const nameEl = document.getElementById("headerUserName");
     if (nameEl) {
-      nameEl.textContent = user.fullName || user.username || "Account";
+      nameEl.textContent = user.fullName || user.full_name || user.username || "Account";
     }
 
     const avatarUrl = user.avatarUrl || user.avatar_url || "";
-    applyAccountAvatar(avatarUrl, user.fullName || user.username);
+    applyAccountAvatar(avatarUrl, user.fullName || user.full_name || user.username || "");
     sessionStorage.setItem("cachedUser", JSON.stringify(user));
+    setAdminVisibility(user?.role === "admin");
 
   } catch {
     // Not authenticated
@@ -380,12 +402,126 @@ async function updateHeaderAuthState() {
       .forEach((el) => el.classList.remove("hidden"));
 
     applyAccountAvatar("", "");
+    setAdminVisibility(false);
   }
 }
 
+function setAdminVisibility(isAdmin) {
+  document.querySelectorAll(".admin-only").forEach((el) => {
+    el.classList.toggle("is-hidden", !isAdmin);
+  });
+}
+
+async function updateAppName() {
+  const cached = sessionStorage.getItem("appName");
+  if (cached) {
+    const nameEl = document.getElementById("appName");
+    if (nameEl) nameEl.textContent = cached;
+    applyAppName(cached);
+  }
+
+  try {
+    const data = await api.appSettings.getPublic();
+    const nextName = data?.appName || DEFAULT_APP_NAME;
+    const nameEl = document.getElementById("appName");
+    if (nameEl) nameEl.textContent = nextName;
+    sessionStorage.setItem("appName", nextName);
+    applyAppName(nextName);
+  } catch {
+    // ignore public settings failure
+  }
+}
+
+function applyCachedAppName() {
+  const cached = sessionStorage.getItem("appName");
+  if (cached) {
+    applyAppName(cached);
+  }
+}
+
+function applyAppName(appName) {
+  if (!appName) return;
+
+  // Title
+  if (document.title && APP_NAME_TEST.test(document.title)) {
+    document.title = document.title.replace(APP_NAME_REGEX, appName);
+  }
+
+  // Header brand
+  const nameEl = document.getElementById("appName");
+  if (nameEl) {
+    nameEl.textContent = appName;
+  }
+
+  // Meta tags
+  const metaDescription = document.querySelector("meta[name='description']");
+  if (metaDescription?.content && APP_NAME_TEST.test(metaDescription.content)) {
+    metaDescription.content = metaDescription.content.replace(APP_NAME_REGEX, appName);
+  }
+
+  const metaAuthor = document.querySelector("meta[name='author']");
+  if (metaAuthor?.content && APP_NAME_TEST.test(metaAuthor.content)) {
+    metaAuthor.content = metaAuthor.content.replace(APP_NAME_REGEX, appName);
+  }
+
+  // Attributes
+  const attrTargets = ["title", "placeholder", "aria-label", "alt", "content"];
+  document.querySelectorAll("*").forEach((el) => {
+    attrTargets.forEach((attr) => {
+      const val = el.getAttribute(attr);
+      if (val && APP_NAME_TEST.test(val)) {
+        el.setAttribute(attr, val.replace(APP_NAME_REGEX, appName));
+      }
+    });
+  });
+
+  // Text nodes in body
+  const walker = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  const nodes = [];
+  let node = walker.nextNode();
+  while (node) {
+    nodes.push(node);
+    node = walker.nextNode();
+  }
+
+  nodes.forEach((textNode) => {
+    const parent = textNode.parentElement;
+    if (!parent) return;
+    const tag = parent.tagName;
+    if (["SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "INPUT"].includes(tag)) return;
+
+    const value = textNode.nodeValue;
+    if (value && APP_NAME_TEST.test(value)) {
+      textNode.nodeValue = value.replace(APP_NAME_REGEX, appName);
+    }
+  });
+}
+
+window.addEventListener("appName:updated", (event) => {
+  const nextName = event?.detail?.appName || sessionStorage.getItem("appName");
+  if (nextName) {
+    sessionStorage.setItem("appName", nextName);
+    applyAppName(nextName);
+  }
+});
+
 window.addEventListener("avatar:updated", (event) => {
   const newUrl = event?.detail?.avatarUrl || "";
-  applyAccountAvatar(newUrl, "");
+  const fallbackName = event?.detail?.fallbackName || "";
+  let nextFallback = fallbackName;
+  if (!nextFallback) {
+    const cachedUserRaw = sessionStorage.getItem("cachedUser");
+    if (cachedUserRaw) {
+      try {
+        const cachedUser = JSON.parse(cachedUserRaw);
+        nextFallback = cachedUser.fullName || cachedUser.full_name || cachedUser.username || "";
+      } catch {
+        sessionStorage.removeItem("cachedUser");
+      }
+    }
+  }
+
+  applyAccountAvatar(newUrl, nextFallback);
   const cachedUserRaw = sessionStorage.getItem("cachedUser");
   if (cachedUserRaw) {
     try {

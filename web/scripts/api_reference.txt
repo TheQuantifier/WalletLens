@@ -1,5 +1,5 @@
 ============================================================
- FRONTEND API REFERENCE — WiseWallet
+FRONTEND API REFERENCE — <AppName>
  All callable functions from web/scripts/api.js
 ============================================================
 

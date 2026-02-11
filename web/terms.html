@@ -14,10 +14,10 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WiseWallet - Terms of Use</title>
+  <title>&lt;AppName&gt; - Terms of Service</title>
 
-  <meta name="description" content="WiseWallet terms of use placeholder and hiring notice for legal implementation." />
-  <meta name="author" content="WiseWallet" />
+  <meta name="description" content="&lt;AppName&gt; Terms of Service governing account use, acceptable use, disclaimers, and liability." />
+  <meta name="author" content="&lt;AppName&gt;" />
   <link rel="icon" type="image/png" href="images/favicon.png" />
 
   <link rel="stylesheet" href="styles/default.css" />
@@ -28,103 +28,138 @@
     document.documentElement.setAttribute("data-theme", savedTheme);
   </script>
 </head>
-<body>
-  <div id="header"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedHeaderHtml");
-      if (!cached) return;
-      const el = document.getElementById("header");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-
-      const cachedUserRaw = sessionStorage.getItem("cachedUser");
-      if (!cachedUserRaw) return;
-      try {
-        const cachedUser = JSON.parse(cachedUserRaw);
-        const name = cachedUser.fullName || cachedUser.username || "Account";
-        const nameEl = document.getElementById("headerUserName");
-        if (nameEl) nameEl.textContent = name;
-
-        const accountIcon = document.getElementById("account-icon");
-        const avatarLetters = document.getElementById("avatarLetters");
-        if (!accountIcon || !avatarLetters) return;
-
-        const parts = name.trim().split(/\s+/).filter(Boolean);
-        const initials = parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : (parts[0] ? parts[0][0].toUpperCase() : "?");
-
-        const avatarUrl = cachedUser.avatarUrl || cachedUser.avatar_url || "";
-        avatarLetters.textContent = initials;
-        accountIcon.dataset.avatarUrl = avatarUrl;
-
-        if (!avatarUrl) {
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          return;
-        }
-
-        const img = new Image();
-        img.onload = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = `url(${avatarUrl})`;
-          accountIcon.classList.add("has-avatar");
-          avatarLetters.textContent = "";
-        };
-        img.onerror = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          avatarLetters.textContent = initials;
-        };
-        img.src = avatarUrl;
-      } catch {
-        sessionStorage.removeItem("cachedUser");
-      }
-    })();
-  </script>
-
-
+<body class="legal-page">
   <main class="main main--legal">
     <section class="legal-hero">
-      <h1>Terms of Use</h1>
+      <button type="button" class="legal-back-btn" id="legalGoBackBtn">Go Back</button>
+      <h1>Terms of Service</h1>
       <p class="lead">
-        We are preparing clear, enforceable terms to protect both users and WiseWallet.
+        Effective Date: February 8, 2026
       </p>
     </section>
 
     <section class="legal-content">
       <article class="card legal-placeholder">
-        <h2>Terms In Progress</h2>
         <p>
-          We are actively looking for a <strong>Legal &amp; Compliance Lead</strong> to draft and implement
-          the Terms of Use, platform guidelines, and risk controls for WiseWallet.
+          These Terms of Service ("Terms") govern your access to and use of &lt;AppName&gt; ("&lt;AppName&gt;," "we," "us," or "our"). By creating an account, accessing, or using &lt;AppName&gt;, you agree to these Terms.
+        </p>
+
+        <h2>1. Eligibility and Account</h2>
+        <p>You must be legally able to enter into a binding agreement to use &lt;AppName&gt;.</p>
+        <p>You are responsible for:</p>
+        <ul>
+          <li>Providing accurate account information.</li>
+          <li>Maintaining the confidentiality of your login credentials.</li>
+          <li>All activity that occurs under your account.</li>
+        </ul>
+        <p>You must promptly notify us if you suspect unauthorized account access.</p>
+
+        <h2>2. Services Provided</h2>
+        <p>
+          &lt;AppName&gt; is a personal finance tool that may include expense and income tracking, receipt/document upload and OCR extraction, AI-assisted parsing and categorization, budgeting and reporting features, and account security tools including optional two-factor authentication.
+        </p>
+        <p>We may update, improve, suspend, or discontinue features at any time.</p>
+
+        <h2>3. Google Sign-In and Third-Party Services</h2>
+        <p>
+          &lt;AppName&gt; may allow sign-in through Google. By using Google Sign-In, you authorize us to receive basic account information from Google for authentication and account linking.
         </p>
         <p>
-          Interested in leading this work? Visit the <a href="careers.html">Careers</a> page to learn more.
+          &lt;AppName&gt; may also rely on third-party providers for hosting, storage, email, OCR, AI, and other infrastructure. Use of those services is subject to their own terms and policies.
         </p>
-        <p class="status-banner">
-          Placeholder notice: formal terms will be published here as part of the legal implementation roadmap.
+
+        <h2>4. Your Content and Data</h2>
+        <p>
+          You retain ownership of the content and data you submit to &lt;AppName&gt; (such as receipts, financial records, and account profile information). You grant us a limited license to host, process, transmit, and display your data solely to operate and improve &lt;AppName&gt; and provide support/security functions.
+        </p>
+        <p>You represent that:</p>
+        <ul>
+          <li>You have rights to submit the content you upload.</li>
+          <li>Your content does not violate law or third-party rights.</li>
+        </ul>
+
+        <h2>5. Acceptable Use</h2>
+        <p>You agree not to:</p>
+        <ul>
+          <li>Use &lt;AppName&gt; for unlawful, fraudulent, or abusive purposes.</li>
+          <li>Attempt to gain unauthorized access to systems or accounts.</li>
+          <li>Interfere with service operation, availability, or security.</li>
+          <li>Upload malware or malicious code.</li>
+          <li>Reverse engineer or attempt to extract source code except where allowed by law.</li>
+        </ul>
+        <p>We may suspend or terminate accounts that violate these Terms.</p>
+
+        <h2>6. Financial and Tax Disclaimer</h2>
+        <p>
+          &lt;AppName&gt; is an informational and organizational tool only. It does not provide legal, tax, accounting, or financial advisory services.
+        </p>
+        <p>
+          You are solely responsible for verifying all financial, OCR, and AI-generated outputs and for any decisions or filings made using &lt;AppName&gt; data.
+        </p>
+
+        <h2>7. Privacy</h2>
+        <p>Your use of &lt;AppName&gt; is also governed by our Privacy Policy.</p>
+
+        <h2>8. Intellectual Property</h2>
+        <p>
+          &lt;AppName&gt; software, branding, and related materials are owned by us or our licensors and are protected by applicable intellectual property laws. Except for rights expressly granted in these Terms, no rights are transferred to you.
+        </p>
+
+        <h2>9. Termination</h2>
+        <p>
+          You may stop using &lt;AppName&gt; at any time and may request account deletion through available account tools.
+        </p>
+        <p>
+          We may suspend or terminate access immediately if required by law, needed to protect &lt;AppName&gt;/users/third parties, or if you violate these Terms.
+        </p>
+        <p>
+          Termination does not affect provisions that should survive by nature, including ownership, disclaimers, limitations of liability, and dispute terms.
+        </p>
+
+        <h2>10. Disclaimers</h2>
+        <p>
+          &lt;AppName&gt; is provided on an "as is" and "as available" basis, without warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not warrant uninterrupted, error-free, or fully secure operation at all times.
+        </p>
+
+        <h2>11. Limitation of Liability</h2>
+        <p>
+          To the maximum extent permitted by law, &lt;AppName&gt; and its affiliates, officers, employees, and licensors will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, revenues, data, or goodwill arising from or related to your use of the service.
+        </p>
+        <p>
+          To the maximum extent permitted by law, our total liability for any claim arising out of or related to &lt;AppName&gt; will not exceed the greater of the amount you paid us for &lt;AppName&gt; in the 12 months before the claim.
+        </p>
+
+        <h2>12. Indemnification</h2>
+        <p>
+          You agree to defend, indemnify, and hold harmless &lt;AppName&gt; and its affiliates, officers, employees, and licensors from claims, damages, liabilities, losses, and expenses (including reasonable legal fees) arising from your use of &lt;AppName&gt;, your content, or your violation of these Terms or applicable law.
+        </p>
+
+        <h2>13. Governing Law</h2>
+        <p>
+          These Terms are governed by applicable laws of the jurisdiction in which &lt;AppName&gt; operates, without regard to conflict of law principles, unless otherwise required by law.
+        </p>
+
+        <h2>14. Changes to Terms</h2>
+        <p>
+          We may update these Terms from time to time. If we make material changes, we may provide notice in the app, site, or by other reasonable means. Continued use after changes become effective means you accept the updated Terms.
+        </p>
+
+        <h2>15. Contact</h2>
+        <p>
+          For questions about these Terms, contact us through &lt;AppName&gt; support channels.
         </p>
       </article>
     </section>
   </main>
-
-  <div id="footer"></div>
   <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedFooterHtml");
-      if (!cached) return;
-      const el = document.getElementById("footer");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
+    document.getElementById("legalGoBackBtn")?.addEventListener("click", () => {
+      if (window.history.length > 1) {
+        window.history.back();
+      } else {
+        window.location.href = "register.html";
       }
-    })();
+    });
   </script>
-
-
   <script src="scripts/default.js" type="module" defer></script>
 </body>
 </html>

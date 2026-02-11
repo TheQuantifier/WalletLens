@@ -14,11 +14,11 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WiseWallet - Register</title>
+  <title>&lt;AppName&gt; - Register</title>
 
   <!-- Meta -->
-  <meta name="description" content="WiseWallet helps you effortlessly scan receipts, organize expenses, and stay tax-ready year-round." />
-  <meta name="author" content="WiseWallet" />
+  <meta name="description" content="&lt;AppName&gt; helps you effortlessly scan receipts, organize expenses, and stay tax-ready year-round." />
+  <meta name="author" content="&lt;AppName&gt;" />
   <link rel="icon" type="image/png" href="images/favicon.png" />
 
   <!-- Styles -->
@@ -39,7 +39,10 @@
     <div class="nf-header-inner">
       <div class="logo-group">
         <h1 class="logo">
-          <a href="about.html" style="text-decoration:none; color:inherit;">WiseWallet</a>
+          <a class="logo-link" href="about.html" style="text-decoration:none; color:inherit;">
+            <img src="images/favicon.png" alt="App icon" class="logo-icon" />
+            <span>&lt;AppName&gt;</span>
+          </a>
         </h1>
         <span class="tagline">Track Smarter. Stress Less.</span>
       </div>
@@ -122,6 +125,19 @@
           <button type="submit" id="registerBtn" class="nf-btn">Create Account</button>
 
           <p id="registerMessage" class="form-message is-hidden" aria-live="polite"></p>
+
+          <div class="auth-alt">
+            <p class="auth-alt-label">Or Register with</p>
+            <button type="button" id="googleRegisterBtn" class="google-auth-btn" aria-label="Register with Google">
+              <svg class="google-auth-icon" viewBox="0 0 533.5 544.3" aria-hidden="true" focusable="false">
+                <path fill="#4285F4" d="M533.5 278.4c0-18.5-1.5-36.2-4.7-53.3H272v100.9h146.9c-6.3 34-25 62.9-53.2 82.2v68h86.1c50.4-46.4 81.7-114.9 81.7-197.8z"></path>
+                <path fill="#34A853" d="M272 544.3c72.7 0 133.8-24.1 178.4-65.5l-86.1-68c-24 16.1-54.7 25.5-92.3 25.5-71 0-131.2-47.9-152.7-112.4h-88.9v70.1C74.6 482.9 166.1 544.3 272 544.3z"></path>
+                <path fill="#FBBC05" d="M119.3 323.9c-10.9-32.8-10.9-68.3 0-101.1v-70.1h-88.9c-36.8 73.3-36.8 168 0 241.3l88.9-70.1z"></path>
+                <path fill="#EA4335" d="M272 107.7c39.5-.6 77.7 14 106 40.8l79-79C411.7 24.6 343.4-.3 272 0 166.1 0 74.6 61.4 30.4 152.7l88.9 70.1C140.8 155.6 201 107.7 272 107.7z"></path>
+              </svg>
+              <span>Google</span>
+            </button>
+          </div>
         </form>
 
         <div class="auth-links">
@@ -133,9 +149,9 @@
     <!-- ABOUT SECTION -->
     <section class="nf-about">
       <div class="nf-about-inner">
-        <h2>What is WiseWallet?</h2>
+        <h2>What is &lt;AppName&gt;?</h2>
         <p>
-          WiseWallet is your digital assistant for managing expenses and receipts with ease.
+          &lt;AppName&gt; is your digital assistant for managing expenses and receipts with ease.
           Whether you’re a freelancer, small business owner, or simply looking to better understand
           your spending habits, our platform simplifies financial organization from start to finish.
         </p>
@@ -161,11 +177,11 @@
   <!-- Footer -->
   <footer class="nf-footer" role="contentinfo">
     <div class="nf-footer-inner">
-      <p>&copy; <span id="year"></span> WiseWallet. All rights reserved.</p>
+      <p>&copy; <span id="year"></span> &lt;AppName&gt;. All rights reserved.</p>
       <nav class="nf-legal" aria-label="Footer">
-        <a href="privacy.html" class="legal-link" data-legal="privacy">Privacy</a><span class="sep">•</span>
-        <a href="terms.html" class="legal-link" data-legal="terms">Terms</a><span class="sep">•</span>
-        <a href="contact.html">Contact</a>
+        <a href="privacy.html" class="nf-legal-link">Privacy</a><span class="sep">&bull;</span>
+        <a href="terms.html" class="nf-legal-link">Terms</a><span class="sep">&bull;</span>
+        <button type="button" class="nf-legal-link" data-contact-open="true">Contact</button>
       </nav>
     </div>
   </footer>
@@ -178,12 +194,270 @@
         <button type="button" class="nf-modal-close" data-legal-close="true" aria-label="Close legal modal">Close</button>
       </div>
       <div class="nf-modal-body" id="legalModalBody">
-        <p class="subtle">Loadingâ€¦</p>
+        <p class="subtle">Loading...</p>
+      </div>
+      <div class="nf-modal-footer is-hidden" id="legalConsentActions">
+        <button type="button" class="nf-modal-action-disagree" id="legalDisagreeBtn">Disagree</button>
+        <button type="button" class="nf-modal-action-agree" id="legalAgreeBtn">Agree</button>
+      </div>
+    </div>
+  </div>
+
+  <template id="termsTemplate">
+    <section class="legal-hero">
+      <h1>Terms of Service</h1>
+      <p class="lead">Effective Date: February 8, 2026</p>
+    </section>
+    <section class="legal-content">
+      <article class="card legal-placeholder">
+        <p>
+          These Terms of Service ("Terms") govern your access to and use of &lt;AppName&gt; ("&lt;AppName&gt;," "we," "us," or "our"). By creating an account, accessing, or using &lt;AppName&gt;, you agree to these Terms.
+        </p>
+
+        <h2>1. Eligibility and Account</h2>
+        <p>You must be legally able to enter into a binding agreement to use &lt;AppName&gt;.</p>
+        <p>You are responsible for:</p>
+        <ul>
+          <li>Providing accurate account information.</li>
+          <li>Maintaining the confidentiality of your login credentials.</li>
+          <li>All activity that occurs under your account.</li>
+        </ul>
+        <p>You must promptly notify us if you suspect unauthorized account access.</p>
+
+        <h2>2. Services Provided</h2>
+        <p>
+          &lt;AppName&gt; is a personal finance tool that may include expense and income tracking, receipt/document upload and OCR extraction, AI-assisted parsing and categorization, budgeting and reporting features, and account security tools including optional two-factor authentication.
+        </p>
+        <p>We may update, improve, suspend, or discontinue features at any time.</p>
+
+        <h2>3. Google Sign-In and Third-Party Services</h2>
+        <p>
+          &lt;AppName&gt; may allow sign-in through Google. By using Google Sign-In, you authorize us to receive basic account information from Google for authentication and account linking.
+        </p>
+        <p>
+          &lt;AppName&gt; may also rely on third-party providers for hosting, storage, email, OCR, AI, and other infrastructure. Use of those services is subject to their own terms and policies.
+        </p>
+
+        <h2>4. Your Content and Data</h2>
+        <p>
+          You retain ownership of the content and data you submit to &lt;AppName&gt; (such as receipts, financial records, and account profile information). You grant us a limited license to host, process, transmit, and display your data solely to operate and improve &lt;AppName&gt; and provide support/security functions.
+        </p>
+        <p>You represent that:</p>
+        <ul>
+          <li>You have rights to submit the content you upload.</li>
+          <li>Your content does not violate law or third-party rights.</li>
+        </ul>
+
+        <h2>5. Acceptable Use</h2>
+        <p>You agree not to:</p>
+        <ul>
+          <li>Use &lt;AppName&gt; for unlawful, fraudulent, or abusive purposes.</li>
+          <li>Attempt to gain unauthorized access to systems or accounts.</li>
+          <li>Interfere with service operation, availability, or security.</li>
+          <li>Upload malware or malicious code.</li>
+          <li>Reverse engineer or attempt to extract source code except where allowed by law.</li>
+        </ul>
+        <p>We may suspend or terminate accounts that violate these Terms.</p>
+
+        <h2>6. Financial and Tax Disclaimer</h2>
+        <p>
+          &lt;AppName&gt; is an informational and organizational tool only. It does not provide legal, tax, accounting, or financial advisory services.
+        </p>
+        <p>
+          You are solely responsible for verifying all financial, OCR, and AI-generated outputs and for any decisions or filings made using &lt;AppName&gt; data.
+        </p>
+
+        <h2>7. Privacy</h2>
+        <p>Your use of &lt;AppName&gt; is also governed by our Privacy Policy.</p>
+
+        <h2>8. Intellectual Property</h2>
+        <p>
+          &lt;AppName&gt; software, branding, and related materials are owned by us or our licensors and are protected by applicable intellectual property laws. Except for rights expressly granted in these Terms, no rights are transferred to you.
+        </p>
+
+        <h2>9. Termination</h2>
+        <p>
+          You may stop using &lt;AppName&gt; at any time and may request account deletion through available account tools.
+        </p>
+        <p>
+          We may suspend or terminate access immediately if required by law, needed to protect &lt;AppName&gt;/users/third parties, or if you violate these Terms.
+        </p>
+        <p>
+          Termination does not affect provisions that should survive by nature, including ownership, disclaimers, limitations of liability, and dispute terms.
+        </p>
+
+        <h2>10. Disclaimers</h2>
+        <p>
+          &lt;AppName&gt; is provided on an "as is" and "as available" basis, without warranties of any kind, whether express or implied, including implied warranties of merchantability, fitness for a particular purpose, and non-infringement. We do not warrant uninterrupted, error-free, or fully secure operation at all times.
+        </p>
+
+        <h2>11. Limitation of Liability</h2>
+        <p>
+          To the maximum extent permitted by law, &lt;AppName&gt; and its affiliates, officers, employees, and licensors will not be liable for indirect, incidental, special, consequential, exemplary, or punitive damages, or for lost profits, revenues, data, or goodwill arising from or related to your use of the service.
+        </p>
+        <p>
+          To the maximum extent permitted by law, our total liability for any claim arising out of or related to &lt;AppName&gt; will not exceed the greater of the amount you paid us for &lt;AppName&gt; in the 12 months before the claim.
+        </p>
+
+        <h2>12. Indemnification</h2>
+        <p>
+          You agree to defend, indemnify, and hold harmless &lt;AppName&gt; and its affiliates, officers, employees, and licensors from claims, damages, liabilities, losses, and expenses (including reasonable legal fees) arising from your use of &lt;AppName&gt;, your content, or your violation of these Terms or applicable law.
+        </p>
+
+        <h2>13. Governing Law</h2>
+        <p>
+          These Terms are governed by applicable laws of the jurisdiction in which &lt;AppName&gt; operates, without regard to conflict of law principles, unless otherwise required by law.
+        </p>
+
+        <h2>14. Changes to Terms</h2>
+        <p>
+          We may update these Terms from time to time. If we make material changes, we may provide notice in the app, site, or by other reasonable means. Continued use after changes become effective means you accept the updated Terms.
+        </p>
+
+        <h2>15. Contact</h2>
+        <p>
+          For questions about these Terms, contact us through &lt;AppName&gt; support channels.
+        </p>
+      </article>
+    </section>
+  </template>
+
+  <template id="privacyTemplate">
+    <section class="legal-hero">
+      <h1>Privacy Policy</h1>
+      <p class="lead">Effective Date: February 8, 2026</p>
+    </section>
+    <section class="legal-content">
+      <article class="card legal-placeholder">
+        <p>
+          &lt;AppName&gt; ("we," "us," or "our") values your privacy. This Privacy Policy explains what information we collect, how we use it, how we share it, and your choices when you use &lt;AppName&gt;.
+        </p>
+
+        <h2>1. Information We Collect</h2>
+        <p>We may collect:</p>
+        <ul>
+          <li>Account information: name, email address, username, password hash, and profile details you choose to provide.</li>
+          <li>Financial content you provide: income and expense records, categories, budgets, notes, and reports.</li>
+          <li>Receipt and document data: uploaded files, extracted OCR text, and parsed metadata.</li>
+          <li>Authentication and security data: session/device information, login activity, and optional two-factor authentication data.</li>
+          <li>Support communications: messages you send through support/contact forms.</li>
+          <li>Technical information: IP address, browser/user agent, and basic usage logs for security and reliability.</li>
+        </ul>
+
+        <h2>2. How We Use Information</h2>
+        <p>We use information to:</p>
+        <ul>
+          <li>Provide and operate &lt;AppName&gt; features.</li>
+          <li>Authenticate users and secure accounts.</li>
+          <li>Process receipt uploads, OCR, and AI-assisted parsing.</li>
+          <li>Store and show your financial records and reports.</li>
+          <li>Respond to support requests.</li>
+          <li>Detect, prevent, and investigate abuse, fraud, and security incidents.</li>
+          <li>Improve product performance and reliability.</li>
+        </ul>
+
+        <h2>3. Google Sign-In</h2>
+        <p>
+          If you use Google Sign-In, we receive basic profile data from Google such as your Google account ID, email, and profile name. We use this information only to authenticate your account and link it to &lt;AppName&gt;.
+        </p>
+
+        <h2>4. How We Share Information</h2>
+        <p>
+          We do not sell your personal information. We may share data with service providers that help us run the app (for example, cloud hosting, storage, email delivery, OCR/AI processing), subject to contractual and security controls. We may also disclose information when required by law, legal process, or to protect rights, safety, and platform security.
+        </p>
+
+        <h2>5. Data Retention</h2>
+        <p>
+          We retain account and app data as long as needed to provide services and comply with legal or operational obligations. If you delete your account, we delete or de-identify data according to our system design and retention requirements, except where retention is required by law.
+        </p>
+
+        <h2>6. Security</h2>
+        <p>
+          We use reasonable administrative, technical, and organizational safeguards to protect data. No system is 100% secure, and we cannot guarantee absolute security.
+        </p>
+
+        <h2>7. Your Choices and Rights</h2>
+        <p>
+          Depending on your location, you may have rights to access, correct, delete, or export personal information. You can also manage some account settings directly in &lt;AppName&gt;. To request privacy-related actions, contact us using the support details provided by the app.
+        </p>
+
+        <h2>8. Children's Privacy</h2>
+        <p>
+          &lt;AppName&gt; is not intended for children under 13 (or the applicable age in your region), and we do not knowingly collect personal data from children.
+        </p>
+
+        <h2>9. International Data Transfers</h2>
+        <p>
+          Your information may be processed and stored in countries other than your own, where privacy laws may differ.
+        </p>
+
+        <h2>10. Changes to This Policy</h2>
+        <p>
+          We may update this Privacy Policy from time to time. We will update the Effective Date above and post the revised version in the app or website.
+        </p>
+
+        <h2>11. Contact</h2>
+        <p>
+          If you have questions about this Privacy Policy, contact us through &lt;AppName&gt; support channels.
+        </p>
+      </article>
+    </section>
+  </template>
+
+  <div id="contactModal" class="nf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+    <div class="nf-modal-backdrop" data-contact-close="true"></div>
+    <div class="nf-modal-content nf-contact-modal-content" role="document">
+      <div class="nf-modal-header">
+        <h2 id="contactModalTitle">Contact Support</h2>
+        <button type="button" class="nf-modal-close" data-contact-close="true" aria-label="Close contact modal">Close</button>
+      </div>
+      <div class="nf-modal-body">
+        <form id="authContactForm" class="nf-contact-form" novalidate>
+          <label for="contactSubject">
+            <span class="label">Subject</span>
+            <input
+              id="contactSubject"
+              name="subject"
+              type="text"
+              autocomplete="off"
+              placeholder="What can we help with?"
+              required
+            />
+          </label>
+
+          <label for="contactEmail">
+            <span class="label">Email</span>
+            <input
+              id="contactEmail"
+              name="email"
+              type="email"
+              autocomplete="email"
+              placeholder="you@example.com"
+              required
+            />
+          </label>
+
+          <label for="contactMessage">
+            <span class="label">Message</span>
+            <textarea
+              id="contactMessage"
+              name="message"
+              rows="5"
+              placeholder="Tell us what happened (include steps to reproduce and any error messages)."
+              required
+            ></textarea>
+          </label>
+
+          <p id="contactStatus" class="subtle is-hidden" aria-live="polite"></p>
+
+          <button type="submit" id="contactSubmitBtn" class="nf-btn">Send Message</button>
+        </form>
       </div>
     </div>
   </div>
 
   <!-- JS -->
+  <script src="scripts/default.js" type="module" defer></script>
   <script type="module" src="scripts/register.js"></script>
 
 </body>

@@ -12,6 +12,16 @@
   border: 1px solid var(--border);
 }
 
+.main--profile {
+  --profile-grid-cols: 464px 1fr;
+}
+
+.profile-status-inline {
+  margin: 0;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.9rem;
+}
+
 /* ===== PROFILE SUMMARY ===== */
 .profile-card .actions {
   display: flex;
@@ -29,14 +39,23 @@
   align-items: center;
   gap: 0.9rem;
   margin-bottom: 0.9rem;
+  flex-wrap: wrap;
 }
 
 .avatar {
   width: 72px;
   height: 72px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 50%;
   background: linear-gradient(180deg, #dbeafe, #bfdbfe);
   border: 2px solid var(--border);
+  color: var(--primary);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
@@ -49,6 +68,17 @@
 }
 
 .identity .subtle { color: var(--muted); }
+
+.avatar-actions {
+  margin-left: auto;
+}
+
+@media (max-width: 680px) {
+  .avatar-actions {
+    width: 100%;
+    margin-left: 0;
+  }
+}
 
 #profileStatus {
   --status-margin: 0.6rem 0 0;
@@ -95,7 +125,20 @@
 }
 
 /* ===== EDIT FORM ===== */
-.edit-form { margin-top: 0.6rem; }
+.edit-form {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border);
+}
+
+.edit-form-header {
+  margin-bottom: 0.8rem;
+}
+
+.edit-form-header h3 {
+  margin-bottom: 0.2rem;
+  font-size: 1.05rem;
+}
 
 .form-grid {
   display: grid;
@@ -106,6 +149,7 @@
 .form-grid label {
   display: grid;
   gap: 0.35rem;
+  font-weight: 600;
 }
 
 .form-grid .span-2 {
@@ -138,7 +182,23 @@ textarea { resize: vertical; }
   display: flex;
   gap: 0.6rem;
   justify-content: flex-end;
+  align-items: center;
+  flex-wrap: wrap;
   margin-top: 0.9rem;
+}
+
+.form-actions .btn {
+  min-width: 140px;
+}
+
+@media (max-width: 680px) {
+  .form-actions {
+    justify-content: stretch;
+  }
+
+  .form-actions .btn {
+    flex: 1 1 160px;
+  }
 }
 
 /* ===== SECURITY ===== */
@@ -147,9 +207,30 @@ textarea { resize: vertical; }
   margin-bottom: 0.6rem;
 }
 
+.security-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.6rem;
+}
+
+.security-header h2 {
+  margin: 0;
+}
+
+.edit-form--identity {
+  margin-top: 0.6rem;
+}
+
 .security-rows {
   display: grid;
   gap: 0.6rem;
+}
+
+.security-rows + .security-rows,
+.stats-rows {
+  margin-top: 0.6rem;
 }
 
 .security-row {
@@ -370,6 +451,65 @@ textarea { resize: vertical; }
 .activity h2 {
   font-size: 1.1rem;
   margin-bottom: 0.6rem;
+}
+
+.activity-table {
+  width: 100%;
+  table-layout: auto;
+}
+
+.activity-table th,
+.activity-table td {
+  vertical-align: middle;
+  width: auto;
+}
+
+.activity-table th.date-col,
+.activity-table td.date-col {
+  text-align: center;
+  width: 21ch;
+  max-width: 21ch;
+}
+
+.activity-table th.activity-col,
+.activity-table td.activity-col {
+  text-align: left;
+  width: 30ch;
+  max-width: 30ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-table th.ip-col,
+.activity-table td.ip-col {
+  text-align: left;
+  width: 12ch;
+  max-width: 12ch;
+  white-space: nowrap;
+}
+
+.activity-table th.result-col,
+.activity-table td.result-col {
+  text-align: right;
+  padding-right: 0.75rem;
+  width: 30ch;
+  max-width: 30ch;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.activity-table th:not(.result-col),
+.activity-table td:not(.result-col) {
+  padding-right: 1rem;
+}
+
+.activity-date {
+  display: inline-block;
+  width: 100%;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ===== RESPONSIVE ===== */

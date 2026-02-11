@@ -16,18 +16,30 @@ const API_BASE =
 // AUTH TOKEN STORAGE (fallback for blocked cookies)
 // --------------------------------------
 const AUTH_TOKEN_KEY = "auth_token";
+const AUTH_TOKEN_TS_KEY = "auth_token_ts";
+const AUTH_TOKEN_TTL_MS = 30 * 60 * 1000;
 
 function getAuthToken() {
-  return localStorage.getItem(AUTH_TOKEN_KEY) || "";
+  const token = sessionStorage.getItem(AUTH_TOKEN_KEY) || "";
+  const tsRaw = sessionStorage.getItem(AUTH_TOKEN_TS_KEY) || "";
+  const ts = Number(tsRaw);
+  if (!token || !Number.isFinite(ts)) return "";
+  if (Date.now() - ts > AUTH_TOKEN_TTL_MS) {
+    clearAuthToken();
+    return "";
+  }
+  return token;
 }
 
 function setAuthToken(token) {
   if (!token) return;
-  localStorage.setItem(AUTH_TOKEN_KEY, token);
+  sessionStorage.setItem(AUTH_TOKEN_KEY, token);
+  sessionStorage.setItem(AUTH_TOKEN_TS_KEY, String(Date.now()));
 }
 
 function clearAuthToken() {
-  localStorage.removeItem(AUTH_TOKEN_KEY);
+  sessionStorage.removeItem(AUTH_TOKEN_KEY);
+  sessionStorage.removeItem(AUTH_TOKEN_TS_KEY);
 }
 
 // --------------------------------------
@@ -71,6 +83,10 @@ async function request(path, options = {}) {
 // AUTH MODULE
 // ======================================================================
 export const auth = {
+  setToken(token) {
+    setAuthToken(token);
+  },
+
   async register(email, password, fullName) {
     const data = await request("/auth/register", {
       method: "POST",
@@ -164,6 +180,40 @@ export const auth = {
   deleteAccount() {
     return request("/auth/me", { method: "DELETE" });
   },
+
+  googleConfig() {
+    return request("/auth/google/config");
+  },
+
+  beginGoogleAuth(mode = "login", returnTo = window.location.href) {
+    const normalizedMode = mode === "register" ? "register" : "login";
+    const url = new URL(`${API_BASE}/auth/google/start`);
+    url.searchParams.set("mode", normalizedMode);
+    url.searchParams.set("returnTo", returnTo);
+    window.location.href = url.toString();
+  },
+
+  consumeGoogleRedirect() {
+    const currentUrl = new URL(window.location.href);
+    const token = currentUrl.searchParams.get("auth_token") || "";
+    const success = currentUrl.searchParams.get("auth_success") === "1";
+    const error = currentUrl.searchParams.get("auth_error") || "";
+    const mode = currentUrl.searchParams.get("auth_mode") || "";
+
+    if (token) {
+      setAuthToken(token);
+    }
+
+    if (token || success || error || mode) {
+      currentUrl.searchParams.delete("auth_token");
+      currentUrl.searchParams.delete("auth_success");
+      currentUrl.searchParams.delete("auth_error");
+      currentUrl.searchParams.delete("auth_mode");
+      window.history.replaceState({}, document.title, currentUrl.toString());
+    }
+
+    return { token, success, error, mode };
+  },
 };
 
 // ======================================================================
@@ -249,11 +299,35 @@ export const receipts = {
       throw new Error(`Upload to object storage failed (${putRes.status})`);
     }
 
-    // 3) Confirm so server can OCR + AI parse + save metadata + auto-record
-    return request(`/receipts/${presign.id}/confirm`, {
+    // 3) Confirm upload; server enqueues async processing job
+    await request(`/receipts/${presign.id}/confirm`, {
       method: "POST",
       body: JSON.stringify({}),
     });
+
+    // 4) Poll receipt status until processing is complete
+    const timeoutMs = 120000;
+    const pollMs = 1500;
+    const startedAt = Date.now();
+    while (Date.now() - startedAt < timeoutMs) {
+      // eslint-disable-next-line no-await-in-loop
+      const receipt = await request(`/receipts/${presign.id}`);
+      const status = receipt?.processing_status || receipt?.processingStatus || "";
+      if (status === "processed") {
+        return { receipt, autoRecord: null };
+      }
+      if (status === "failed") {
+        throw new Error(
+          receipt?.processing_error ||
+            receipt?.processingError ||
+            "Receipt processing failed."
+        );
+      }
+      // eslint-disable-next-line no-await-in-loop
+      await new Promise((resolve) => setTimeout(resolve, pollMs));
+    }
+
+    throw new Error("Receipt processing is taking longer than expected. Please refresh shortly.");
   },
 
   getAll() {
@@ -353,6 +427,10 @@ export const budgetSheets = {
     const query = new URLSearchParams({ cadence, period }).toString();
     return request(`/budget-sheets/lookup?${query}`);
   },
+  summary({ cadence, period }) {
+    const query = new URLSearchParams({ cadence, period }).toString();
+    return request(`/budget-sheets/summary?${query}`);
+  },
 
   getOne(id) {
     return request(`/budget-sheets/${id}`);
@@ -400,6 +478,69 @@ export const activity = {
 };
 
 // ======================================================================
+// APP SETTINGS MODULE (PUBLIC)
+// ======================================================================
+export const appSettings = {
+  getPublic() {
+    return request("/app-settings/public");
+  },
+};
+
+// ======================================================================
+// ADMIN MODULE
+// ======================================================================
+export const admin = {
+  listUsers(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/admin/users${query ? `?${query}` : ""}`);
+  },
+
+  getUser(id) {
+    return request(`/admin/users/${id}`);
+  },
+
+  updateUser(id, updates) {
+    return request(`/admin/users/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  },
+
+  listRecords(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/admin/records${query ? `?${query}` : ""}`);
+  },
+
+  getRecord(id) {
+    return request(`/admin/records/${id}`);
+  },
+
+  updateRecord(id, updates) {
+    return request(`/admin/records/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  },
+
+  deleteRecord(id, deleteReceipt) {
+    const query =
+      deleteReceipt === undefined ? "" : `?deleteReceipt=${deleteReceipt}`;
+    return request(`/admin/records/${id}${query}`, { method: "DELETE" });
+  },
+
+  getSettings() {
+    return request("/admin/settings");
+  },
+
+  updateSettings(updates) {
+    return request("/admin/settings", {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  },
+};
+
+// ======================================================================
 // SUPPORT MODULE
 // ======================================================================
 export const support = {
@@ -407,6 +548,12 @@ export const support = {
     return request("/support/contact", {
       method: "POST",
       body: JSON.stringify({ subject, message, name, email }),
+    });
+  },
+  contactPublic({ subject, message, name, email, website } = {}) {
+    return request("/support/public", {
+      method: "POST",
+      body: JSON.stringify({ subject, message, name, email, website }),
     });
   },
 };
@@ -460,6 +607,8 @@ export const api = {
   budgetSheets,
   fxRates,
   activity,
+  appSettings,
+  admin,
   support,
   getUploadType,
   getReceiptSummary,

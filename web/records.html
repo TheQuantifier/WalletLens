@@ -14,7 +14,7 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WiseWallet - Records</title>
+  <title>&lt;AppName&gt; - Records</title>
 
   <meta name="description" content="Browse, filter, and manage your expense and income transactions." />
   <link rel="icon" type="image/png" href="images/favicon.png" />
@@ -31,61 +31,6 @@
 <body>
 
   <div id="header"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedHeaderHtml");
-      if (!cached) return;
-      const el = document.getElementById("header");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-
-      const cachedUserRaw = sessionStorage.getItem("cachedUser");
-      if (!cachedUserRaw) return;
-      try {
-        const cachedUser = JSON.parse(cachedUserRaw);
-        const name = cachedUser.fullName || cachedUser.username || "Account";
-        const nameEl = document.getElementById("headerUserName");
-        if (nameEl) nameEl.textContent = name;
-
-        const accountIcon = document.getElementById("account-icon");
-        const avatarLetters = document.getElementById("avatarLetters");
-        if (!accountIcon || !avatarLetters) return;
-
-        const parts = name.trim().split(/\s+/).filter(Boolean);
-        const initials = parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : (parts[0] ? parts[0][0].toUpperCase() : "?");
-
-        const avatarUrl = cachedUser.avatarUrl || cachedUser.avatar_url || "";
-        avatarLetters.textContent = initials;
-        accountIcon.dataset.avatarUrl = avatarUrl;
-
-        if (!avatarUrl) {
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          return;
-        }
-
-        const img = new Image();
-        img.onload = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = `url(${avatarUrl})`;
-          accountIcon.classList.add("has-avatar");
-          avatarLetters.textContent = "";
-        };
-        img.onerror = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          avatarLetters.textContent = initials;
-        };
-        img.src = avatarUrl;
-      } catch {
-        sessionStorage.removeItem("cachedUser");
-      }
-    })();
-  </script>
 
 
   <main class="main">
@@ -146,18 +91,6 @@
             </label>
 
             <label>
-              <span>Sort</span>
-              <select id="sort" name="sort">
-                <option value="date_desc">Date ↓</option>
-                <option value="date_asc">Date ↑</option>
-                <option value="amount_desc">Amount ↓</option>
-                <option value="amount_asc">Amount ↑</option>
-                <option value="category_asc">Category A–Z</option>
-                <option value="category_desc">Category Z–A</option>
-              </select>
-            </label>
-
-            <label>
               <span>Rows per page</span>
               <select id="pageSize" name="pageSize">
                 <option selected>5</option>
@@ -185,12 +118,36 @@
           <table class="txn-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Category</th>
-                <th class="num">Amount</th>
-                <th>Note</th>
-                <th>Origin</th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="date">
+                    Date <span class="sort-arrow" data-arrow-for="expense:date">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="type">
+                    Type <span class="sort-arrow" data-arrow-for="expense:type">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="category">
+                    Category <span class="sort-arrow" data-arrow-for="expense:category">↕</span>
+                  </button>
+                </th>
+                <th class="num">
+                  <button type="button" class="records-sort-btn records-sort-btn--num" data-sort-table="expense" data-sort-key="amount">
+                    Amount <span class="sort-arrow" data-arrow-for="expense:amount">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="note">
+                    Note <span class="sort-arrow" data-arrow-for="expense:note">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="origin">
+                    Origin <span class="sort-arrow" data-arrow-for="expense:origin">↕</span>
+                  </button>
+                </th>
                 <th class="actions-col">Actions</th>
               </tr>
             </thead>
@@ -265,18 +222,6 @@
             </label>
 
             <label>
-              <span>Sort</span>
-              <select id="sortIncome" name="sortIncome">
-                <option value="date_desc">Date ↓</option>
-                <option value="date_asc">Date ↑</option>
-                <option value="amount_desc">Amount ↓</option>
-                <option value="amount_asc">Amount ↑</option>
-                <option value="category_asc">Category A–Z</option>
-                <option value="category_desc">Category Z–A</option>
-              </select>
-            </label>
-
-            <label>
               <span>Rows per page</span>
               <select id="pageSizeIncome" name="pageSizeIncome">
                 <option selected>5</option>
@@ -304,12 +249,36 @@
           <table class="txn-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Type</th>
-                <th>Category</th>
-                <th class="num">Amount</th>
-                <th>Note</th>
-                <th>Origin</th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="date">
+                    Date <span class="sort-arrow" data-arrow-for="income:date">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="type">
+                    Type <span class="sort-arrow" data-arrow-for="income:type">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="category">
+                    Category <span class="sort-arrow" data-arrow-for="income:category">↕</span>
+                  </button>
+                </th>
+                <th class="num">
+                  <button type="button" class="records-sort-btn records-sort-btn--num" data-sort-table="income" data-sort-key="amount">
+                    Amount <span class="sort-arrow" data-arrow-for="income:amount">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="note">
+                    Note <span class="sort-arrow" data-arrow-for="income:note">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="origin">
+                    Origin <span class="sort-arrow" data-arrow-for="income:origin">↕</span>
+                  </button>
+                </th>
                 <th class="actions-col">Actions</th>
               </tr>
             </thead>
@@ -458,3 +427,5 @@
 
 </body>
 </html>
+
+

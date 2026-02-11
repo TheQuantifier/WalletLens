@@ -94,6 +94,13 @@ export async function updateReceiptParsedData(userId, id, patch = {}) {
     parsedData,
     linkedRecordId,
     fileSaved,
+    processingStatus,
+    processingStage,
+    processingError,
+    rawOcrText,
+    aiModelVersion,
+    parseConfidence,
+    parseWarnings,
   } = patch;
 
   const sets = [];
@@ -118,6 +125,13 @@ export async function updateReceiptParsedData(userId, id, patch = {}) {
 
   if (linkedRecordId !== undefined) push("linked_record_id = ?", linkedRecordId);
   if (fileSaved !== undefined) push("file_saved = ?", fileSaved);
+  if (processingStatus !== undefined) push("processing_status = ?", processingStatus);
+  if (processingStage !== undefined) push("processing_stage = ?", processingStage);
+  if (processingError !== undefined) push("processing_error = ?", processingError);
+  if (rawOcrText !== undefined) push("raw_ocr_text = ?", rawOcrText);
+  if (aiModelVersion !== undefined) push("ai_model_version = ?", aiModelVersion);
+  if (parseConfidence !== undefined) push("parse_confidence = ?", parseConfidence);
+  if (parseWarnings !== undefined) push("parse_warnings = ?", JSON.stringify(parseWarnings || []));
 
   if (sets.length === 0) return getReceiptById(userId, id);
 

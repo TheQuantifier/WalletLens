@@ -46,6 +46,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let incomePage = 1;
   let pendingCategorySelect = null;
   let userCustomCategories = { expense: [], income: [] };
+  const tableSorts = {
+    expense: { key: "", dir: "" },
+    income: { key: "", dir: "" },
+  };
 
   // NEW: cache so we don’t hit API on each keystroke
   let allRecordsCache = [];
@@ -119,6 +123,7 @@ document.addEventListener("DOMContentLoaded", () => {
   ];
 
   const normalizeName = (name) => String(name || "").trim().toLowerCase();
+  const normalizeText = (value) => String(value || "").toLowerCase().trim();
 
   const showModal = (modal) => modal?.classList.remove("hidden");
   const hideModal = (modal) => modal?.classList.add("hidden");
@@ -453,6 +458,66 @@ document.addEventListener("DOMContentLoaded", () => {
   // Support both camelCase and snake_case for linked receipt id
   const getLinkedReceiptId = (r) => r?.linkedReceiptId ?? r?.linked_receipt_id ?? "";
 
+  const getSortValue = (record, key) => {
+    if (key === "date") {
+      return record.date ? Date.parse(`${toDateOnly(record.date)}T00:00:00Z`) : 0;
+    }
+    if (key === "amount") return Number(record.amount || 0);
+    if (key === "category") return normalizeText(record.category);
+    if (key === "type") return normalizeText(record.type);
+    if (key === "note") return normalizeText(record.note);
+    if (key === "origin") return getLinkedReceiptId(record) ? "receipt" : "manual";
+    return "";
+  };
+
+  const buildSearchHaystack = (record) => {
+    const dateOnly = toDateOnly(record.date);
+    const origin = getLinkedReceiptId(record) ? "receipt" : "manual";
+    const amount = Number(record.amount || 0);
+    return [
+      record.type || "",
+      record.category || "",
+      record.note || "",
+      origin,
+      dateOnly,
+      fmtDate(record.date),
+      String(amount),
+      amount.toFixed(2),
+    ]
+      .map((v) => normalizeText(v))
+      .join(" ");
+  };
+
+  const updateSortArrows = () => {
+    document.querySelectorAll(".sort-arrow[data-arrow-for]").forEach((el) => {
+      const token = el.getAttribute("data-arrow-for") || "";
+      const [table, key] = token.split(":");
+      const cfg = tableSorts[table];
+      if (!cfg || cfg.key !== key) {
+        el.textContent = "↕";
+        return;
+      }
+      el.textContent = cfg.dir === "asc" ? "↑" : "↓";
+    });
+  };
+
+  const toggleSort = (table, key) => {
+    const cfg = tableSorts[table];
+    if (!cfg) return;
+
+    if (cfg.key !== key) {
+      cfg.key = key;
+      cfg.dir = "asc";
+    } else {
+      cfg.dir = cfg.dir === "asc" ? "desc" : "asc";
+    }
+
+    if (table === "expense") expensePage = 1;
+    if (table === "income") incomePage = 1;
+    updateSortArrows();
+    renderAll();
+  };
+
   const typeBadgeEl = (record) => {
     const span = document.createElement("span");
     if (getLinkedReceiptId(record)) {
@@ -731,33 +796,29 @@ document.addEventListener("DOMContentLoaded", () => {
     const maxDate = maxDateStr ? new Date(maxDateStr) : null;
     const minAmt = parseFloat(form.querySelector("input[id^=minAmt]")?.value) || 0;
     const maxAmt = parseFloat(form.querySelector("input[id^=maxAmt]")?.value) || Infinity;
-    const sort = form.querySelector("select[id^=sort]")?.value || "";
     const pageSize = parseInt(form.querySelector("select[id^=pageSize]")?.value, 10) || 5;
 
     let filtered = records.filter(r => {
-      const note = (r.note || "").toLowerCase();
-      const cat = (r.category || "").toLowerCase();
       const rDate = r.date ? Date.parse(`${toDateOnly(r.date)}T00:00:00Z`) : null;
-      return (!q || cat.includes(q) || note.includes(q)) &&
+      const haystack = buildSearchHaystack(r);
+      return (!q || haystack.includes(q)) &&
              (!category || r.category === category) &&
              (!minDate || (rDate && rDate >= minDate)) &&
              (!maxDate || (rDate && rDate <= maxDate)) &&
              r.amount >= minAmt && r.amount <= maxAmt;
     });
 
-    filtered.sort((a,b) => {
-      const da = a.date ? Date.parse(`${toDateOnly(a.date)}T00:00:00Z`) : null;
-      const db = b.date ? Date.parse(`${toDateOnly(b.date)}T00:00:00Z`) : null;
-      switch(sort) {
-        case "date_asc": return da - db;
-        case "date_desc": return db - da;
-        case "amount_asc": return a.amount - b.amount;
-        case "amount_desc": return b.amount - a.amount;
-        case "category_asc": return (a.category||"").localeCompare(b.category||"");
-        case "category_desc": return (b.category||"").localeCompare(a.category||"");
-        default: return 0;
-      }
-    });
+    const sortCfg = tableSorts[type] || { key: "", dir: "" };
+    if (sortCfg.key && sortCfg.dir) {
+      const dir = sortCfg.dir === "desc" ? -1 : 1;
+      filtered.sort((a, b) => {
+        const av = getSortValue(a, sortCfg.key);
+        const bv = getSortValue(b, sortCfg.key);
+        if (av < bv) return -1 * dir;
+        if (av > bv) return 1 * dir;
+        return 0;
+      });
+    }
 
     const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
     const clampPage = (p) => Math.min(Math.max(1, p), totalPages);
@@ -1000,6 +1061,12 @@ document.addEventListener("DOMContentLoaded", () => {
   wireLiveFilters(filtersForm, "expense");
   wireLiveFilters(filtersFormIncome, "income");
 
+  document.querySelectorAll(".records-sort-btn[data-sort-table][data-sort-key]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      toggleSort(btn.dataset.sortTable, btn.dataset.sortKey);
+    });
+  });
+
   document.getElementById("btnClear")?.addEventListener("click", () => {
     filtersForm?.reset();
     expensePage = 1;
@@ -1105,6 +1172,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // INITIAL LOAD
   (async () => {
+    updateSortArrows();
     await loadUserCustomCategories();
     populateBudgetCategorySelects();
     await loadFxRates();

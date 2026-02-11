@@ -11,6 +11,15 @@ document.addEventListener("DOMContentLoaded", () => {
   const twoFactorWrap = document.getElementById("twoFactorWrap");
   const twoFactorCode = document.getElementById("twoFactorCode");
   const verifyTwoFactorBtn = document.getElementById("verifyTwoFactorBtn");
+  const googleLoginBtn = document.getElementById("googleLoginBtn");
+  const contactModal = document.getElementById("contactModal");
+  const contactForm = document.getElementById("authContactForm");
+  const contactOpeners = document.querySelectorAll("[data-contact-open='true']");
+  const contactStatus = document.getElementById("contactStatus");
+  const contactSubmitBtn = document.getElementById("contactSubmitBtn");
+  const contactSubject = document.getElementById("contactSubject");
+  const contactEmail = document.getElementById("contactEmail");
+  const contactMessage = document.getElementById("contactMessage");
 
   if (!form) {
     console.error("❌ loginForm not found.");
@@ -21,6 +30,15 @@ document.addEventListener("DOMContentLoaded", () => {
   if (redirectMsg && errorEl) {
     errorEl.textContent = redirectMsg;
     sessionStorage.removeItem("authRedirectMessage");
+  }
+
+  const googleRedirect = api.auth.consumeGoogleRedirect();
+  if (googleRedirect?.token || googleRedirect?.success) {
+    window.location.href = "home.html";
+    return;
+  }
+  if (googleRedirect?.error && errorEl) {
+    errorEl.textContent = googleRedirect.error;
   }
 
   const showTwoFactor = (token) => {
@@ -95,6 +113,102 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("2FA verify error:", err);
       errorEl.textContent = err.message || "Verification failed.";
+    }
+  });
+
+  if (googleLoginBtn) {
+    (async () => {
+      try {
+        const cfg = await api.auth.googleConfig();
+        if (!cfg?.enabled) {
+          googleLoginBtn.disabled = true;
+          googleLoginBtn.title = "Google login is not configured yet.";
+          return;
+        }
+        googleLoginBtn.addEventListener("click", () => {
+          api.auth.beginGoogleAuth("login", window.location.href);
+        });
+      } catch (err) {
+        console.error("Google config error:", err);
+        googleLoginBtn.disabled = true;
+        googleLoginBtn.title = "Google login is unavailable.";
+      }
+    })();
+  }
+
+  const setContactModalOpen = (open) => {
+    if (!contactModal) return;
+    contactModal.classList.toggle("hidden", !open);
+    document.body.style.overflow = open ? "hidden" : "";
+    if (open) {
+      contactSubject?.focus();
+    }
+  };
+
+  const setContactStatus = (message, kind = "info") => {
+    if (!contactStatus) return;
+    if (!message) {
+      contactStatus.textContent = "";
+      contactStatus.classList.add("is-hidden");
+      contactStatus.style.color = "";
+      return;
+    }
+    contactStatus.textContent = message;
+    contactStatus.classList.remove("is-hidden");
+    contactStatus.style.color =
+      kind === "error" ? "#b91c1c" : kind === "ok" ? "#166534" : "";
+  };
+
+  contactOpeners.forEach((trigger) => {
+    trigger.addEventListener("click", () => {
+      setContactStatus("");
+      setContactModalOpen(true);
+    });
+  });
+
+  contactModal?.addEventListener("click", (e) => {
+    if (e.target?.matches("[data-contact-close]")) {
+      setContactModalOpen(false);
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && contactModal && !contactModal.classList.contains("hidden")) {
+      setContactModalOpen(false);
+    }
+  });
+
+  contactForm?.addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const subject = contactSubject?.value?.trim() || "";
+    const email = contactEmail?.value?.trim() || "";
+    const message = contactMessage?.value?.trim() || "";
+
+    if (!subject || !email || !message) {
+      setContactStatus("Please add subject, email, and message.", "error");
+      return;
+    }
+
+    if (contactSubmitBtn) {
+      contactSubmitBtn.disabled = true;
+      contactSubmitBtn.textContent = "Sending...";
+    }
+    setContactStatus("Sending your message...");
+
+    try {
+      await api.support.contactPublic({ subject, message, name: "Guest User", email });
+      setContactStatus("Thanks! Your message has been sent to support.", "ok");
+      contactForm.reset();
+    } catch (err) {
+      const fallback = "Unable to send message right now.";
+      const raw = err?.message || fallback;
+      setContactStatus(raw, "error");
+    } finally {
+      if (contactSubmitBtn) {
+        contactSubmitBtn.disabled = false;
+        contactSubmitBtn.textContent = "Send Message";
+      }
     }
   });
 });

@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function () {
+      const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+      const currentPage = rawPage === "" ? "index.html" : rawPage;
+      const cachedTitle = sessionStorage.getItem(`pageTitle:${currentPage}`);
+      if (cachedTitle) {
+        document.title = cachedTitle;
+      }
+    })();
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>&lt;AppName&gt; - Admin Console</title>
+
+  <meta name="description" content="Admin console for overseeing users, records, and app settings." />
+  <link rel="icon" type="image/png" href="images/favicon.png" />
+
+  <link rel="stylesheet" href="styles/default.css" />
+  <link rel="stylesheet" href="styles/admin.css" />
+
+  <script>
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+  </script>
+</head>
+
+<body>
+  <div id="header"></div>
+
+  <main class="main admin-main">
+    <section class="admin-hero">
+      <div>
+        <h1>Admin Console</h1>
+        <p class="subtle">Oversee users, records, and global app configuration.</p>
+      </div>
+      <div class="admin-badge">Admin Only</div>
+    </section>
+
+    <section class="admin-grid">
+      <section class="card admin-panel" id="usersPanel">
+        <div class="admin-panel-header">
+          <div>
+            <h2>Users</h2>
+            <p class="subtle">Search users and update roles or profile data.</p>
+          </div>
+          <div class="admin-actions">
+            <input id="userSearch" type="text" placeholder="Search name or email" autocomplete="off" />
+            <button class="btn btn--primary" id="userSearchBtn" type="button">Search</button>
+          </div>
+        </div>
+
+        <p id="usersStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="name">
+                    Name <span class="sort-arrow" data-arrow-for="users:name">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="email">
+                    Email <span class="sort-arrow" data-arrow-for="users:email">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="role">
+                    Role <span class="sort-arrow" data-arrow-for="users:role">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="created">
+                    Created <span class="sort-arrow" data-arrow-for="users:created">↕</span>
+                  </button>
+                </th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTbody">
+              <tr><td colspan="5" class="subtle">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card admin-panel" id="recordsPanel">
+        <div class="admin-panel-header">
+          <div>
+            <h2>Records</h2>
+            <p class="subtle">View and edit records across all users.</p>
+          </div>
+          <div class="admin-actions">
+            <input id="recordsUserId" type="text" placeholder="Filter by name or email" />
+            <select id="recordsType">
+              <option value="">All types</option>
+              <option value="expense">Expense</option>
+              <option value="income">Income</option>
+            </select>
+            <button class="btn btn--primary" id="recordsSearchBtn" type="button">Search</button>
+          </div>
+        </div>
+
+        <p id="recordsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="records" data-key="date">
+                    Date <span class="sort-arrow" data-arrow-for="records:date">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="records" data-key="userName">
+                    User Name <span class="sort-arrow" data-arrow-for="records:userName">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="records" data-key="type">
+                    Type <span class="sort-arrow" data-arrow-for="records:type">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="records" data-key="category">
+                    Category <span class="sort-arrow" data-arrow-for="records:category">↕</span>
+                  </button>
+                </th>
+                <th class="num">
+                  <button type="button" class="admin-sort-btn admin-sort-btn--num" data-table="records" data-key="amount">
+                    Amount <span class="sort-arrow" data-arrow-for="records:amount">↕</span>
+                  </button>
+                </th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody">
+              <tr><td colspan="6" class="subtle">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="card admin-panel" id="settingsPanel">
+        <div class="admin-panel-header">
+          <div>
+            <h2>App Settings</h2>
+            <p class="subtle">Update global configuration like app name.</p>
+          </div>
+        </div>
+
+        <form id="settingsForm" class="admin-form">
+          <label>
+            <span>App Name</span>
+            <input id="appNameInput" type="text" placeholder="&lt;AppName&gt;" />
+          </label>
+          <label>
+            <span>Receipt Storage</span>
+            <div class="checkbox-row">
+              <input id="receiptKeepFilesInput" type="checkbox" />
+              <span>
+                Keep receipt files in storage.
+                <span class="subtle">Disabling will block new uploads and delete files after parsing.</span>
+              </span>
+            </div>
+          </label>
+          <div class="admin-actions">
+            <button class="btn btn--primary" type="submit">Save Settings</button>
+          </div>
+          <p id="settingsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+        </form>
+      </section>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <div id="adminUserModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminUserTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminUserTitle">Edit User</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <form id="adminUserForm" class="admin-form">
+        <input type="hidden" id="adminUserId" />
+        <label>
+          <span>Full Name</span>
+          <input id="adminUserFullName" type="text" />
+        </label>
+        <label>
+          <span>Email</span>
+          <input id="adminUserEmail" type="email" />
+        </label>
+        <label>
+          <span>Username</span>
+          <input id="adminUserUsername" type="text" />
+        </label>
+        <label>
+          <span>Role</span>
+          <select id="adminUserRole">
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </select>
+        </label>
+        <div class="admin-actions">
+          <button class="btn btn--primary" type="submit">Save User</button>
+          <button class="btn btn--link" type="button" data-close-modal>Cancel</button>
+        </div>
+        <p id="adminUserStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="adminRecordModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminRecordTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminRecordTitle">Edit Record</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <form id="adminRecordForm" class="admin-form">
+        <input type="hidden" id="adminRecordId" />
+        <label>
+          <span>Date</span>
+          <input id="adminRecordDate" type="date" />
+        </label>
+        <label>
+          <span>Type</span>
+          <select id="adminRecordType">
+            <option value="expense">expense</option>
+            <option value="income">income</option>
+          </select>
+        </label>
+        <label>
+          <span>Category</span>
+          <input id="adminRecordCategory" type="text" />
+        </label>
+        <label>
+          <span>Amount</span>
+          <input id="adminRecordAmount" type="number" min="0" step="0.01" inputmode="decimal" />
+        </label>
+        <label>
+          <span>Note</span>
+          <textarea id="adminRecordNote" rows="3"></textarea>
+        </label>
+        <div class="admin-actions">
+          <button class="btn btn--primary" type="submit">Save Record</button>
+          <button class="btn btn--link" type="button" data-close-modal>Cancel</button>
+        </div>
+        <p id="adminRecordStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <script type="module" src="scripts/api.js"></script>
+  <script type="module" src="scripts/default.js"></script>
+  <script type="module" src="scripts/admin.js"></script>
+</body>
+</html>

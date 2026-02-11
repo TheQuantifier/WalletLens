@@ -10,9 +10,9 @@ const setText = (el, text) => {
 };
 
 const formatShortDateTime = (value) => {
-  if (!value) return "—";
+  if (!value) return "\u2014";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
+  if (Number.isNaN(date.getTime())) return "\u2014";
   return date.toLocaleString(undefined, {
     weekday: "short",
     year: "numeric",
@@ -33,6 +33,7 @@ const getInitials = (name) => {
 const editBtn = $("editProfileBtn");
 const form = $("editForm");
 const cancelBtn = $("cancelEditBtn");
+const saveBtn = $("saveProfileBtn");
 const statusEl = $("profileStatus");
 
 // SUMMARY ELEMENTS
@@ -54,7 +55,6 @@ const input = {
   email: $("input_email"),
   phoneNumber: $("input_phoneNumber"),
   location: $("input_location"),
-  role: $("input_role"),
   bio: $("input_bio"),
 };
 
@@ -69,10 +69,21 @@ const activityBody = $("activityBody");
 // Linked accounts + identity placeholders
 const linkedAccountsList = $("linkedAccountsList");
 const identityEls = {
-  name: $("identityName"),
   address: $("identityAddress"),
   employer: $("identityEmployer"),
   income: $("identityIncome"),
+};
+const identityDisplay = $("identityDisplay");
+const identityForm = $("identityForm");
+const identityInput = {
+  address: $("input_identityAddress"),
+  employer: $("input_identityEmployer"),
+  income: $("input_identityIncome"),
+};
+const currentIdentity = {
+  address: "",
+  employer: "",
+  income: "",
 };
 
 const linkAccountBtn = $("linkAccountBtn");
@@ -83,6 +94,15 @@ const confirmLinkAccount = $("confirmLinkAccount");
 const bankGrid = $("bankGrid");
 
 const LINKED_ACCOUNTS_KEY = "linked_accounts";
+try {
+  const legacy = JSON.parse(localStorage.getItem(IDENTITY_KEY) || "null");
+  if (legacy?.name !== undefined) {
+    const { address, employer, income } = legacy || {};
+    localStorage.setItem(IDENTITY_KEY, JSON.stringify({ address, employer, income }));
+  }
+} catch {
+  // ignore legacy cleanup errors
+}
 const BANK_OPTIONS = [
   { id: "chase", name: "Chase", desc: "Checking, Savings, Credit Card" },
   { id: "bofa", name: "Bank of America", desc: "Checking, Savings, Credit Card" },
@@ -181,7 +201,8 @@ const closeLinkModal = () => {
 };
 
 // AVATAR ELEMENTS
-const changeAvatarBtn = $("changeAvatarBtn");
+const avatarTriggerButtons = document.querySelectorAll("[data-avatar-trigger]");
+const topChangeAvatarBtn = $("changeAvatarBtnTop");
 const avatarInput = $("avatarInput");
 const avatarBlock = document.querySelector(".avatar-block .avatar");
 const avatarModal = $("avatarModal");
@@ -221,12 +242,25 @@ if (themeToggleBtn) {
 const showForm = () => {
   if (form) form.hidden = false;
   if (editBtn) editBtn.disabled = true;
-  if (input.role) input.role.setAttribute("readonly", "readonly");
+  const summary = $("profileSummary");
+  if (summary) summary.classList.add("is-hidden");
+  showIdentityForm();
+  if (editBtn) editBtn.classList.add("is-hidden");
+  if (cancelBtn) cancelBtn.classList.remove("is-hidden");
+  if (saveBtn) saveBtn.classList.remove("is-hidden");
+  if (topChangeAvatarBtn) topChangeAvatarBtn.classList.remove("is-hidden");
 };
 
 const hideForm = () => {
   if (form) form.hidden = true;
   if (editBtn) editBtn.disabled = false;
+  const summary = $("profileSummary");
+  if (summary) summary.classList.remove("is-hidden");
+  hideIdentityForm();
+  if (editBtn) editBtn.classList.remove("is-hidden");
+  if (cancelBtn) cancelBtn.classList.add("is-hidden");
+  if (saveBtn) saveBtn.classList.add("is-hidden");
+  if (topChangeAvatarBtn) topChangeAvatarBtn.classList.add("is-hidden");
 };
 
 const showStatus = (msg, kind = "ok") => {
@@ -247,6 +281,7 @@ const clearStatusSoon = (ms = 2000) => {
     statusEl.classList.remove("is-ok", "is-error");
   }, ms);
 };
+
 
 /* ----------------------------------------
    AVATAR PRESETS
@@ -272,8 +307,40 @@ const applyAvatarPreview = (avatarUrl, fallbackName = "") => {
   avatarBlock.textContent = getInitials(fallbackName);
 };
 
-const applyHeaderAvatar = (avatarUrl) => {
-  window.dispatchEvent(new CustomEvent("avatar:updated", { detail: { avatarUrl } }));
+const applyHeaderAvatar = (avatarUrl, fallbackName = "") => {
+  window.dispatchEvent(new CustomEvent("avatar:updated", { detail: { avatarUrl, fallbackName } }));
+};
+
+const loadIdentity = () => {
+  const sanitize = (value) => {
+    if (!value) return "—";
+    const cleaned = String(value).replace(/â€”/g, "—").trim();
+    return cleaned || "—";
+  };
+
+  setText(identityEls.address, sanitize(currentIdentity.address));
+  setText(identityEls.employer, sanitize(currentIdentity.employer));
+  setText(identityEls.income, sanitize(currentIdentity.income));
+
+  if (identityInput.address) identityInput.address.value = currentIdentity.address || "";
+  if (identityInput.employer) identityInput.employer.value = currentIdentity.employer || "";
+  if (identityInput.income) identityInput.income.value = currentIdentity.income || "";
+};
+
+const showIdentityForm = () => {
+  if (identityForm) identityForm.hidden = false;
+  if (identityDisplay) identityDisplay.classList.add("is-hidden");
+};
+
+const hideIdentityForm = () => {
+  if (identityForm) identityForm.hidden = true;
+  if (identityDisplay) identityDisplay.classList.remove("is-hidden");
+};
+
+const persistIdentityFromInputs = () => {
+  currentIdentity.address = identityInput.address?.value.trim() || "";
+  currentIdentity.employer = identityInput.employer?.value.trim() || "";
+  currentIdentity.income = identityInput.income?.value.trim() || "";
 };
 
 /* ----------------------------------------
@@ -310,21 +377,21 @@ async function loadUserProfile() {
     const displayName = user?.fullName || user?.full_name || user?.username || "";
     currentDisplayName = displayName;
 
-    setText(f.fullName, displayName || "—");
-    setText(f.username, "@" + (user?.username || "—"));
-    setText(f.email, user?.email || "—");
-    setText(f.phoneNumber, user?.phoneNumber || user?.phone_number || "—");
-    setText(f.location, user?.location || "—");
-    setText(f.role, user?.role || "—");
-    setText(f.createdAt, createdAt ? new Date(createdAt).toLocaleDateString() : "—");
-    setText(f.bio, user?.bio || "—");
+    setText(f.fullName, displayName || "\u2014");
+    setText(f.username, "@" + (user?.username || "\u2014"));
+    setText(f.email, user?.email || "\u2014");
+    setText(f.phoneNumber, user?.phoneNumber || user?.phone_number || "\u2014");
+    setText(f.location, user?.location || "\u2014");
+    setText(f.role, user?.role || "\u2014");
+    setText(f.createdAt, createdAt ? new Date(createdAt).toLocaleDateString() : "\u2014");
+    setText(f.bio, user?.bio || "\u2014");
 
     setText(stats.lastLogin, lastLogin);
     setText(stats.uploads, totalUploads);
-    setText(identityEls.name, displayName || "—");
-    setText(identityEls.address, "—");
-    setText(identityEls.employer, "—");
-    setText(identityEls.income, "—");
+    currentIdentity.address = user?.address || "";
+    currentIdentity.employer = user?.employer || "";
+    currentIdentity.income = user?.incomeRange || user?.income_range || "";
+    loadIdentity();
 
     Object.keys(input).forEach((k) => {
       if (!input[k]) return;
@@ -342,7 +409,7 @@ async function loadUserProfile() {
     currentAvatarUrl = avatarUrl || "";
     pendingAvatarUrl = currentAvatarUrl;
     applyAvatarPreview(currentAvatarUrl, displayName);
-    applyHeaderAvatar(currentAvatarUrl);
+    applyHeaderAvatar(currentAvatarUrl, displayName);
 
     if (linkedAccountsList) {
       renderLinkedAccounts();
@@ -375,9 +442,9 @@ const ACTION_LABELS = {
 };
 
 const formatActivityDate = (value) => {
-  if (!value) return "—";
+  if (!value) return "\u2014";
   const d = new Date(value);
-  if (Number.isNaN(d.getTime())) return "—";
+  if (Number.isNaN(d.getTime())) return "\u2014";
   return d.toLocaleString();
 };
 
@@ -386,7 +453,7 @@ async function loadRecentActivity() {
   activityBody.innerHTML = `<tr><td colspan="4" class="subtle">Loading…</td></tr>`;
 
   try {
-    const rows = await api.activity.getRecent(20);
+    const rows = await api.activity.getRecent(5);
     if (!rows?.length) {
       activityBody.innerHTML = `<tr><td colspan="4" class="subtle">No activity yet</td></tr>`;
       return;
@@ -397,17 +464,23 @@ async function loadRecentActivity() {
       const tr = document.createElement("tr");
 
       const tdDate = document.createElement("td");
-      tdDate.textContent = formatActivityDate(row.created_at);
+      const dateBadge = document.createElement("span");
+      dateBadge.className = "activity-date";
+      dateBadge.textContent = formatActivityDate(row.created_at);
+      tdDate.className = "date-col";
+      tdDate.appendChild(dateBadge);
 
       const tdAction = document.createElement("td");
+      tdAction.className = "activity-col";
       tdAction.textContent = ACTION_LABELS[row.action] || row.action || "Activity";
 
       const tdIp = document.createElement("td");
-      tdIp.textContent = row.ip_address || "—";
+      tdIp.className = "ip-col";
+      tdIp.textContent = row.ip_address || "\u2014";
 
       const tdResult = document.createElement("td");
-      tdResult.className = "num";
-      tdResult.textContent = row.entity_type || "—";
+      tdResult.className = "result-col";
+      tdResult.textContent = row.entity_type || "\u2014";
 
       tr.appendChild(tdDate);
       tr.appendChild(tdAction);
@@ -432,6 +505,10 @@ async function saveProfile(e) {
     if (key === "role") continue;
     if(input[key]) updates[key] = input[key].value.trim();
   }
+  persistIdentityFromInputs();
+  updates.address = currentIdentity.address;
+  updates.employer = currentIdentity.employer;
+  updates.incomeRange = currentIdentity.income;
 
   try {
     await api.auth.updateProfile(updates);
@@ -445,6 +522,9 @@ async function saveProfile(e) {
   }
 }
 
+/* ----------------------------------------
+   SAVE IDENTITY (LOCAL ONLY)
+---------------------------------------- */
 /* ----------------------------------------
    CHANGE AVATAR
 ---------------------------------------- */
@@ -489,7 +569,9 @@ const closeAvatarModal = () => {
   avatarModal?.classList.add("hidden");
 };
 
-changeAvatarBtn?.addEventListener("click", openAvatarModal);
+avatarTriggerButtons.forEach((btn) => {
+  btn.addEventListener("click", openAvatarModal);
+});
 closeAvatarModalBtn?.addEventListener("click", closeAvatarModal);
 cancelAvatarBtn?.addEventListener("click", closeAvatarModal);
 avatarModal?.addEventListener("click", (e) => {
@@ -514,7 +596,7 @@ saveAvatarBtn?.addEventListener("click", async () => {
     await api.auth.updateProfile({ avatarUrl: pendingAvatarUrl });
     currentAvatarUrl = pendingAvatarUrl;
     applyAvatarPreview(currentAvatarUrl, currentDisplayName);
-    applyHeaderAvatar(currentAvatarUrl);
+    applyHeaderAvatar(currentAvatarUrl, currentDisplayName);
     closeAvatarModal();
     showStatus("Avatar updated.");
     clearStatusSoon(2500);
@@ -591,3 +673,8 @@ linkedAccountsList?.addEventListener("click", (e) => {
   saveLinkedAccounts(accounts);
   renderLinkedAccounts();
 });
+
+
+
+
+

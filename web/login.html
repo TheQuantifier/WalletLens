@@ -14,11 +14,11 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WiseWallet - Login</title>
+  <title>&lt;AppName&gt; - Login</title>
 
   <!-- Meta -->
-  <meta name="description" content="Login to your WiseWallet account." />
-  <meta name="author" content="WiseWallet" />
+  <meta name="description" content="Login to your &lt;AppName&gt; account." />
+  <meta name="author" content="&lt;AppName&gt;" />
   <link rel="icon" type="image/png" href="images/favicon.png" />
 
   <!-- Styles -->
@@ -36,7 +36,12 @@
   <header class="nf-header" role="banner">
     <div class="nf-header-inner">
       <div class="logo-group">
-        <h1 class="logo">WiseWallet</h1>
+        <h1 class="logo">
+          <a class="logo-link" href="about.html" style="text-decoration:none; color:inherit;">
+            <img src="images/favicon.png" alt="App icon" class="logo-icon" />
+            <span>&lt;AppName&gt;</span>
+          </a>
+        </h1>
         <span class="tagline">Track Smarter. Stress Less.</span>
       </div>
       <nav class="nf-auth-right" aria-label="Authentication">
@@ -71,6 +76,19 @@
           />
           <button type="submit" class="nf-btn">Login</button>
 
+          <div class="auth-alt">
+            <p class="auth-alt-label">Or Login with</p>
+            <button type="button" id="googleLoginBtn" class="google-auth-btn" aria-label="Login with Google">
+              <svg class="google-auth-icon" viewBox="0 0 533.5 544.3" aria-hidden="true" focusable="false">
+                <path fill="#4285F4" d="M533.5 278.4c0-18.5-1.5-36.2-4.7-53.3H272v100.9h146.9c-6.3 34-25 62.9-53.2 82.2v68h86.1c50.4-46.4 81.7-114.9 81.7-197.8z"></path>
+                <path fill="#34A853" d="M272 544.3c72.7 0 133.8-24.1 178.4-65.5l-86.1-68c-24 16.1-54.7 25.5-92.3 25.5-71 0-131.2-47.9-152.7-112.4h-88.9v70.1C74.6 482.9 166.1 544.3 272 544.3z"></path>
+                <path fill="#FBBC05" d="M119.3 323.9c-10.9-32.8-10.9-68.3 0-101.1v-70.1h-88.9c-36.8 73.3-36.8 168 0 241.3l88.9-70.1z"></path>
+                <path fill="#EA4335" d="M272 107.7c39.5-.6 77.7 14 106 40.8l79-79C411.7 24.6 343.4-.3 272 0 166.1 0 74.6 61.4 30.4 152.7l88.9 70.1C140.8 155.6 201 107.7 272 107.7z"></path>
+              </svg>
+              <span>Google</span>
+            </button>
+          </div>
+
           <div id="twoFactorWrap" class="two-factor-wrap is-hidden">
             <p class="subtle">Enter the code sent to your email.</p>
             <input
@@ -95,11 +113,69 @@
 
   <footer class="nf-footer" role="contentinfo">
     <div class="nf-footer-inner">
-      <p>&copy; <span id="year"></span> WiseWallet. All rights reserved.</p>
+      <p>&copy; <span id="year"></span> &lt;AppName&gt;. All rights reserved.</p>
+      <nav class="nf-legal" aria-label="Footer">
+        <a href="privacy.html" class="nf-legal-link">Privacy</a><span class="sep">&bull;</span>
+        <a href="terms.html" class="nf-legal-link">Terms</a><span class="sep">&bull;</span>
+        <button type="button" class="nf-legal-link" data-contact-open="true">Contact</button>
+      </nav>
     </div>
   </footer>
 
+  <div id="contactModal" class="nf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+    <div class="nf-modal-backdrop" data-contact-close="true"></div>
+    <div class="nf-modal-content nf-contact-modal-content" role="document">
+      <div class="nf-modal-header">
+        <h2 id="contactModalTitle">Contact Support</h2>
+        <button type="button" class="nf-modal-close" data-contact-close="true" aria-label="Close contact modal">Close</button>
+      </div>
+      <div class="nf-modal-body">
+        <form id="authContactForm" class="nf-contact-form" novalidate>
+          <label for="contactSubject">
+            <span class="label">Subject</span>
+            <input
+              id="contactSubject"
+              name="subject"
+              type="text"
+              autocomplete="off"
+              placeholder="What can we help with?"
+              required
+            />
+          </label>
+
+          <label for="contactEmail">
+            <span class="label">Email</span>
+            <input
+              id="contactEmail"
+              name="email"
+              type="email"
+              autocomplete="email"
+              placeholder="you@example.com"
+              required
+            />
+          </label>
+
+          <label for="contactMessage">
+            <span class="label">Message</span>
+            <textarea
+              id="contactMessage"
+              name="message"
+              rows="5"
+              placeholder="Tell us what happened (include steps to reproduce and any error messages)."
+              required
+            ></textarea>
+          </label>
+
+          <p id="contactStatus" class="subtle is-hidden" aria-live="polite"></p>
+
+          <button type="submit" id="contactSubmitBtn" class="nf-btn">Send Message</button>
+        </form>
+      </div>
+    </div>
+  </div>
+
   <!-- MUST USE type="module" because login.js imports api.js -->
+  <script src="scripts/default.js" type="module" defer></script>
   <script type="module" src="scripts/login.js"></script>
 </body>
 </html>

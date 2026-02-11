@@ -4,7 +4,10 @@
     <!-- Left: Logo -->
     <div class="logo-group">
       <h1 class="logo">
-        <a href="about.html">WiseWallet</a>
+        <a class="logo-link" href="about.html">
+          <img src="images/favicon.png" alt="App icon" class="logo-icon" />
+          <span id="appName">&lt;AppName&gt;</span>
+        </a>
       </h1>
       <span class="tagline">Track Smarter. Stress Less.</span>
     </div>
@@ -39,6 +42,7 @@
           <li><button role="menuitem" class="mobile-nav-link" data-href="./budgeting.html">Budgeting</button></li>
           <li><button role="menuitem" class="mobile-nav-link" data-href="./reports.html">Reports</button></li>
           <li><button role="menuitem" class="mobile-nav-link" data-href="./about.html">About</button></li>
+          <li class="admin-only is-hidden"><button role="menuitem" class="mobile-nav-link" data-href="./admin.html">Admin</button></li>
         </ul>
       </div>
 
@@ -77,6 +81,12 @@
           <li>
             <button class="menu-btn" onclick="window.location.href='help.html'">
               Help
+            </button>
+          </li>
+
+          <li class="admin-only is-hidden">
+            <button class="menu-btn" onclick="window.location.href='admin.html'">
+              Admin
             </button>
           </li>
 

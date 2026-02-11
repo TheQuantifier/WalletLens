@@ -14,7 +14,7 @@
 
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>WiseWallet - Profile</title>
+  <title>&lt;AppName&gt; - Profile</title>
 
   <link rel="icon" type="image/png" href="images/favicon.png" />
 
@@ -29,61 +29,6 @@
 
 <body>
   <div id="header"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedHeaderHtml");
-      if (!cached) return;
-      const el = document.getElementById("header");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-
-      const cachedUserRaw = sessionStorage.getItem("cachedUser");
-      if (!cachedUserRaw) return;
-      try {
-        const cachedUser = JSON.parse(cachedUserRaw);
-        const name = cachedUser.fullName || cachedUser.username || "Account";
-        const nameEl = document.getElementById("headerUserName");
-        if (nameEl) nameEl.textContent = name;
-
-        const accountIcon = document.getElementById("account-icon");
-        const avatarLetters = document.getElementById("avatarLetters");
-        if (!accountIcon || !avatarLetters) return;
-
-        const parts = name.trim().split(/\s+/).filter(Boolean);
-        const initials = parts.length >= 2
-          ? (parts[0][0] + parts[parts.length - 1][0]).toUpperCase()
-          : (parts[0] ? parts[0][0].toUpperCase() : "?");
-
-        const avatarUrl = cachedUser.avatarUrl || cachedUser.avatar_url || "";
-        avatarLetters.textContent = initials;
-        accountIcon.dataset.avatarUrl = avatarUrl;
-
-        if (!avatarUrl) {
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          return;
-        }
-
-        const img = new Image();
-        img.onload = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = `url(${avatarUrl})`;
-          accountIcon.classList.add("has-avatar");
-          avatarLetters.textContent = "";
-        };
-        img.onerror = () => {
-          if (accountIcon.dataset.avatarUrl !== avatarUrl) return;
-          accountIcon.style.backgroundImage = "";
-          accountIcon.classList.remove("has-avatar");
-          avatarLetters.textContent = initials;
-        };
-        img.src = avatarUrl;
-      } catch {
-        sessionStorage.removeItem("cachedUser");
-      }
-    })();
-  </script>
 
 
   <main class="main main--profile">
@@ -95,8 +40,15 @@
         <p class="subtle">View and update your personal info</p>
       </div>
       <div class="actions" role="group">
+        <p id="profileStatus" class="status-banner subtle is-hidden profile-status-inline" aria-live="polite"></p>
         <button id="editProfileBtn" class="btn btn--primary" type="button">
           Edit Profile
+        </button>
+        <button id="cancelEditBtn" class="btn is-hidden" type="button">
+          Cancel
+        </button>
+        <button id="saveProfileBtn" class="btn btn--primary is-hidden" type="submit" form="editForm">
+          Save Changes
         </button>
       </div>
     </section>
@@ -108,42 +60,44 @@
         <div class="avatar-block">
           <div class="avatar"></div>
           <div class="identity">
-            <h3 class="name" id="fullName">—</h3>
-            <p class="subtle" id="username">@—</p>
+            <h3 class="name" id="fullName">&mdash;</h3>
+            <p class="subtle" id="username">@&mdash;</p>
+          </div>
+          <div class="avatar-actions">
+            <button class="btn is-hidden" id="changeAvatarBtnTop" data-avatar-trigger type="button">Change Avatar</button>
           </div>
         </div>
 
-        <dl class="meta">
-          <div><dt>Email</dt><dd id="email">—</dd></div>
-          <div><dt>Phone</dt><dd id="phoneNumber">—</dd></div>
-          <div><dt>Location</dt><dd id="location">—</dd></div>
-          <div><dt>Role</dt><dd id="role">—</dd></div>
-          <div><dt>Member Since</dt><dd id="createdAt">—</dd></div>
-          <div><dt>Bio</dt><dd id="bio">—</dd></div>
+        <dl id="profileSummary" class="meta">
+          <div><dt>Email</dt><dd id="email">&mdash;</dd></div>
+          <div><dt>Phone</dt><dd id="phoneNumber">&mdash;</dd></div>
+          <div><dt>Location</dt><dd id="location">&mdash;</dd></div>
+          <div><dt>Role</dt><dd id="role">&mdash;</dd></div>
+          <div><dt>Member Since</dt><dd id="createdAt">&mdash;</dd></div>
+          <div><dt>Bio</dt><dd id="bio">&mdash;</dd></div>
         </dl>
 
         <!-- EDIT FORM -->
         <form id="editForm" class="edit-form" hidden>
+          <div class="edit-form-header">
+            <h3>Edit Profile</h3>
+            <p class="subtle">Update your contact details and profile info.</p>
+          </div>
           <div class="form-grid">
             <label><span class="label">Full Name</span><input id="input_fullName" name="fullName" type="text" autocomplete="name" required></label>
             <label><span class="label">Username</span><input id="input_username" name="username" type="text" autocomplete="username" required></label>
             <label><span class="label">Email</span><input id="input_email" name="email" type="email" autocomplete="email" required></label>
             <label><span class="label">Phone Number</span><input id="input_phoneNumber" name="phoneNumber" type="tel" autocomplete="tel"></label>
             <label><span class="label">Location</span><input id="input_location" name="location" type="text" autocomplete="address-level2"></label>
-            <label><span class="label">Role</span><input id="input_role" name="role" type="text" autocomplete="organization-title" readonly></label>
             <label class="span-2"><span class="label">Bio</span><textarea id="input_bio" name="bio" rows="4" autocomplete="off"></textarea></label>
           </div>
 
           <div class="form-actions">
-            <button type="button" id="cancelEditBtn" class="btn">Cancel</button>
-            <button type="submit" class="btn btn--primary">Save Changes</button>
+            <button type="button" id="changeAvatarBtnForm" data-avatar-trigger class="btn">Change Avatar</button>
           </div>
         </form>
 
-        <p id="profileStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
-
         <div class="actions">
-          <button class="btn" id="changeAvatarBtn" type="button">Change Avatar</button>
           <input id="avatarInput" type="file" accept="image/*" hidden />
         </div>
       </section>
@@ -164,42 +118,47 @@
           </div>
         </div>
       </div>
-
       <!-- IDENTITY + STATS -->
       <section class="card security">
-        <h2>Identity & Stats</h2>
+        <div class="security-header">
+          <h2>Identity & Stats</h2>
+        </div>
 
-        <div class="security-rows">
-          <div class="security-row">
-            <div class="sr-left"><p class="label">Legal Name</p></div>
-            <div class="sr-right align-right" id="identityName">—</div>
-          </div>
-
+        <div id="identityDisplay" class="security-rows">
           <div class="security-row">
             <div class="sr-left"><p class="label">Address</p></div>
-            <div class="sr-right align-right" id="identityAddress">—</div>
+            <div class="sr-right align-right" id="identityAddress">&mdash;</div>
           </div>
 
           <div class="security-row">
             <div class="sr-left"><p class="label">Employer</p></div>
-            <div class="sr-right align-right" id="identityEmployer">—</div>
+            <div class="sr-right align-right" id="identityEmployer">&mdash;</div>
           </div>
 
           <div class="security-row">
             <div class="sr-left"><p class="label">Income Range</p></div>
-            <div class="sr-right align-right" id="identityIncome">—</div>
+            <div class="sr-right align-right" id="identityIncome">&mdash;</div>
           </div>
+        </div>
 
+        <form id="identityForm" class="edit-form edit-form--identity" hidden>
+          <div class="form-grid">
+            <label><span class="label">Address</span><input id="input_identityAddress" name="identityAddress" type="text" autocomplete="street-address"></label>
+            <label><span class="label">Employer</span><input id="input_identityEmployer" name="identityEmployer" type="text" autocomplete="organization"></label>
+            <label><span class="label">Income Range</span><input id="input_identityIncome" name="identityIncome" type="text" autocomplete="off" placeholder="e.g., $50k–$75k"></label>
+          </div>
+        </form>
+
+        <div class="security-rows stats-rows">
           <div class="security-row">
             <div class="sr-left"><p class="label">Last Login</p></div>
-            <div class="sr-right align-right" id="stat_lastLogin">—</div>
+            <div class="sr-right align-right" id="stat_lastLogin">&mdash;</div>
           </div>
 
           <div class="security-row">
             <div class="sr-left"><p class="label">Records Uploaded</p></div>
-            <div class="sr-right align-right" id="stat_uploads">—</div>
+            <div class="sr-right align-right" id="stat_uploads">&mdash;</div>
           </div>
-
         </div>
       </section>
 
@@ -280,13 +239,13 @@
       <section class="card activity">
         <h2>Recent Activity</h2>
         <div class="table-wrap">
-          <table class="txn-table">
+          <table class="txn-table activity-table">
             <thead>
               <tr>
-                <th>Date</th>
-                <th>Activity</th>
-                <th>IP</th>
-                <th class="num">Result</th>
+                <th class="date-col"><span class="activity-date">Date</span></th>
+                <th class="activity-col">Activity</th>
+                <th class="ip-col">IP</th>
+                <th class="result-col">Result</th>
               </tr>
             </thead>
             <tbody id="activityBody">
@@ -316,3 +275,8 @@
   <script src="scripts/profile.js" type="module"></script>
 </body>
 </html>
+
+
+
+
+

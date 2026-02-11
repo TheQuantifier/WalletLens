@@ -1,4 +1,4 @@
-// src/jobs/cleanupSessions.js
+// src/jobs/cleanup_sessions.js
 import env from "../config/env.js";
 import { connectDb, closeDb } from "../config/db.js";
 import { cleanupOldSessions } from "../models/session.model.js";

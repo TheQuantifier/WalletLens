@@ -1,13 +1,15 @@
 // src/controllers/receipts.controller.js
 import asyncHandler from "../middleware/async.js";
 
-import { parseReceiptText } from "../services/aiParser.service.js";
+import { parseReceiptText } from "../services/ai_parser.service.js";
 import { runOcrBuffer } from "../services/ocr.service.js";
 import env from "../config/env.js";
 import { parseDateOnly } from "./records.controller.js";
+import { getAppSettings } from "../models/app_settings.model.js";
 
 import { query } from "../config/db.js";
 import { logActivity } from "../services/activity.service.js";
+import { enqueueReceiptJob } from "../models/receipt_job.model.js";
 
 import {
   createReceiptPending,
@@ -27,6 +29,75 @@ import {
   deleteObject,
 } from "../services/r2.service.js";
 
+const ALLOWED_PAY_METHODS = new Set([
+  "Cash",
+  "Check",
+  "Credit Card",
+  "Debit Card",
+  "Gift Card",
+  "Multiple",
+  "Other",
+]);
+
+const ALLOWED_CATEGORIES = new Set([
+  "Housing",
+  "Utilities",
+  "Groceries",
+  "Transportation",
+  "Dining",
+  "Health",
+  "Entertainment",
+  "Shopping",
+  "Membership",
+  "Miscellaneous",
+  "Education",
+  "Giving",
+  "Savings",
+  "Other",
+]);
+
+function toNumberSafe(raw, warnings, fieldName) {
+  const num = Number(raw);
+  if (!Number.isFinite(num)) {
+    warnings.push(`${fieldName}_not_numeric`);
+    return 0;
+  }
+  if (num < 0) {
+    warnings.push(`${fieldName}_negative`);
+    return 0;
+  }
+  return Number(num.toFixed(2));
+}
+
+function normalizeParsedForStorage(parsed, ocrText) {
+  const warnings = [];
+  const hasText = String(ocrText || "").trim().length > 5;
+  if (!hasText) warnings.push("ocr_text_too_short");
+
+  const payMethod = ALLOWED_PAY_METHODS.has(parsed?.payMethod) ? parsed.payMethod : "Other";
+  const category = ALLOWED_CATEGORIES.has(parsed?.category) ? parsed.category : "Other";
+  if (!ALLOWED_PAY_METHODS.has(parsed?.payMethod)) warnings.push("pay_method_unknown");
+  if (!ALLOWED_CATEGORIES.has(parsed?.category)) warnings.push("category_unknown");
+
+  const normalized = {
+    date: parsed?.date || "",
+    source: String(parsed?.source || "").trim(),
+    subAmount: toNumberSafe(parsed?.subAmount ?? 0, warnings, "sub_amount"),
+    amount: toNumberSafe(parsed?.amount ?? 0, warnings, "amount"),
+    taxAmount: toNumberSafe(parsed?.taxAmount ?? 0, warnings, "tax_amount"),
+    payMethod,
+    category,
+    items: Array.isArray(parsed?.items) ? parsed.items : [],
+  };
+
+  if (normalized.amount === 0) warnings.push("amount_zero");
+  if (normalized.subAmount > normalized.amount && normalized.amount > 0) warnings.push("subtotal_gt_total");
+  if (normalized.taxAmount > normalized.amount && normalized.amount > 0) warnings.push("tax_gt_total");
+
+  const confidence = Math.max(0.2, Math.min(0.99, Number((0.9 - warnings.length * 0.1).toFixed(4))));
+  return { normalized, warnings: Array.from(new Set(warnings)), confidence };
+}
+
 /* ============================================================
    POST /api/receipts/presign
    Create pending receipt row + return presigned PUT URL (R2)
@@ -39,7 +110,8 @@ export const presignUpload = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "filename and contentType are required" });
   }
 
-  if (!env.keepReceiptFiles) {
+  const keepReceiptFiles = await getReceiptKeepFiles();
+  if (!keepReceiptFiles) {
     return res.status(403).json({ message: "Saving receipt files is currently disabled" });
   }
 
@@ -116,94 +188,30 @@ export const confirmUpload = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Upload not found in object storage" });
   }
 
-  // 2) Download the file (server-side) for OCR + AI parsing
-  //    Note: This uses a short-lived presigned GET.
-  const downloadUrl = await presignGet({ key: receipt.object_key, expiresIn: 60 });
-
-  const fileRes = await fetch(downloadUrl);
-  if (!fileRes.ok) {
-    return res.status(400).json({ message: "Failed to fetch uploaded file for processing" });
-  }
-  const buffer = Buffer.from(await fileRes.arrayBuffer());
-
-  // 3) OCR extraction
-  let ocrText = "";
-  try {
-    const result = await runOcrBuffer(buffer);
-    ocrText = result?.text || "";
-  } catch (err) {
-    console.error("❌ OCR failed:", err);
-  }
-
-  // 4) AI parsing (Gemini)
-  let parsed = null;
-  if (ocrText.trim().length > 5) {
-    parsed = await parseReceiptText(ocrText);
-  }
-
-  const parsedDate = parsed?.date ? parseDateOnly(parsed.date) : null;
-
-  // 5) Update receipt metadata
-  let updatedReceipt = await updateReceiptParsedData(req.user.id, receiptId, {
-    ocrText,
-    date: parsedDate,
-    source: parsed?.source || "",
-    subAmount: parsed?.subAmount || 0,
-    amount: parsed?.amount || 0,
-    taxAmount: parsed?.taxAmount || 0,
-    payMethod: parsed?.payMethod || "Other",
-    items: parsed?.items || [],
-    parsedData: parsed || {},
+  await updateReceiptParsedData(req.user.id, receiptId, {
+    processingStatus: "queued",
+    processingStage: "queued",
+    processingError: "",
   });
-
-  // 6) Auto-create Record if amount found
-  let autoRecord = null;
-
-  if (parsed && parsed.amount && Number(parsed.amount) > 0) {
-    const recordDate =
-      parsedDate ||
-      (() => {
-        console.log("⚠️ Invalid AI date → using today.");
-        return new Date();
-      })();
-
-    autoRecord = await createRecord(req.user.id, {
-      type: "expense",
-      amount: Number(parsed.amount),
-      category: parsed?.category || "Other",
-      date: recordDate,
-      note: parsed?.source || "Receipt",
-      linkedReceiptId: receiptId,
-    });
-
-    // Cross-link record back to receipt
-    updatedReceipt = await updateReceiptParsedData(req.user.id, receiptId, {
-      linkedRecordId: autoRecord.id,
-    });
-  }
-
-  // 7) Optional: remove uploaded file after processing (useful for testing)
-  if (!env.keepReceiptFiles) {
-    try {
-      if (receipt.object_key) {
-        await deleteObject({ key: receipt.object_key });
-      }
-    } catch (err) {
-      console.error("Error deleting R2 object after OCR", receipt.id, err);
-    }
-  }
+  const job = await enqueueReceiptJob({
+    userId: req.user.id,
+    receiptId,
+    jobType: "process_receipt",
+    maxAttempts: 3,
+  });
 
   await logActivity({
     userId: req.user.id,
     action: "receipt_upload_confirm",
     entityType: "receipt",
     entityId: receiptId,
-    metadata: { autoRecordId: autoRecord?.id || null },
+    metadata: { jobId: job?.id || null, status: "queued" },
     req,
   });
-  res.status(200).json({
-    receipt: updatedReceipt,
-    autoRecord,
+  res.status(202).json({
+    receiptId,
+    jobId: job?.id || null,
+    status: "processing",
   });
 });
 
@@ -248,7 +256,8 @@ export const scanOnly = asyncHandler(async (req, res) => {
     parsed = await parseReceiptText(ocrText);
   }
 
-  const parsedDate = parsed?.date ? parseDateOnly(parsed.date) : null;
+  const assessed = normalizeParsedForStorage(parsed || {}, ocrText);
+  const parsedDate = assessed.normalized.date ? parseDateOnly(assessed.normalized.date) : null;
 
   // Create receipt metadata row without saving the file
   const scanObjectKey = `scan-only/${req.user.id}/${cryptoRandomIdFallback()}`;
@@ -263,26 +272,40 @@ export const scanOnly = asyncHandler(async (req, res) => {
 
   receipt = await updateReceiptParsedData(req.user.id, receipt.id, {
     ocrText,
+    rawOcrText: ocrText,
     date: parsedDate,
-    source: parsed?.source || "",
-    subAmount: parsed?.subAmount || 0,
-    amount: parsed?.amount || 0,
-    taxAmount: parsed?.taxAmount || 0,
-    payMethod: parsed?.payMethod || "Other",
-    items: parsed?.items || [],
-    parsedData: parsed || {},
+    source: assessed.normalized.source || "",
+    subAmount: assessed.normalized.subAmount || 0,
+    amount: assessed.normalized.amount || 0,
+    taxAmount: assessed.normalized.taxAmount || 0,
+    payMethod: assessed.normalized.payMethod || "Other",
+    items: assessed.normalized.items || [],
+    parsedData: {
+      ...assessed.normalized,
+      _meta: {
+        modelVersion: env.aiModel || "",
+        parseConfidence: assessed.confidence,
+        parseWarnings: assessed.warnings,
+      },
+    },
+    aiModelVersion: env.aiModel || "",
+    parseConfidence: assessed.confidence,
+    parseWarnings: assessed.warnings,
     fileSaved: false,
+    processingStatus: "processed",
+    processingStage: "completed",
+    processingError: "",
   });
 
   let autoRecord = null;
-  if (parsed && parsed.amount && Number(parsed.amount) > 0) {
+  if (assessed.normalized.amount > 0) {
     const recordDate = parsedDate || new Date();
     autoRecord = await createRecord(req.user.id, {
       type: "expense",
-      amount: Number(parsed.amount),
-      category: parsed?.category || "Other",
+      amount: Number(assessed.normalized.amount),
+      category: assessed.normalized.category || "Other",
       date: recordDate,
-      note: parsed?.source || "Receipt",
+      note: assessed.normalized.source || "Receipt",
       linkedReceiptId: receipt.id,
     });
 
@@ -301,7 +324,7 @@ export const scanOnly = asyncHandler(async (req, res) => {
   });
   res.status(200).json({
     ocrText,
-    parsed: parsed || {},
+    parsed: assessed.normalized || {},
     parsedDate,
     receipt,
     autoRecord,
@@ -333,38 +356,51 @@ export const updateOcrText = asyncHandler(async (req, res) => {
     parsed = await parseReceiptText(ocrText);
   }
 
-  const parsedDate = parsed?.date ? parseDateOnly(parsed.date) : null;
+  const assessed = normalizeParsedForStorage(parsed || {}, ocrText);
+  const parsedDate = assessed.normalized.date ? parseDateOnly(assessed.normalized.date) : null;
 
-  if (parsed) {
-    updated = await updateReceiptParsedData(req.user.id, receiptId, {
-      date: parsedDate,
-      source: parsed?.source || "",
-      subAmount: parsed?.subAmount || 0,
-      amount: parsed?.amount || 0,
-      taxAmount: parsed?.taxAmount || 0,
-      payMethod: parsed?.payMethod || "Other",
-      items: parsed?.items || [],
-      parsedData: parsed || {},
-    });
-  }
+  updated = await updateReceiptParsedData(req.user.id, receiptId, {
+    date: parsedDate,
+    source: assessed.normalized.source || "",
+    subAmount: assessed.normalized.subAmount || 0,
+    amount: assessed.normalized.amount || 0,
+    taxAmount: assessed.normalized.taxAmount || 0,
+    payMethod: assessed.normalized.payMethod || "Other",
+    items: assessed.normalized.items || [],
+    parsedData: {
+      ...assessed.normalized,
+      _meta: {
+        modelVersion: env.aiModel || "",
+        parseConfidence: assessed.confidence,
+        parseWarnings: assessed.warnings,
+      },
+    },
+    rawOcrText: ocrText,
+    aiModelVersion: env.aiModel || "",
+    parseConfidence: assessed.confidence,
+    parseWarnings: assessed.warnings,
+    processingStatus: "processed",
+    processingStage: "completed",
+    processingError: "",
+  });
 
   let autoRecord = null;
-  if (parsed && parsed.amount && Number(parsed.amount) > 0) {
+  if (assessed.normalized.amount > 0) {
     const recordDate = parsedDate || new Date();
     if (updated?.linked_record_id) {
       autoRecord = await updateRecord(req.user.id, updated.linked_record_id, {
-        amount: Number(parsed.amount),
+        amount: Number(assessed.normalized.amount),
         date: recordDate,
-        note: parsed?.source || "Receipt",
-        category: parsed?.category || "Other",
+        note: assessed.normalized.source || "Receipt",
+        category: assessed.normalized.category || "Other",
       });
     } else {
       autoRecord = await createRecord(req.user.id, {
         type: "expense",
-        amount: Number(parsed.amount),
-        category: parsed?.category || "Other",
+        amount: Number(assessed.normalized.amount),
+        category: assessed.normalized.category || "Other",
         date: recordDate,
-        note: parsed?.source || "Receipt",
+        note: assessed.normalized.source || "Receipt",
         linkedReceiptId: receiptId,
       });
       updated = await updateReceiptParsedData(req.user.id, receiptId, {
@@ -380,7 +416,7 @@ export const updateOcrText = asyncHandler(async (req, res) => {
     entityId: receiptId,
     req,
   });
-  res.json({ receipt: updated, autoRecord, parsed: parsed || {} });
+  res.json({ receipt: updated, autoRecord, parsed: assessed.normalized || {} });
 });
 
 /* ============================================================
@@ -480,4 +516,16 @@ function cryptoRandomIdFallback() {
   } catch {
     return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
   }
+}
+
+async function getReceiptKeepFiles() {
+  try {
+    const settings = await getAppSettings();
+    if (typeof settings?.receipt_keep_files === "boolean") {
+      return settings.receipt_keep_files;
+    }
+  } catch (err) {
+    console.error("Failed to load app settings for receipt files", err);
+  }
+  return env.keepReceiptFiles;
 }

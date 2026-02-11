@@ -5,15 +5,38 @@ import env from "../config/env.js";
 import { findUserById } from "../models/user.model.js";
 import { getSessionById, revokeSessionById, updateSessionLastSeen } from "../models/session.model.js";
 
+const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
+const TRUSTED_ORIGINS = new Set(
+  [
+    ...(env.clientOrigins || []),
+    "https://wisewallet.manuswebworks.org",
+    "http://localhost:5500",
+    "http://127.0.0.1:5500",
+    "http://localhost:3000",
+    "http://localhost:5000",
+  ].filter(Boolean)
+);
+
+function isTrustedOriginValue(raw) {
+  if (!raw) return false;
+  try {
+    return TRUSTED_ORIGINS.has(new URL(String(raw)).origin);
+  } catch {
+    return false;
+  }
+}
+
 export default async function auth(req, res, next) {
   try {
     let token = null;
+    let authSource = "";
 
     /* ----------------------------------------------
        1. Prefer secure cookie
     ---------------------------------------------- */
     if (req.cookies?.token) {
       token = req.cookies.token;
+      authSource = "cookie";
     }
 
     /* ----------------------------------------------
@@ -24,6 +47,21 @@ export default async function auth(req, res, next) {
 
       if (scheme === "Bearer" && value && value !== "null" && value !== "undefined") {
         token = value.trim();
+        authSource = "bearer";
+      }
+    }
+
+    // CSRF guard for cookie-authenticated mutating requests.
+    if (
+      token &&
+      authSource === "cookie" &&
+      !SAFE_METHODS.has(req.method)
+    ) {
+      const origin = req.headers.origin;
+      const referer = req.headers.referer;
+      const trusted = isTrustedOriginValue(origin) || isTrustedOriginValue(referer);
+      if (!trusted) {
+        return res.status(403).json({ message: "CSRF protection: untrusted request origin" });
       }
     }
 

@@ -55,6 +55,7 @@ import { api } from "./api.js";
   // -----------------------------
   let pendingFiles = []; // File[]
   let isUploading = false;
+  let processingPollTimer = null;
 
   let pendingDelete = {
     receiptId: null,
@@ -273,6 +274,8 @@ import { api } from "./api.js";
       const createdRaw = r?.createdAt || r?.created_at || r?.uploadedAt || r?.uploaded_at;
       const created = createdRaw ? new Date(createdRaw).toLocaleString() : "—";
 
+      const processingStatus = r?.processing_status || r?.processingStatus || "";
+      const processingStage = r?.processing_stage || r?.processingStage || "";
       let status = "Raw";
       const ocrText = r?.ocrText ?? r?.ocr_text;
       const parsedData = r?.parsedData ?? r?.parsed_data;
@@ -281,6 +284,14 @@ import { api } from "./api.js";
       if (hasParsed) status = "Parsed";
       else if (hasOCR) status = "Read";
       if (r?.error || r?.ocrFailed || r?.ocr_failed) status = "Error";
+      if (processingStatus === "queued") status = "Queued";
+      if (processingStatus === "processing") {
+        if (processingStage === "extracting_text") status = "OCR";
+        else if (processingStage === "parsing_ai") status = "Parsing";
+        else if (processingStage === "updating_records") status = "Record";
+        else status = "Processing";
+      }
+      if (processingStatus === "failed") status = "Failed";
 
       const fileSaved = r?.fileSaved ?? r?.file_saved ?? true;
       const downloadBtn = fileSaved
@@ -323,6 +334,18 @@ import { api } from "./api.js";
       const res = await api.receipts.getAll();
       const receipts = Array.isArray(res) ? res : (res?.receipts || res?.data || []);
       renderRecentRows(receipts || []);
+      const hasInFlight = (receipts || []).some((entry) => {
+        const status = entry?.processing_status || entry?.processingStatus || "";
+        return status === "queued" || status === "processing";
+      });
+      if (hasInFlight && !processingPollTimer) {
+        processingPollTimer = window.setInterval(() => {
+          refreshRecent().catch(() => {});
+        }, 4000);
+      } else if (!hasInFlight && processingPollTimer) {
+        window.clearInterval(processingPollTimer);
+        processingPollTimer = null;
+      }
     } catch (err) {
       console.error("Failed to refresh uploads:", err);
       recentTableBody.innerHTML = `<tr><td colspan="6" class="subtle">Failed to load uploads.</td></tr>`;
@@ -599,4 +622,11 @@ import { api } from "./api.js";
   renderPending();
   refreshRecent();
   setStatus("", "ok");
+
+  window.addEventListener("beforeunload", () => {
+    if (processingPollTimer) {
+      window.clearInterval(processingPollTimer);
+      processingPollTimer = null;
+    }
+  });
 })();

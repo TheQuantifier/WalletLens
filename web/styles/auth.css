@@ -1,5 +1,5 @@
 /* =========================================================
-   WalletWise — AUTH + LANDING
+   <AppName> — AUTH + LANDING
    Login, Register, Landing Pages
    Uses global design tokens from default.css
    ========================================================= */
@@ -241,12 +241,51 @@ body.landing-light {
 .nf-footer-inner {
   max-width: 900px;
   margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
 }
 
 .nf-footer-inner p {
   margin: 0;
   color: #555;
   font-size: 0.95rem;
+}
+
+.nf-legal {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.nf-legal a,
+.nf-legal-link {
+  color: #334155;
+  text-decoration: none;
+  font-size: 0.92rem;
+  font-weight: 600;
+}
+
+.nf-legal-link {
+  font-family: inherit;
+  font-size: 0.92rem;
+  font-weight: 600;
+  color: #334155;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.nf-legal a:hover,
+.nf-legal-link:hover {
+  text-decoration: underline;
+}
+
+.nf-legal .sep {
+  color: #64748b;
 }
 
 /* =========================================================
@@ -320,6 +359,52 @@ body.landing-light {
   text-align: left;
 }
 
+.nf-contact-modal-content {
+  width: min(560px, 100%);
+  max-height: min(90vh, 720px);
+}
+
+.nf-contact-form {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.nf-contact-form label {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.nf-contact-form .label {
+  font-weight: 700;
+}
+
+.nf-contact-form input,
+.nf-contact-form textarea {
+  width: 100%;
+  padding: 0.72rem 0.82rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.nf-contact-form textarea {
+  resize: vertical;
+  min-height: 140px;
+}
+
+.nf-contact-form input:focus-visible,
+.nf-contact-form textarea:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.nf-contact-form .nf-btn {
+  width: auto;
+  justify-self: start;
+}
+
 .nf-modal-body .main,
 .nf-modal-body .main--legal {
   padding: 0;
@@ -327,6 +412,45 @@ body.landing-light {
   box-shadow: none;
   background: transparent;
   border-radius: 0;
+}
+
+.nf-modal-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 1rem 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.nf-modal-footer.is-hidden {
+  display: none;
+}
+
+.nf-modal-action-disagree,
+.nf-modal-action-agree {
+  min-width: 120px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.nf-modal-action-disagree {
+  background: #dc2626;
+  border-color: #dc2626;
+  color: #fff;
+}
+
+.nf-modal-action-agree {
+  background: var(--primary);
+  border-color: var(--primary);
+  color: #fff;
+}
+
+.nf-modal-action-disagree:hover,
+.nf-modal-action-agree:hover {
+  filter: brightness(0.92);
 }
 
 :root[data-theme="dark"] .nf-modal {
@@ -418,6 +542,64 @@ body.landing-light {
   gap: 0.65rem;
 }
 
+.auth-alt {
+  margin-top: 0.25rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.auth-alt-label {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--muted);
+}
+
+.google-auth-btn {
+  width: 50%;
+  min-width: 190px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #1f2937;
+  cursor: pointer;
+  font-weight: 700;
+  transition: background 0.2s, box-shadow 0.2s, border-color 0.2s;
+}
+
+.auth-form .google-auth-btn {
+  border: 1px solid var(--border);
+  background: #fff;
+  color: #1f2937;
+}
+
+.google-auth-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  box-shadow: var(--shadow-sm);
+}
+
+.auth-form .google-auth-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.google-auth-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.google-auth-icon {
+  width: 18px;
+  height: 18px;
+}
+
 /* =========================================================
    ⭐ FIX AUTOFILL — MOVED HERE BELOW INPUT RULES
    ========================================================= */
@@ -469,6 +651,17 @@ input:-webkit-autofill {
   background: var(--accent);
 }
 
+:root[data-theme="dark"] .google-auth-btn {
+  background: #111418;
+  color: #f3f4f6;
+  border-color: #2a2e35;
+}
+
+:root[data-theme="dark"] .google-auth-btn:hover {
+  background: #1c1f26;
+  border-color: #3b4250;
+}
+
 :root[data-theme="dark"] .nf-about {
   background: #111418;
   border-color: #2a2e35;
@@ -483,6 +676,15 @@ input:-webkit-autofill {
   background: #111418;
   color: #ccc;
   border-color: #2a2e35;
+}
+
+:root[data-theme="dark"] .nf-legal a,
+:root[data-theme="dark"] .nf-legal-link {
+  color: #cbd5e1;
+}
+
+:root[data-theme="dark"] .nf-legal .sep {
+  color: #64748b;
 }
 
 :root[data-theme="dark"] .nf-login {
