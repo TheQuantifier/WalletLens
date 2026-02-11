@@ -162,17 +162,10 @@ function sanitizeReturnTo(raw, mode = "login", req, enforceAllowedOrigins = true
     if (!["http:", "https:"].includes(parsed.protocol)) return fallback;
     if (enforceAllowedOrigins) {
       const allowedOrigins = new Set(env.clientOrigins || []);
-      const originHeader = String(req?.headers?.origin || "").trim();
-      const refererHeader = String(req?.headers?.referer || "").trim();
-      if (originHeader) allowedOrigins.add(originHeader);
-      if (refererHeader) {
-        try {
-          allowedOrigins.add(new URL(refererHeader).origin);
-        } catch {
-          // ignore invalid referer
-        }
+      const allowLoopback = isLoopbackHost(parsed.hostname);
+      if (!allowLoopback && (allowedOrigins.size === 0 || !allowedOrigins.has(parsed.origin))) {
+        return fallback;
       }
-      if (allowedOrigins.size > 0 && !allowedOrigins.has(parsed.origin)) return fallback;
     }
     return parsed.toString();
   } catch {
@@ -189,12 +182,60 @@ function appendUrlParams(url, params = {}) {
   return target.toString();
 }
 
+function appendUrlHashParams(url, params = {}) {
+  const target = new URL(url);
+  const hashParams = new URLSearchParams(target.hash.startsWith("#") ? target.hash.slice(1) : "");
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    hashParams.set(key, String(value));
+  }
+  target.hash = hashParams.toString();
+  return target.toString();
+}
+
+function signOauthStatePayload(payloadB64) {
+  return crypto.createHmac("sha256", env.jwtSecret).update(payloadB64).digest("base64url");
+}
+
+function createOauthState({ nonce, mode, returnTo }) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      nonce: String(nonce || ""),
+      mode: mode === "register" ? "register" : "login",
+      returnTo: String(returnTo || ""),
+    }),
+    "utf8"
+  ).toString("base64url");
+  const sig = signOauthStatePayload(payload);
+  return `${payload}.${sig}`;
+}
+
+function parseOauthState(rawState) {
+  const raw = String(rawState || "");
+  if (!raw) return null;
+  const [payload, sig] = raw.split(".");
+  if (!payload || !sig) return null;
+
+  const expectedSig = signOauthStatePayload(payload);
+  const sigBuf = Buffer.from(sig, "utf8");
+  const expectedBuf = Buffer.from(expectedSig, "utf8");
+  if (sigBuf.length !== expectedBuf.length) return null;
+  if (!crypto.timingSafeEqual(sigBuf, expectedBuf)) return null;
+
+  try {
+    return JSON.parse(Buffer.from(payload, "base64url").toString("utf8"));
+  } catch {
+    return null;
+  }
+}
+
 function setOauthStateCookie(res, value) {
   const isProd = env.nodeEnv === "production";
   res.cookie("oauth_state", value, {
     httpOnly: true,
     secure: isProd,
     sameSite: "lax",
+    path: "/api/auth/google",
     maxAge: 10 * 60 * 1000,
   });
 }
@@ -205,6 +246,7 @@ function clearOauthStateCookie(res) {
     httpOnly: true,
     secure: isProd,
     sameSite: "lax",
+    path: "/api/auth/google",
     expires: new Date(0),
   });
 }
@@ -340,7 +382,7 @@ export const googleStart = asyncHandler(async (req, res) => {
   const mode = req.query?.mode === "register" ? "register" : "login";
   const returnTo = sanitizeReturnTo(req.query?.returnTo, mode, req, true);
   const nonce = crypto.randomUUID();
-  const state = Buffer.from(JSON.stringify({ nonce, mode, returnTo }), "utf8").toString("base64url");
+  const state = createOauthState({ nonce, mode, returnTo });
 
   setOauthStateCookie(res, nonce);
 
@@ -358,20 +400,15 @@ export const googleStart = asyncHandler(async (req, res) => {
 });
 
 export const googleCallback = asyncHandler(async (req, res) => {
-  const rawState = String(req.query?.state || "");
-
-  let decodedState = { nonce: "", mode: "login", returnTo: getDefaultFrontendAuthUrl("login") };
-  if (rawState) {
-    try {
-      decodedState = JSON.parse(Buffer.from(rawState, "base64url").toString("utf8"));
-    } catch {
-      // keep fallback defaults
-    }
-  }
+  const decodedState = parseOauthState(req.query?.state) || {
+    nonce: "",
+    mode: "login",
+    returnTo: getDefaultFrontendAuthUrl("login"),
+  };
 
   const mode = decodedState.mode === "register" ? "register" : "login";
-  const returnTo = sanitizeReturnTo(decodedState.returnTo, mode, req, false);
-  const failRedirect = (message) => res.redirect(appendUrlParams(returnTo, { auth_error: message }));
+  const returnTo = sanitizeReturnTo(decodedState.returnTo, mode, req, true);
+  const failRedirect = (message) => res.redirect(appendUrlHashParams(returnTo, { auth_error: message }));
   const googleRedirectUri = getGoogleRedirectUri(req);
 
   if (!isGoogleAuthConfigured(req)) {
@@ -419,13 +456,11 @@ export const googleCallback = asyncHandler(async (req, res) => {
       req,
     });
 
-    return res.redirect(
-      appendUrlParams(returnTo, {
-        auth_success: "1",
-        auth_mode: mode,
-        auth_token: token,
-      })
-    );
+    return res.redirect(appendUrlHashParams(returnTo, {
+      auth_success: "1",
+      auth_mode: mode,
+      auth_token: token,
+    }));
   } catch (err) {
     console.error("Google auth callback failed:", err);
     return failRedirect(err?.message || "Google authentication failed");

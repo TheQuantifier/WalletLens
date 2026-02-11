@@ -195,10 +195,17 @@ export const auth = {
 
   consumeGoogleRedirect() {
     const currentUrl = new URL(window.location.href);
-    const token = currentUrl.searchParams.get("auth_token") || "";
-    const success = currentUrl.searchParams.get("auth_success") === "1";
-    const error = currentUrl.searchParams.get("auth_error") || "";
-    const mode = currentUrl.searchParams.get("auth_mode") || "";
+    const hashParams = new URLSearchParams(
+      currentUrl.hash.startsWith("#") ? currentUrl.hash.slice(1) : ""
+    );
+    const token =
+      hashParams.get("auth_token") || currentUrl.searchParams.get("auth_token") || "";
+    const success =
+      (hashParams.get("auth_success") || currentUrl.searchParams.get("auth_success")) === "1";
+    const error =
+      hashParams.get("auth_error") || currentUrl.searchParams.get("auth_error") || "";
+    const mode =
+      hashParams.get("auth_mode") || currentUrl.searchParams.get("auth_mode") || "";
 
     if (token) {
       setAuthToken(token);
@@ -209,6 +216,11 @@ export const auth = {
       currentUrl.searchParams.delete("auth_success");
       currentUrl.searchParams.delete("auth_error");
       currentUrl.searchParams.delete("auth_mode");
+      hashParams.delete("auth_token");
+      hashParams.delete("auth_success");
+      hashParams.delete("auth_error");
+      hashParams.delete("auth_mode");
+      currentUrl.hash = hashParams.toString();
       window.history.replaceState({}, document.title, currentUrl.toString());
     }
 
