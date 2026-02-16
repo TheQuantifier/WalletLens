@@ -78,39 +78,9 @@ const LEGAL_KEYWORDS = [
   "compliance",
 ];
 
-const EXPENSE_CATEGORIES = [
-  "Housing",
-  "Utilities",
-  "Groceries",
-  "Transportation",
-  "Dining",
-  "Health",
-  "Entertainment",
-  "Shopping",
-  "Membership",
-  "Miscellaneous",
-  "Education",
-  "Giving",
-  "Savings",
-  "Other",
-];
-
-const INCOME_CATEGORIES = [
-  "Salary / Wages",
-  "Bonus / Commission",
-  "Business Income",
-  "Freelance / Contract",
-  "Rental Income",
-  "Interest / Dividends",
-  "Capital Gains",
-  "Refunds / Reimbursements",
-  "Gifts Received",
-  "Government Benefits",
-  "Other",
-];
-
 const PAGE_SIZE = 500;
 const CACHE_TTL_MS = 60 * 1000;
+const CATEGORY_TTL_MS = 5 * 60 * 1000;
 
 const normalizeKey = (value) => String(value || "").trim().toLowerCase();
 const normalizeText = (value) =>
@@ -127,21 +97,77 @@ const isProtectedCategory = (name) =>
 const isDiscretionaryCategory = (name) =>
   DISCRETIONARY_HINTS.some((token) => normalizeKey(name).includes(token));
 
+const STOPWORDS = new Set(["and", "or", "of", "the", "a", "an"]);
+const categoryTokens = (value) =>
+  tokenize(value).filter((token) => token.length > 1 && !STOPWORDS.has(token));
+
+let categoriesCache = { ts: 0, expense: [], income: [] };
+
+const loadCategories = async () => {
+  if (Date.now() - categoriesCache.ts < CATEGORY_TTL_MS && categoriesCache.expense.length) {
+    return categoriesCache;
+  }
+  const data = await api.records.categories();
+  categoriesCache = {
+    ts: Date.now(),
+    expense: Array.isArray(data?.expense) ? data.expense : [],
+    income: Array.isArray(data?.income) ? data.income : [],
+  };
+  return categoriesCache;
+};
+
 const getAllowedCategories = (type) => {
-  if (type === "income") return INCOME_CATEGORIES;
-  return EXPENSE_CATEGORIES;
+  if (type === "income") return categoriesCache.income || [];
+  return categoriesCache.expense || [];
 };
 
 const formatCategoryList = (type) => getAllowedCategories(type).join(", ");
 
 const normalizeCategory = (value) => normalizeText(value);
 
+const scoreCategoryMatch = (input, category) => {
+  const inputTokens = new Set(categoryTokens(input));
+  const catTokens = categoryTokens(category);
+  let score = 0;
+  catTokens.forEach((t) => {
+    if (inputTokens.has(t)) score += 1;
+  });
+  return score;
+};
+
 const pickCategory = (input, type) => {
   if (!input) return null;
   const normalized = normalizeCategory(input);
   const options = getAllowedCategories(type);
-  const match = options.find((c) => normalizeCategory(c) === normalized);
-  return match || null;
+  const exact = options.find((c) => normalizeCategory(c) === normalized);
+  if (exact) return exact;
+
+  let best = null;
+  let bestScore = 0;
+  options.forEach((opt) => {
+    const score = scoreCategoryMatch(input, opt);
+    if (score > bestScore) {
+      bestScore = score;
+      best = opt;
+    }
+  });
+
+  return bestScore > 0 ? best : null;
+};
+
+const findCategoryInText = (text, type) => {
+  if (!text) return null;
+  const options = getAllowedCategories(type);
+  let best = null;
+  let bestScore = 0;
+  options.forEach((opt) => {
+    const score = scoreCategoryMatch(text, opt);
+    if (score > bestScore) {
+      bestScore = score;
+      best = opt;
+    }
+  });
+  return bestScore > 0 ? best : null;
 };
 
 const parseISODate = (iso) => {
@@ -178,6 +204,75 @@ const relativeDateToISO = (value) => {
     const day = String(d.getDate()).padStart(2, "0");
     return `${y}-${m}-${day}`;
   }
+  return null;
+};
+
+const MONTHS = new Map([
+  ["january", 1],
+  ["jan", 1],
+  ["february", 2],
+  ["feb", 2],
+  ["march", 3],
+  ["mar", 3],
+  ["april", 4],
+  ["apr", 4],
+  ["may", 5],
+  ["june", 6],
+  ["jun", 6],
+  ["july", 7],
+  ["jul", 7],
+  ["august", 8],
+  ["aug", 8],
+  ["september", 9],
+  ["sep", 9],
+  ["sept", 9],
+  ["october", 10],
+  ["oct", 10],
+  ["november", 11],
+  ["nov", 11],
+  ["december", 12],
+  ["dec", 12],
+]);
+
+const parseMonthNameDate = (text) => {
+  const match = text.match(
+    /\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?\b/i
+  );
+  if (!match) return null;
+  const monthKey = match[1].toLowerCase();
+  const month = MONTHS.get(monthKey);
+  const day = Number(match[2]);
+  if (!month || !day || day < 1 || day > 31) return null;
+  const year = new Date().getFullYear();
+  const m = String(month).padStart(2, "0");
+  const d = String(day).padStart(2, "0");
+  return `${year}-${m}-${d}`;
+};
+
+const stripDatePhrases = (text) =>
+  text.replace(
+    /\b(on|for|date)\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|sept|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?\b/gi,
+    " "
+  );
+
+const extractAmountFromText = (text) => {
+  if (!text) return null;
+  const cleaned = stripDatePhrases(text);
+
+  const keywordMatch = cleaned.match(
+    /\bamount\s+(?:to\s+)?\$?([0-9]+(?:\.[0-9]{1,2})?)\b/i
+  );
+  if (keywordMatch) return Number(keywordMatch[1]);
+
+  const currencyMatch = cleaned.match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)\b/);
+  if (currencyMatch) return Number(currencyMatch[1]);
+
+  const addMatch = cleaned.match(/\badd\s+([0-9]+(?:\.[0-9]{1,2})?)\b/i);
+  if (addMatch) return Number(addMatch[1]);
+
+  const anyMatch = cleaned.match(/\b([0-9]+(?:\.[0-9]{1,2})?)\b/);
+  if (anyMatch) return Number(anyMatch[1]);
+
   return null;
 };
 
@@ -345,7 +440,7 @@ const hasMultipleCurrencies = (records) => {
   return set.size > 1;
 };
 
-const formatRecordLine = (record) => {
+  const formatRecordLine = (record) => {
   const d = parseISODate(record?.date);
   const dateLabel = d ? formatDateOnly(d) : "Unknown date";
   const currency = record?.currency || "USD";
@@ -353,6 +448,15 @@ const formatRecordLine = (record) => {
   const typeLabel = record?.type === "income" ? "Income" : "Expense";
   const category = record?.category || "Uncategorized";
   return `${dateLabel} · ${typeLabel} · ${category} · ${amountLabel}`;
+};
+
+const formatRecordDisplay = (record) => {
+  const note = String(record?.note || "").trim();
+  if (note) return note;
+  const category = record?.category || "Uncategorized";
+  const d = parseISODate(record?.date);
+  const dateLabel = d ? formatDateOnly(d) : "Unknown date";
+  return `${category} on ${dateLabel}`;
 };
 
 const scoreMatch = (query, candidate) => {
@@ -444,6 +548,9 @@ const parseRecordEdits = (text) => {
   if (dateMatch) {
     const rel = relativeDateToISO(dateMatch[1]);
     updates.date = rel || dateMatch[1];
+  } else {
+    const named = parseMonthNameDate(text);
+    if (named) updates.date = named;
   }
   if (noteMatch) updates.note = noteMatch[1].trim();
   if (typeMatch) updates.type = typeMatch[2];
@@ -463,8 +570,9 @@ const parseRecordCreate = (text) => {
   if (!amountMatch) {
     amountMatch = text.match(/\badd\s+([0-9]+(?:\.\d{1,2})?)\b/i);
   }
-  if (!amountMatch) return null;
-  const amount = Number(amountMatch[1]);
+  const amount =
+    (amountMatch ? Number(amountMatch[1]) : null) ?? extractAmountFromText(text);
+  if (amount === null || Number.isNaN(amount)) return null;
 
   const categoryMatch =
     text.match(
@@ -480,17 +588,51 @@ const parseRecordCreate = (text) => {
   }
   if (!category) {
     category =
+      findCategoryInText(text, type) ||
+      findCategoryInText(text, "expense") ||
+      findCategoryInText(text, "income") ||
       pickCategory(text, type) ||
       pickCategory(text, "expense") ||
       pickCategory(text, "income") ||
-      "Uncategorized";
+      "";
   }
 
-  const dateMatch = text.match(/\b(on|date)\s+(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
+  const dateMatch = text.match(/\b(on|date|for)\s+(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
   const dateValue = dateMatch ? dateMatch[2] : null;
-  const date = dateValue ? relativeDateToISO(dateValue) || dateValue : null;
+  const date =
+    (dateValue ? relativeDateToISO(dateValue) || dateValue : null) ||
+    parseMonthNameDate(text);
 
   return { type, amount, category, date };
+};
+
+const parseRecordCreateSeed = (text) => {
+  const key = normalizeKey(text);
+  if (!/\b(add|create|log)\b/.test(key)) return null;
+
+  const matchType = key.match(/\b(expense|income)\b/);
+  const type = matchType ? matchType[1] : "";
+  const category =
+    findCategoryInText(text, type || "expense") ||
+    findCategoryInText(text, "income") ||
+    "";
+  const dateMatch = text.match(/\b(on|date|for)\s+(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
+  const dateValue = dateMatch ? dateMatch[2] : null;
+  const date =
+    (dateValue ? relativeDateToISO(dateValue) || dateValue : null) ||
+    parseMonthNameDate(text);
+  const amount = extractAmountFromText(text);
+
+  if (!type && !category && !date && (amount === null || Number.isNaN(amount))) {
+    return null;
+  }
+
+  return {
+    type: type || "",
+    category: category || "",
+    amount: Number.isNaN(amount) ? null : amount,
+    date: date || null,
+  };
 };
 
 const parseRecordDelete = (text) => {
@@ -518,7 +660,11 @@ const parseRecordLookup = (text, records) => {
   }
   if (noteMatch) filters.note = noteMatch[1].trim();
 
-  if (!Object.keys(filters).length) return null;
+  const freeText = text
+    .replace(/\b(edit|update|change)\b/i, "")
+    .trim();
+
+  if (!Object.keys(filters).length && !freeText) return null;
 
   const candidates = records
     .map((r) => {
@@ -535,6 +681,10 @@ const parseRecordLookup = (text, records) => {
       }
       if (filters.note && r.note) {
         score += scoreMatch(filters.note, r.note);
+      }
+      if (freeText) {
+        if (r.note) score += scoreMatch(freeText, r.note) * 2;
+        if (r.category) score += scoreMatch(freeText, r.category);
       }
       return { record: r, score };
     })
@@ -628,13 +778,33 @@ export function initWalterLens() {
   let pendingAction = null;
   let pendingEditTarget = null;
   let pendingCreate = null;
+  let pendingEditField = null;
+  let pendingEditRecord = null;
+
+  let isHandlingMessage = false;
+  let responseBuffer = [];
 
   const addMessage = (role, text) => {
+    if (role === "assistant" && isHandlingMessage) {
+      responseBuffer.push(text);
+      return;
+    }
     const msg = document.createElement("div");
     msg.className = `walterlens-msg walterlens-msg--${role}`;
     msg.textContent = text;
     messages.appendChild(msg);
     messages.scrollTop = messages.scrollHeight;
+  };
+
+  const flushResponses = () => {
+    if (!responseBuffer.length) {
+      isHandlingMessage = false;
+      return;
+    }
+    const combined = responseBuffer.join("\n");
+    responseBuffer = [];
+    isHandlingMessage = false;
+    addMessage("assistant", combined);
   };
 
   const renderSuggestions = () => {
@@ -678,19 +848,24 @@ export function initWalterLens() {
     pendingAction = null;
     pendingEditTarget = null;
     pendingCreate = null;
+    pendingEditField = null;
+    pendingEditRecord = null;
     try {
       if (action.kind === "update") {
         await api.records.update(action.id, action.updates);
         recordsCache = { ts: 0, data: [] };
         addMessage("assistant", "Done. The record was updated.");
+        window.location.reload();
       } else if (action.kind === "delete") {
         await api.records.remove(action.id);
         recordsCache = { ts: 0, data: [] };
         addMessage("assistant", "Done. The record was deleted.");
+        window.location.reload();
       } else if (action.kind === "create") {
         await api.records.create(action.payload);
         recordsCache = { ts: 0, data: [] };
         addMessage("assistant", "Done. The record was created.");
+        window.location.reload();
       }
     } catch (err) {
       addMessage("assistant", `I couldn't complete that. ${err?.message || "Try again."}`);
@@ -701,6 +876,8 @@ export function initWalterLens() {
     pendingAction = null;
     pendingEditTarget = null;
     pendingCreate = null;
+    pendingEditField = null;
+    pendingEditRecord = null;
     addMessage("assistant", "Cancelled. No changes were made.");
   };
 
@@ -726,27 +903,70 @@ export function initWalterLens() {
     return updates;
   };
 
+  const normalizeFieldName = (text) => {
+    const key = normalizeText(text);
+    if (key.includes("date")) return "date";
+    if (key.includes("amount")) return "amount";
+    if (key.includes("category")) return "category";
+    if (key.includes("note") || key.includes("description")) return "note";
+    if (key.includes("type")) return "type";
+    return "";
+  };
+
+  const formatFieldValue = (record, field) => {
+    if (!record) return "unknown";
+    if (field === "date") {
+      const d = parseISODate(record.date);
+      return d ? formatDateOnly(d) : "unknown";
+    }
+    if (field === "amount") {
+      return fmtMoney(record.amount || 0, record.currency || "USD");
+    }
+    if (field === "category") {
+      return record.category || "Uncategorized";
+    }
+    if (field === "note") {
+      return record.note || "empty";
+    }
+    if (field === "type") {
+      return record.type || "unknown";
+    }
+    return "unknown";
+  };
+
+  const askEditField = () => {
+    addMessage("assistant", "Which part should I update: date, amount, category, or note?");
+  };
+
+  const askEditNewValue = (field, record) => {
+    const current = formatFieldValue(record, field);
+    addMessage(
+      "assistant",
+      `Got it. The ${field} is currently ${current}. What should it be instead?`
+    );
+  };
+
   const askCreateType = () => {
-    addMessage("assistant", "Would you like me to add an expense or income?");
+    addMessage("assistant", "Are we adding an expense or income?");
   };
 
   const askCreateCategory = (type) => {
     addMessage(
       "assistant",
-      `What category was it? Choose one of: ${formatCategoryList(type)}.`
+      `Which category fits best? Choose one of: ${formatCategoryList(type)}.`
     );
   };
 
   const askCreateAmount = () => {
-    addMessage("assistant", "What amount should I add?");
+    addMessage("assistant", "What’s the amount?");
   };
 
   const askCreateNoteConfirm = () => {
-    addMessage("assistant", "Would you like to add a note? (yes/no)");
+    addMessage("assistant", "Want to add a note? (yes/no)");
   };
 
   const askCreateNote = () => {
-    addMessage("assistant", "What's your note?");
+    addMessage("assistant", "What should the note say?");
   };
 
   const startCreateFlow = (seed = {}) => {
@@ -757,10 +977,13 @@ export function initWalterLens() {
       amount: seed.amount ?? null,
       date: seed.date || null,
       note: seed.note || "",
+      rawText: seed.rawText || "",
     };
 
     if (pendingCreate.type) {
-      const category = pickCategory(pendingCreate.category, pendingCreate.type);
+      const category =
+        pickCategory(pendingCreate.category, pendingCreate.type) ||
+        findCategoryInText(pendingCreate.rawText, pendingCreate.type);
       if (category) {
         pendingCreate.category = category;
         if (pendingCreate.amount !== null) {
@@ -992,20 +1215,33 @@ export function initWalterLens() {
     if (!raw) return;
 
     addMessage("user", raw);
+    isHandlingMessage = true;
+    responseBuffer = [];
 
-    const key = normalizeKey(raw);
-    if (pendingAction) {
-      if (["yes", "y", "confirm", "ok", "okay", "do it"].includes(key)) {
-        await executePending();
+    try {
+      try {
+        await loadCategories();
+      } catch {
+        addMessage(
+          "assistant",
+          "I couldn't load your categories. Please try again in a moment."
+        );
         return;
       }
-      if (["no", "n", "cancel", "stop"].includes(key)) {
-        cancelPending();
+
+      const key = normalizeKey(raw);
+      if (pendingAction) {
+        if (["yes", "y", "confirm", "ok", "okay", "do it"].includes(key)) {
+          await executePending();
+          return;
+        }
+        if (["no", "n", "cancel", "stop"].includes(key)) {
+          cancelPending();
+          return;
+        }
+        addMessage("assistant", "Please reply yes or no to confirm the last request.");
         return;
       }
-      addMessage("assistant", "Please reply yes or no to confirm the last request.");
-      return;
-    }
 
     if (pendingCreate) {
       const handled = await continueCreateFlow(raw);
@@ -1013,7 +1249,27 @@ export function initWalterLens() {
     }
 
     if (pendingEditTarget) {
-      const updates = parseUpdateFieldsOnly(raw);
+      if (!pendingEditRecord && pendingEditTarget.id) {
+        try {
+          pendingEditRecord = await api.records.getOne(pendingEditTarget.id);
+        } catch {
+          addMessage("assistant", "I couldn't load that record. Please try again.");
+          return;
+        }
+      }
+
+      if (!pendingEditField) {
+        const field = normalizeFieldName(raw);
+        if (!field) {
+          askEditField();
+          return;
+        }
+        pendingEditField = field;
+        askEditNewValue(field, pendingEditRecord);
+        return;
+      }
+
+      const updates = parseUpdateFieldsOnly(`${pendingEditField} ${raw}`);
       if (Object.keys(updates).length) {
         if (updates.category) {
           const category =
@@ -1035,167 +1291,186 @@ export function initWalterLens() {
           .map(([k, v]) => `${k}=${v}`)
           .join(", ");
         confirmAction(
-          `I can update record ${pendingEditTarget.id} with ${fields}.`,
+          `I can update that record with ${fields}.`,
           { kind: "update", id: pendingEditTarget.id, updates }
         );
         return;
       }
-      addMessage("assistant", "Tell me what to change, like: amount 45 or category dining.");
+
+      addMessage("assistant", "Please provide a new value.");
       return;
     }
 
-    if (isLegalQuery(key)) {
-      addMessage(
-        "assistant",
-        "I can’t help with legal or tax advice. I can help with spending insights or records."
-      );
-      return;
-    }
+      if (isLegalQuery(key)) {
+        addMessage(
+          "assistant",
+          "I can’t help with legal or tax advice. I can help with spending insights or records."
+        );
+        return;
+      }
 
-    let llmResult = null;
-    try {
-      const records = await loadAllRecords();
-      const range = detectRange(raw);
-      const context = buildLlmContext(records, range);
-      llmResult = await api.walterlens.chat({ message: raw, context });
-    } catch (err) {
-      llmResult = null;
-    }
+      const createSeed = parseRecordCreateSeed(raw);
+      if (createSeed) {
+        startCreateFlow({ ...createSeed, rawText: raw });
+        return;
+      }
 
-    if (llmResult?.reply) {
-      addMessage("assistant", llmResult.reply);
-    }
+      const earlyCreate = parseRecordCreate(raw);
+      if (earlyCreate && earlyCreate.amount !== undefined) {
+        const category =
+          pickCategory(earlyCreate.category, earlyCreate.type) ||
+          findCategoryInText(raw, earlyCreate.type);
+        if (category) {
+          startCreateFlow({
+            ...earlyCreate,
+            category,
+          });
+          return;
+        }
+      }
 
-    if (llmResult?.action?.kind) {
-      const summary =
-        llmResult.actionSummary ||
-        `I can ${llmResult.action.kind} a record.`;
-      if (llmResult.action.kind === "update" && llmResult.action.id) {
-        confirmAction(
-          `${summary} (record ${llmResult.action.id})`,
-          {
+      let llmResult = null;
+      try {
+        const records = await loadAllRecords();
+        const range = detectRange(raw);
+        const context = buildLlmContext(records, range);
+        llmResult = await api.walterlens.chat({ message: raw, context });
+      } catch (err) {
+        llmResult = null;
+      }
+
+      if (llmResult?.action?.kind) {
+        const summary =
+          llmResult.actionSummary ||
+          `I can ${llmResult.action.kind} a record.`;
+        if (llmResult.action.kind === "update" && llmResult.action.id) {
+          confirmAction(summary, {
             kind: "update",
             id: llmResult.action.id,
             updates: llmResult.action.updates || {},
+          });
+          return;
+        }
+        if (llmResult.action.kind === "delete" && llmResult.action.id) {
+          confirmAction(summary, {
+            kind: "delete",
+            id: llmResult.action.id,
+          });
+          return;
+        }
+        if (llmResult.action.kind === "create") {
+          const payload = llmResult.action.payload || {};
+          if (payload?.type && payload?.category && payload?.amount !== undefined) {
+            const category = pickCategory(payload.category, payload.type);
+            if (!category) {
+              addMessage(
+                "assistant",
+                `Choose one of the default categories: ${formatCategoryList(payload.type)}.`
+              );
+              return;
+            }
           }
-        );
+          if (!payload?.type || !payload?.category || payload?.amount === undefined) {
+            startCreateFlow(payload);
+            return;
+          }
+          confirmAction(summary, { kind: "create", payload });
+          return;
+        }
+        addMessage("assistant", summary);
         return;
       }
-      if (llmResult.action.kind === "delete" && llmResult.action.id) {
-        confirmAction(`${summary} (record ${llmResult.action.id})`, {
-          kind: "delete",
-          id: llmResult.action.id,
-        });
+
+      if (llmResult?.reply) {
+        addMessage("assistant", llmResult.reply);
+      }
+
+      if (llmResult?.intent && llmResult.intent !== "unknown" && llmResult.intent !== "refusal") {
         return;
       }
-      if (llmResult.action.kind === "create") {
-        const payload = llmResult.action.payload || {};
-        if (payload?.type && payload?.category && payload?.amount !== undefined) {
-          const category = pickCategory(payload.category, payload.type);
+
+      const intent = detectIntent(raw);
+
+      const deleteIntent = parseRecordDelete(raw);
+      if (deleteIntent) {
+        confirmAction("I can delete that record.", { kind: "delete", id: deleteIntent.id });
+        return;
+      }
+
+      const editIntent = parseRecordEdits(raw);
+      if (editIntent && Object.keys(editIntent.updates || {}).length) {
+        if (editIntent.updates.category) {
+          const category =
+            pickCategory(editIntent.updates.category, editIntent.updates.type) ||
+            pickCategory(editIntent.updates.category, "expense") ||
+            pickCategory(editIntent.updates.category, "income");
           if (!category) {
             addMessage(
               "assistant",
-              `Choose one of the default categories: ${formatCategoryList(payload.type)}.`
+              `Choose one of the default categories. Expense: ${formatCategoryList(
+                "expense"
+              )}. Income: ${formatCategoryList("income")}.`
             );
             return;
           }
+          editIntent.updates.category = category;
         }
-        if (!payload?.type || !payload?.category || payload?.amount === undefined) {
-          startCreateFlow(payload);
-          return;
-        }
-        confirmAction(summary, { kind: "create", payload });
-        return;
-      }
-    }
-
-    if (llmResult?.intent && llmResult.intent !== "unknown" && llmResult.intent !== "refusal") {
-      return;
-    }
-
-    const intent = detectIntent(raw);
-
-    const deleteIntent = parseRecordDelete(raw);
-    if (deleteIntent) {
-      confirmAction(
-        `I can delete record ${deleteIntent.id}.`,
-        { kind: "delete", id: deleteIntent.id }
-      );
-      return;
-    }
-
-    const editIntent = parseRecordEdits(raw);
-    if (editIntent && Object.keys(editIntent.updates || {}).length) {
-      if (editIntent.updates.category) {
-        const category =
-          pickCategory(editIntent.updates.category, editIntent.updates.type) ||
-          pickCategory(editIntent.updates.category, "expense") ||
-          pickCategory(editIntent.updates.category, "income");
-        if (!category) {
-          addMessage(
-            "assistant",
-            `Choose one of the default categories. Expense: ${formatCategoryList(
-              "expense"
-            )}. Income: ${formatCategoryList("income")}.`
-          );
-          return;
-        }
-        editIntent.updates.category = category;
-      }
-      const fields = Object.entries(editIntent.updates)
-        .map(([k, v]) => `${k}=${v}`)
-        .join(", ");
-      confirmAction(
-        `I can update record ${editIntent.id} with ${fields}.`,
-        { kind: "update", id: editIntent.id, updates: editIntent.updates }
-      );
-      return;
-    }
-
-    const createIntent = parseRecordCreate(raw);
-    if (createIntent) {
-      startCreateFlow(createIntent);
-      return;
-    }
-
-    if (intent === "create") {
-      startCreateFlow();
-      return;
-    }
-
-    if (intent === "list") {
-      await handleListRecords(raw);
-      return;
-    }
-
-    if (intent === "edit") {
-      let records = [];
-      try {
-        records = await loadAllRecords();
-      } catch {
-        addMessage("assistant", "I couldn't load records. Please check your login.");
-        return;
-      }
-      const lookup = parseRecordLookup(raw, records);
-      if (lookup) {
-        pendingEditTarget = { id: lookup.id };
-        addMessage(
-          "assistant",
-          `I found record ${lookup.id}: ${formatRecordLine(lookup)}. What should I change?`
+        const fields = Object.entries(editIntent.updates)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(", ");
+        confirmAction(
+          `I can update that record with ${fields}.`,
+          { kind: "update", id: editIntent.id, updates: editIntent.updates }
         );
         return;
       }
-    }
 
-    if (intent === "insight") {
-      await handleInsights(raw);
-      return;
-    }
+      const createIntent = parseRecordCreate(raw);
+      if (createIntent) {
+        startCreateFlow(createIntent);
+        return;
+      }
 
-    addMessage(
-      "assistant",
-      pickFallback()
-    );
+      if (intent === "create") {
+        startCreateFlow();
+        return;
+      }
+
+      if (intent === "list") {
+        await handleListRecords(raw);
+        return;
+      }
+
+      if (intent === "edit") {
+        let records = [];
+        try {
+          records = await loadAllRecords();
+        } catch {
+          addMessage("assistant", "I couldn't load records. Please check your login.");
+          return;
+        }
+        const lookup = parseRecordLookup(raw, records);
+        if (lookup) {
+          pendingEditTarget = { id: lookup.id };
+          pendingEditRecord = lookup;
+          pendingEditField = null;
+          addMessage(
+            "assistant",
+            `What would you like to edit for ${formatRecordDisplay(lookup)}?`
+          );
+          return;
+        }
+      }
+
+      if (intent === "insight") {
+        await handleInsights(raw);
+        return;
+      }
+
+      addMessage("assistant", pickFallback());
+    } finally {
+      flushResponses();
+    }
   };
 
   fab.addEventListener("click", () => togglePanel());

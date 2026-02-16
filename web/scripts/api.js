@@ -237,6 +237,10 @@ export const records = {
     return request(`/records${query ? `?${query}` : ""}`);
   },
 
+  categories() {
+    return request("/records/categories");
+  },
+
   stats() {
     return request("/records/stats");
   },
