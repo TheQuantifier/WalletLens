@@ -272,6 +272,18 @@ export const records = {
 };
 
 // ======================================================================
+// WALTERLENS MODULE
+// ======================================================================
+export const walterlens = {
+  chat({ message, context }) {
+    return request("/walterlens/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, context }),
+    });
+  },
+};
+
+// ======================================================================
 // RECEIPTS MODULE (R2 presigned flow)
 // ======================================================================
 export const receipts = {
@@ -616,6 +628,7 @@ export const api = {
   auth,
   records,
   receipts,
+  walterlens,
   budgetSheets,
   fxRates,
   activity,

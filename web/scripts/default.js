@@ -8,6 +8,7 @@ and manages dashboard view preference.
 =============================================== */
 
 import { api } from "./api.js";
+import { initWalterLens } from "./walterlens.js";
 
 /* ===============================================
   DEVELOPMENT AUTH GUARD TOGGLE
@@ -85,6 +86,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initLiveNavigation();
   applyCachedAppName();
   updateAppName();
+  initWalterLens();
 });
 
 /**

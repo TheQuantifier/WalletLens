@@ -1,0 +1,1213 @@
+import { api } from "./api.js";
+
+const WELCOME_MESSAGES = [
+  "Hi, what's on your mind today?",
+  "Hi, what can I help you with?",
+  "Hey there! How can I help today?",
+  "Hello! Want insights or a quick update?",
+  "Welcome back. What would you like to do?",
+  "Hi! Ask me about spending, saving, or a record edit.",
+];
+
+const SUGGESTION_PROMPTS = [
+  "Where am I spending a lot this month?",
+  "Where can I save money?",
+  "Show expenses last 30 days",
+  "Add record",
+  "Add expense 12.50 coffee today",
+  "Edit record 12 amount 45",
+];
+
+const FALLBACK_MESSAGES = [
+  "I can help with spending insights, listing records, or edits. Try asking about your top category.",
+  "Not sure I got that. Ask about spending, savings, or say 'show records last 30 days'.",
+  "I can assist with insights or record changes. Try: 'Add expense 12.50 coffee today'.",
+  "Want insights or edits? Ask about spending, or say 'edit record 12 amount 45'.",
+  "Try a prompt like 'where can I save money?' or 'show expenses this month'.",
+];
+
+const PROTECTED_CATEGORIES = [
+  "rent",
+  "mortgage",
+  "housing",
+  "grocery",
+  "grocer",
+  "supermarket",
+  "utilities",
+  "utility",
+  "insurance",
+  "medical",
+  "health",
+  "pharmacy",
+  "tuition",
+  "childcare",
+  "tax",
+  "legal",
+];
+
+const DISCRETIONARY_HINTS = [
+  "entertainment",
+  "dining",
+  "restaurant",
+  "takeout",
+  "coffee",
+  "cafe",
+  "subscription",
+  "streaming",
+  "shopping",
+  "retail",
+  "travel",
+  "rideshare",
+  "games",
+  "gaming",
+  "hobby",
+  "gifts",
+  "bars",
+];
+
+const LEGAL_KEYWORDS = [
+  "legal",
+  "lawsuit",
+  "attorney",
+  "lawyer",
+  "court",
+  "tax",
+  "irs",
+  "regulation",
+  "contract",
+  "compliance",
+];
+
+const EXPENSE_CATEGORIES = [
+  "Housing",
+  "Utilities",
+  "Groceries",
+  "Transportation",
+  "Dining",
+  "Health",
+  "Entertainment",
+  "Shopping",
+  "Membership",
+  "Miscellaneous",
+  "Education",
+  "Giving",
+  "Savings",
+  "Other",
+];
+
+const INCOME_CATEGORIES = [
+  "Salary / Wages",
+  "Bonus / Commission",
+  "Business Income",
+  "Freelance / Contract",
+  "Rental Income",
+  "Interest / Dividends",
+  "Capital Gains",
+  "Refunds / Reimbursements",
+  "Gifts Received",
+  "Government Benefits",
+  "Other",
+];
+
+const PAGE_SIZE = 500;
+const CACHE_TTL_MS = 60 * 1000;
+
+const normalizeKey = (value) => String(value || "").trim().toLowerCase();
+const normalizeText = (value) =>
+  String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const tokenize = (value) => normalizeText(value).split(" ").filter(Boolean);
+
+const isProtectedCategory = (name) =>
+  PROTECTED_CATEGORIES.some((token) => normalizeKey(name).includes(token));
+const isDiscretionaryCategory = (name) =>
+  DISCRETIONARY_HINTS.some((token) => normalizeKey(name).includes(token));
+
+const getAllowedCategories = (type) => {
+  if (type === "income") return INCOME_CATEGORIES;
+  return EXPENSE_CATEGORIES;
+};
+
+const formatCategoryList = (type) => getAllowedCategories(type).join(", ");
+
+const normalizeCategory = (value) => normalizeText(value);
+
+const pickCategory = (input, type) => {
+  if (!input) return null;
+  const normalized = normalizeCategory(input);
+  const options = getAllowedCategories(type);
+  const match = options.find((c) => normalizeCategory(c) === normalized);
+  return match || null;
+};
+
+const parseISODate = (iso) => {
+  if (!iso) return null;
+  if (typeof iso !== "string") return new Date(iso);
+  if (/^\d{4}-\d{2}-\d{2}$/.test(iso)) return new Date(`${iso}T00:00:00`);
+  return new Date(iso);
+};
+
+const todayDateOnly = () => {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const formatDateOnly = (d) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+};
+
+const relativeDateToISO = (value) => {
+  const key = normalizeKey(value);
+  const now = new Date();
+  if (key === "today") return todayDateOnly();
+  if (key === "yesterday") {
+    const d = new Date(now);
+    d.setDate(d.getDate() - 1);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+  return null;
+};
+
+const isLegalQuery = (text) => {
+  const key = normalizeKey(text);
+  return LEGAL_KEYWORDS.some((token) => key.includes(token));
+};
+
+const pickWelcome = () =>
+  WELCOME_MESSAGES[Math.floor(Math.random() * WELCOME_MESSAGES.length)];
+
+const pickFallback = () =>
+  FALLBACK_MESSAGES[Math.floor(Math.random() * FALLBACK_MESSAGES.length)];
+
+const fmtMoney = (value, currency = "USD") =>
+  new Intl.NumberFormat(undefined, { style: "currency", currency }).format(
+    Number(value) || 0
+  );
+
+const getMonthKey = (d) => {
+  if (!d || Number.isNaN(d.getTime())) return "";
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  return `${y}-${m}`;
+};
+
+const filterByRange = (records, range) => {
+  if (!range || !range.start || !range.end) return records;
+  return (records || []).filter((r) => {
+    const d = parseISODate(r?.date);
+    if (!d || Number.isNaN(d.getTime())) return false;
+    return d >= range.start && d <= range.end;
+  });
+};
+
+const buildRange = (start, end, label) => ({
+  start,
+  end,
+  label,
+});
+
+const parseExplicitRange = (text) => {
+  const match = text.match(
+    /\b(?:between|from)\s+(\d{4}-\d{2}-\d{2})\s+(?:and|to)\s+(\d{4}-\d{2}-\d{2})\b/i
+  );
+  if (!match) return null;
+  const start = parseISODate(match[1]);
+  const end = parseISODate(match[2]);
+  if (!start || !end) return null;
+  start.setHours(0, 0, 0, 0);
+  end.setHours(23, 59, 59, 999);
+  return buildRange(start, end, `from ${match[1]} to ${match[2]}`);
+};
+
+const detectRange = (text) => {
+  const key = normalizeText(text);
+  const explicit = parseExplicitRange(text);
+  if (explicit) return explicit;
+
+  const lastDaysMatch = key.match(/\blast\s+(\d+)\s+days?\b/);
+  if (lastDaysMatch) {
+    const days = Math.max(1, Number(lastDaysMatch[1]));
+    const end = new Date();
+    end.setHours(23, 59, 59, 999);
+    const start = new Date(end);
+    start.setDate(start.getDate() - days + 1);
+    start.setHours(0, 0, 0, 0);
+    return buildRange(start, end, `last ${days} days`);
+  }
+
+  const now = new Date();
+  if (key.includes("this week")) {
+    const start = new Date(now);
+    const day = start.getDay();
+    const mondayOffset = (day + 6) % 7;
+    start.setDate(start.getDate() - mondayOffset);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return buildRange(start, end, "this week");
+  }
+  if (key.includes("last week")) {
+    const end = new Date(now);
+    const day = end.getDay();
+    const mondayOffset = (day + 6) % 7;
+    end.setDate(end.getDate() - mondayOffset - 1);
+    end.setHours(23, 59, 59, 999);
+    const start = new Date(end);
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    return buildRange(start, end, "last week");
+  }
+  if (key.includes("this month")) {
+    const start = new Date(now.getFullYear(), now.getMonth(), 1);
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(now);
+    end.setHours(23, 59, 59, 999);
+    return buildRange(start, end, "this month");
+  }
+  if (key.includes("last month")) {
+    const start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const end = new Date(now.getFullYear(), now.getMonth(), 0);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return buildRange(start, end, "last month");
+  }
+  if (key.includes("this year")) {
+    const start = new Date(now.getFullYear(), 0, 1);
+    const end = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return buildRange(start, end, "this year");
+  }
+  if (key.includes("last year")) {
+    const start = new Date(now.getFullYear() - 1, 0, 1);
+    const end = new Date(now.getFullYear() - 1, 11, 31);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(23, 59, 59, 999);
+    return buildRange(start, end, "last year");
+  }
+  return null;
+};
+
+let recordsCache = { ts: 0, data: [] };
+const loadAllRecords = async () => {
+  if (Date.now() - recordsCache.ts < CACHE_TTL_MS && recordsCache.data.length) {
+    return recordsCache.data;
+  }
+  const all = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const batch = await api.records.getAll({ limit: PAGE_SIZE, offset });
+    const rows = Array.isArray(batch) ? batch : batch?.records || batch?.data || [];
+    all.push(...rows);
+    if (!Array.isArray(rows) || rows.length < PAGE_SIZE) break;
+  }
+  recordsCache = { ts: Date.now(), data: all };
+  return all;
+};
+
+const summarizeSpending = (records) => {
+  const expenses = (records || []).filter((r) => r.type === "expense");
+  const income = (records || []).filter((r) => r.type === "income");
+  const totalExp = expenses.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+  const totalInc = income.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+
+  const byCategory = new Map();
+  expenses.forEach((r) => {
+    const key = r.category || "Uncategorized";
+    byCategory.set(key, (byCategory.get(key) || 0) + Number(r.amount || 0));
+  });
+
+  const topCats = [...byCategory.entries()]
+    .map(([name, amount]) => ({ name, amount }))
+    .sort((a, b) => b.amount - a.amount);
+
+  return { totalExp, totalInc, topCats };
+};
+
+const hasMultipleCurrencies = (records) => {
+  const set = new Set(
+    (records || [])
+      .map((r) => String(r.currency || "USD").toUpperCase())
+      .filter(Boolean)
+  );
+  return set.size > 1;
+};
+
+const formatRecordLine = (record) => {
+  const d = parseISODate(record?.date);
+  const dateLabel = d ? formatDateOnly(d) : "Unknown date";
+  const currency = record?.currency || "USD";
+  const amountLabel = fmtMoney(record?.amount || 0, currency);
+  const typeLabel = record?.type === "income" ? "Income" : "Expense";
+  const category = record?.category || "Uncategorized";
+  return `${dateLabel} · ${typeLabel} · ${category} · ${amountLabel}`;
+};
+
+const scoreMatch = (query, candidate) => {
+  const q = normalizeText(query);
+  const c = normalizeText(candidate);
+  if (!q || !c) return 0;
+  if (q === c) return 1;
+  if (c.includes(q) || q.includes(c)) return 0.9;
+  const qTokens = new Set(tokenize(q));
+  const cTokens = new Set(tokenize(c));
+  let overlap = 0;
+  qTokens.forEach((t) => {
+    if (cTokens.has(t)) overlap += 1;
+  });
+  if (overlap) {
+    return overlap / Math.max(qTokens.size, cTokens.size);
+  }
+  return 0;
+};
+
+const pickBestMatch = (query, candidates) => {
+  let best = null;
+  let score = 0;
+  (candidates || []).forEach((candidate) => {
+    const s = scoreMatch(query, candidate);
+    if (s > score) {
+      score = s;
+      best = candidate;
+    }
+  });
+  return score >= 0.45 ? best : null;
+};
+
+const extractCategoryHint = (text) => {
+  const catMatch = text.match(
+    /\b(?:category|on|in|for)\s+([a-zA-Z0-9 &-]{2,})\b/i
+  );
+  if (catMatch) return catMatch[1].trim();
+  return null;
+};
+
+const parseRecordFilter = (text, categories) => {
+  const key = normalizeText(text);
+  const typeMatch = key.match(/\b(expense|income|expenses|income)\b/);
+  const type =
+    typeMatch && typeMatch[1].includes("income") ? "income" : typeMatch ? "expense" : null;
+
+  const categoryHint = extractCategoryHint(text);
+  const category = categoryHint ? pickBestMatch(categoryHint, categories) : null;
+
+  const dateMatch = text.match(/\b(\d{4}-\d{2}-\d{2})\b/);
+  const date = dateMatch ? dateMatch[1] : null;
+
+  return { type, category, date };
+};
+
+const filterRecords = (records, filter) => {
+  let out = records;
+  if (filter?.type) out = out.filter((r) => r.type === filter.type);
+  if (filter?.category) {
+    out = out.filter((r) => normalizeText(r.category) === normalizeText(filter.category));
+  }
+  if (filter?.date) {
+    out = out.filter((r) => {
+      const d = parseISODate(r?.date);
+      if (!d || Number.isNaN(d.getTime())) return false;
+      return formatDateOnly(d) === filter.date;
+    });
+  }
+  return out;
+};
+
+const parseRecordEdits = (text) => {
+  const idMatch = text.match(/\b(?:edit|update)\s+(?:record|transaction)\s+#?(\d+)\b/i);
+  if (!idMatch) return null;
+  const id = idMatch[1];
+
+  const amountMatch = text.match(/\bamount\s+(?:to\s+)?([0-9]+(?:\.[0-9]+)?)\b/i);
+  const categoryMatch = text.match(
+    /\bcategory\s+(.+?)(?:\s+(amount|date|note|type|as)\b|$)/i
+  );
+  const dateMatch = text.match(/\bdate\s+(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
+  const noteMatch = text.match(/\bnote\s+(.+)$/i);
+  const typeMatch = text.match(/\b(type|as)\s+(income|expense)\b/i);
+
+  const updates = {};
+  if (amountMatch) updates.amount = Number(amountMatch[1]);
+  if (categoryMatch) updates.category = categoryMatch[1].trim();
+  if (dateMatch) {
+    const rel = relativeDateToISO(dateMatch[1]);
+    updates.date = rel || dateMatch[1];
+  }
+  if (noteMatch) updates.note = noteMatch[1].trim();
+  if (typeMatch) updates.type = typeMatch[2];
+
+  return { id, updates };
+};
+
+const parseRecordCreate = (text) => {
+  const key = normalizeKey(text);
+  const matchType = key.match(/\b(expense|income)\b/);
+  if (!/\b(add|create|log)\b/.test(key)) return null;
+  const type = matchType ? matchType[1] : "expense";
+
+  let amountMatch = text.match(
+    /\b(?:expense|income)\b\s+([0-9]+(?:\.\d{1,2})?)\b/i
+  );
+  if (!amountMatch) {
+    amountMatch = text.match(/\badd\s+([0-9]+(?:\.\d{1,2})?)\b/i);
+  }
+  if (!amountMatch) return null;
+  const amount = Number(amountMatch[1]);
+
+  const categoryMatch =
+    text.match(
+      /\b(?:expense|income)\b\s+\d+(?:\.\d{1,2})?\s+(.+?)(?:\s+(?:on|date)\s+|$)/i
+    ) ||
+    text.match(
+      /\badd\s+\d+(?:\.\d{1,2})?\s+(.+?)(?:\s+(?:as|for|on|date)\s+|$)/i
+    );
+
+  let category = categoryMatch ? categoryMatch[1].trim() : "";
+  if (category) {
+    category = category.replace(/\b(expense|income)\b/i, "").trim();
+  }
+  if (!category) {
+    category =
+      pickCategory(text, type) ||
+      pickCategory(text, "expense") ||
+      pickCategory(text, "income") ||
+      "Uncategorized";
+  }
+
+  const dateMatch = text.match(/\b(on|date)\s+(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
+  const dateValue = dateMatch ? dateMatch[2] : null;
+  const date = dateValue ? relativeDateToISO(dateValue) || dateValue : null;
+
+  return { type, amount, category, date };
+};
+
+const parseRecordDelete = (text) => {
+  const match = text.match(/\bdelete\s+(?:record|transaction)\s+#?(\d+)\b/i);
+  if (!match) return null;
+  return { id: match[1] };
+};
+
+const parseRecordLookup = (text, records) => {
+  const key = normalizeText(text);
+  if (!/\b(edit|update|change)\b/.test(key)) return null;
+  if (/\brecord\s+#?\d+\b/.test(key)) return null;
+
+  const categoryHint = extractCategoryHint(text);
+  const amountMatch = text.match(/\bamount\s+(?:to\s+)?([0-9]+(?:\.[0-9]+)?)\b/i);
+  const dateMatch = text.match(/\bdate\s+(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
+  const noteMatch = text.match(/\bnote\s+(.+)$/i);
+
+  const filters = {};
+  if (categoryHint) filters.category = categoryHint;
+  if (amountMatch) filters.amount = Number(amountMatch[1]);
+  if (dateMatch) {
+    const rel = relativeDateToISO(dateMatch[1]);
+    filters.date = rel || dateMatch[1];
+  }
+  if (noteMatch) filters.note = noteMatch[1].trim();
+
+  if (!Object.keys(filters).length) return null;
+
+  const candidates = records
+    .map((r) => {
+      let score = 0;
+      if (filters.category && r.category) {
+        score += scoreMatch(filters.category, r.category) * 2;
+      }
+      if (filters.amount !== undefined) {
+        score += Math.abs(Number(r.amount || 0) - filters.amount) < 0.01 ? 2 : 0;
+      }
+      if (filters.date) {
+        const d = parseISODate(r.date);
+        if (d && formatDateOnly(d) === filters.date) score += 2;
+      }
+      if (filters.note && r.note) {
+        score += scoreMatch(filters.note, r.note);
+      }
+      return { record: r, score };
+    })
+    .sort((a, b) => b.score - a.score);
+
+  const best = candidates[0];
+  if (!best || best.score < 2) return null;
+  return best.record;
+};
+
+const detectIntent = (text) => {
+  const key = normalizeText(text);
+  if (/\b(delete|remove)\b/.test(key)) return "delete";
+  if (/\b(add|create|log)\b/.test(key)) return "create";
+  if (/\b(edit|update|change)\b/.test(key)) return "edit";
+  if (/\b(show|list|display)\b/.test(key)) {
+    if (/\b(record|transaction|entries)\b/.test(key)) return "list";
+    if (/\b(spending|expenses|income|summary|insight)\b/.test(key)) return "insight";
+    return "list";
+  }
+  if (/\b(spending|save|reduce|afford|top|insight|summary)\b/.test(key)) return "insight";
+  return "unknown";
+};
+
+const extractCategoryFromText = (text, categories) => {
+  const hint = extractCategoryHint(text);
+  if (hint) return pickBestMatch(hint, categories);
+  return null;
+};
+
+const buildLlmContext = (records, range) => {
+  const scoped = filterByRange(records, range);
+  const { totalExp, totalInc, topCats } = summarizeSpending(scoped);
+  const rangeLabel = range?.label || "all time";
+  const totals = {
+    expenses: totalExp,
+    income: totalInc,
+    net: totalInc - totalExp,
+  };
+  return {
+    totals,
+    topCategories: topCats.slice(0, 5),
+    dateRange: rangeLabel,
+    currencyNote: hasMultipleCurrencies(scoped)
+      ? "Totals include multiple currencies without conversion."
+      : "",
+  };
+};
+
+export function initWalterLens() {
+  const existing = document.getElementById("walterlens-widget");
+  if (existing) return;
+
+  const root = document.createElement("div");
+  root.id = "walterlens-widget";
+  root.className = "walterlens-widget";
+  root.innerHTML = `
+    <button class="walterlens-fab" aria-expanded="false" aria-controls="walterlens-panel">
+      <span class="walterlens-fab__logo">WL</span>
+    </button>
+    <section id="walterlens-panel" class="walterlens-panel" aria-hidden="true" role="dialog" aria-label="WalterLens Advisor">
+      <div class="walterlens-header">
+        <div class="walterlens-title">
+          <span class="walterlens-title__logo">WL</span>
+          <div>
+            <h3>WalterLens</h3>
+            <p>General insights, not legal or tax advice.</p>
+          </div>
+        </div>
+        <button class="walterlens-close" type="button" aria-label="Close WalterLens">×</button>
+      </div>
+      <div class="walterlens-suggestions" aria-label="Suggested prompts"></div>
+      <div class="walterlens-messages" aria-live="polite"></div>
+      <div class="walterlens-input">
+        <input type="text" placeholder="Ask about spending, saving, or a record edit..." />
+        <button type="button" class="walterlens-send">Send</button>
+      </div>
+    </section>
+  `;
+  document.body.appendChild(root);
+
+  const fab = root.querySelector(".walterlens-fab");
+  const panel = root.querySelector(".walterlens-panel");
+  const closeBtn = root.querySelector(".walterlens-close");
+  const suggestions = root.querySelector(".walterlens-suggestions");
+  const messages = root.querySelector(".walterlens-messages");
+  const input = root.querySelector("input");
+  const sendBtn = root.querySelector(".walterlens-send");
+
+  let hasWelcomed = false;
+  let pendingAction = null;
+  let pendingEditTarget = null;
+  let pendingCreate = null;
+
+  const addMessage = (role, text) => {
+    const msg = document.createElement("div");
+    msg.className = `walterlens-msg walterlens-msg--${role}`;
+    msg.textContent = text;
+    messages.appendChild(msg);
+    messages.scrollTop = messages.scrollHeight;
+  };
+
+  const renderSuggestions = () => {
+    if (!suggestions) return;
+    suggestions.innerHTML = "";
+    SUGGESTION_PROMPTS.forEach((prompt) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "walterlens-suggestion";
+      btn.textContent = prompt;
+      btn.addEventListener("click", () => {
+        handleMessage(prompt);
+      });
+      suggestions.appendChild(btn);
+    });
+  };
+
+  const togglePanel = (open) => {
+    const isOpen = open ?? !panel.classList.contains("is-open");
+    panel.classList.toggle("is-open", isOpen);
+    panel.setAttribute("aria-hidden", String(!isOpen));
+    fab.setAttribute("aria-expanded", String(isOpen));
+    if (isOpen) {
+      input.focus();
+      renderSuggestions();
+      if (!hasWelcomed) {
+        addMessage("assistant", pickWelcome());
+        hasWelcomed = true;
+      }
+    }
+  };
+
+  const confirmAction = (summary, action) => {
+    pendingAction = action;
+    addMessage("assistant", `${summary} Reply "yes" to confirm or "no" to cancel.`);
+  };
+
+  const executePending = async () => {
+    if (!pendingAction) return;
+    const action = pendingAction;
+    pendingAction = null;
+    pendingEditTarget = null;
+    pendingCreate = null;
+    try {
+      if (action.kind === "update") {
+        await api.records.update(action.id, action.updates);
+        recordsCache = { ts: 0, data: [] };
+        addMessage("assistant", "Done. The record was updated.");
+      } else if (action.kind === "delete") {
+        await api.records.remove(action.id);
+        recordsCache = { ts: 0, data: [] };
+        addMessage("assistant", "Done. The record was deleted.");
+      } else if (action.kind === "create") {
+        await api.records.create(action.payload);
+        recordsCache = { ts: 0, data: [] };
+        addMessage("assistant", "Done. The record was created.");
+      }
+    } catch (err) {
+      addMessage("assistant", `I couldn't complete that. ${err?.message || "Try again."}`);
+    }
+  };
+
+  const cancelPending = () => {
+    pendingAction = null;
+    pendingEditTarget = null;
+    pendingCreate = null;
+    addMessage("assistant", "Cancelled. No changes were made.");
+  };
+
+  const parseUpdateFieldsOnly = (text) => {
+    const amountMatch = text.match(/\bamount\s+(?:to\s+)?([0-9]+(?:\.[0-9]+)?)\b/i);
+    const categoryMatch = text.match(
+      /\bcategory\s+(.+?)(?:\s+(amount|date|note|type|as)\b|$)/i
+    );
+    const dateMatch = text.match(/\bdate\s+(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
+    const noteMatch = text.match(/\bnote\s+(.+)$/i);
+    const typeMatch = text.match(/\b(type|as)\s+(income|expense)\b/i);
+
+    const updates = {};
+    if (amountMatch) updates.amount = Number(amountMatch[1]);
+    if (categoryMatch) updates.category = categoryMatch[1].trim();
+    if (dateMatch) {
+      const rel = relativeDateToISO(dateMatch[1]);
+      updates.date = rel || dateMatch[1];
+    }
+    if (noteMatch) updates.note = noteMatch[1].trim();
+    if (typeMatch) updates.type = typeMatch[2];
+
+    return updates;
+  };
+
+  const askCreateType = () => {
+    addMessage("assistant", "Would you like me to add an expense or income?");
+  };
+
+  const askCreateCategory = (type) => {
+    addMessage(
+      "assistant",
+      `What category was it? Choose one of: ${formatCategoryList(type)}.`
+    );
+  };
+
+  const askCreateAmount = () => {
+    addMessage("assistant", "What amount should I add?");
+  };
+
+  const askCreateNoteConfirm = () => {
+    addMessage("assistant", "Would you like to add a note? (yes/no)");
+  };
+
+  const askCreateNote = () => {
+    addMessage("assistant", "What's your note?");
+  };
+
+  const startCreateFlow = (seed = {}) => {
+    pendingCreate = {
+      step: "type",
+      type: seed.type || "",
+      category: seed.category || "",
+      amount: seed.amount ?? null,
+      date: seed.date || null,
+      note: seed.note || "",
+    };
+
+    if (pendingCreate.type) {
+      const category = pickCategory(pendingCreate.category, pendingCreate.type);
+      if (category) {
+        pendingCreate.category = category;
+        if (pendingCreate.amount !== null) {
+          pendingCreate.step = "note_confirm";
+          askCreateNoteConfirm();
+          return;
+        }
+        pendingCreate.step = "amount";
+        askCreateAmount();
+        return;
+      }
+      pendingCreate.step = "category";
+      askCreateCategory(pendingCreate.type);
+      return;
+    }
+
+    askCreateType();
+  };
+
+  const continueCreateFlow = async (rawInput) => {
+    if (!pendingCreate) return false;
+    const key = normalizeText(rawInput);
+
+    if (["cancel", "stop"].includes(key)) {
+      cancelPending();
+      return true;
+    }
+
+    if (pendingCreate.step === "type") {
+      if (key.includes("expense")) pendingCreate.type = "expense";
+      if (key.includes("income")) pendingCreate.type = "income";
+      if (!pendingCreate.type) {
+        addMessage("assistant", "Please reply with expense or income.");
+        return true;
+      }
+      pendingCreate.step = "category";
+      askCreateCategory(pendingCreate.type);
+      return true;
+    }
+
+    if (pendingCreate.step === "category") {
+      const category = pickCategory(rawInput, pendingCreate.type);
+      if (!category) {
+        addMessage(
+          "assistant",
+          `Choose one of the default categories: ${formatCategoryList(pendingCreate.type)}.`
+        );
+        return true;
+      }
+      pendingCreate.category = category;
+      pendingCreate.step = "amount";
+      askCreateAmount();
+      return true;
+    }
+
+    if (pendingCreate.step === "amount") {
+      const amountMatch = rawInput.match(/([0-9]+(?:\.[0-9]+)?)/);
+      if (!amountMatch) {
+        addMessage("assistant", "Please enter a valid amount.");
+        return true;
+      }
+      pendingCreate.amount = Number(amountMatch[1]);
+      pendingCreate.step = "note_confirm";
+      askCreateNoteConfirm();
+      return true;
+    }
+
+    if (pendingCreate.step === "note_confirm") {
+      if (["yes", "y"].includes(key)) {
+        pendingCreate.step = "note";
+        askCreateNote();
+        return true;
+      }
+      if (["no", "n"].includes(key)) {
+        const summary = `Create ${pendingCreate.type} ${fmtMoney(
+          pendingCreate.amount
+        )} in ${pendingCreate.category}${pendingCreate.date ? ` on ${pendingCreate.date}` : ""}.`;
+        confirmAction(summary, {
+          kind: "create",
+          payload: {
+            type: pendingCreate.type,
+            amount: pendingCreate.amount,
+            category: pendingCreate.category,
+            date: pendingCreate.date,
+            note: pendingCreate.note || "",
+          },
+        });
+        return true;
+      }
+      addMessage("assistant", "Please reply yes or no.");
+      return true;
+    }
+
+    if (pendingCreate.step === "note") {
+      pendingCreate.note = rawInput.trim();
+      const summary = `Create ${pendingCreate.type} ${fmtMoney(
+        pendingCreate.amount
+      )} in ${pendingCreate.category}${pendingCreate.date ? ` on ${pendingCreate.date}` : ""} with a note.`;
+      confirmAction(summary, {
+        kind: "create",
+        payload: {
+          type: pendingCreate.type,
+          amount: pendingCreate.amount,
+          category: pendingCreate.category,
+          date: pendingCreate.date,
+          note: pendingCreate.note,
+        },
+      });
+      return true;
+    }
+
+    return false;
+  };
+
+  const handleInsights = async (text) => {
+    let records = [];
+    try {
+      records = await loadAllRecords();
+    } catch (err) {
+      addMessage("assistant", "I couldn't load records. Please check your login.");
+      return;
+    }
+
+    const range = detectRange(text);
+    const scoped = filterByRange(records, range);
+    const { totalExp, totalInc, topCats } = summarizeSpending(scoped);
+    const categoryList = [...new Set((records || []).map((r) => r.category).filter(Boolean))];
+    const category = extractCategoryFromText(text, categoryList);
+    const scopedByCategory = category
+      ? scoped.filter((r) => normalizeText(r.category) === normalizeText(category))
+      : scoped;
+    const categorySummary = category ? summarizeSpending(scopedByCategory) : null;
+
+    if (text.includes("save") || text.includes("reduce") || text.includes("cut")) {
+      const discretionary = topCats.filter((c) => !isProtectedCategory(c.name));
+      if (!discretionary.length) {
+        addMessage(
+          "assistant",
+          "Your spending looks essential-heavy. I don't recommend cutting rent or groceries."
+        );
+        return;
+      }
+      const pick = discretionary.slice(0, 2).map((c) => c.name).join(" and ");
+      addMessage(
+        "assistant",
+        `Consider a gentle cap on ${pick}. These are typically more flexible.`
+      );
+      return;
+    }
+
+    if (text.includes("spending") || text.includes("top") || text.includes("where")) {
+      const summary = categorySummary || { topCats };
+      const label = category ? `in ${category}` : "overall";
+      if (!summary.topCats?.length) {
+        addMessage("assistant", "No expenses found in this range.");
+        return;
+      }
+      const top = summary.topCats[0];
+      addMessage(
+        "assistant",
+        `Your top expense ${label} is ${top.name} at ${fmtMoney(top.amount)}.`
+      );
+      return;
+    }
+
+    const net = totalInc - totalExp;
+    const rangeLabel = range?.label ? ` for ${range.label}` : "";
+    if (net > 0) {
+      addMessage(
+        "assistant",
+        `You saved ${fmtMoney(net)}${rangeLabel}. Want to set a goal or plan something fun?`
+      );
+    } else {
+      addMessage(
+        "assistant",
+        `You're spending ${fmtMoney(Math.abs(net))} more than income${rangeLabel}. Want help trimming discretionary spend?`
+      );
+    }
+  };
+
+  const handleListRecords = async (text) => {
+    let records = [];
+    try {
+      records = await loadAllRecords();
+    } catch (err) {
+      addMessage("assistant", "I couldn't load records. Please check your login.");
+      return;
+    }
+
+    const categories = [...new Set((records || []).map((r) => r.category).filter(Boolean))];
+    const range = detectRange(text);
+    const filter = parseRecordFilter(text, categories);
+    const scoped = filterByRange(records, range);
+    const filtered = filterRecords(scoped, filter);
+
+    if (!filtered.length) {
+      addMessage("assistant", "No records found for that filter.");
+      return;
+    }
+
+    const total = filtered.reduce((sum, r) => sum + Number(r.amount || 0), 0);
+    const labelParts = [];
+    if (filter?.type) labelParts.push(filter.type);
+    if (filter?.category) labelParts.push(filter.category);
+    if (range?.label) labelParts.push(range.label);
+    const label = labelParts.length ? ` (${labelParts.join(", ")})` : "";
+
+    addMessage(
+      "assistant",
+      `Found ${filtered.length} records${label}. Total: ${fmtMoney(total)}.`
+    );
+
+    const sorted = filtered
+      .slice()
+      .sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))
+      .slice(0, 5);
+
+    sorted.forEach((r) => {
+      addMessage("assistant", formatRecordLine(r));
+    });
+
+    if (hasMultipleCurrencies(filtered)) {
+      addMessage("assistant", "Note: totals are not converted across currencies.");
+    }
+  };
+
+  const handleMessage = async (text) => {
+    const raw = text.trim();
+    if (!raw) return;
+
+    addMessage("user", raw);
+
+    const key = normalizeKey(raw);
+    if (pendingAction) {
+      if (["yes", "y", "confirm", "ok", "okay", "do it"].includes(key)) {
+        await executePending();
+        return;
+      }
+      if (["no", "n", "cancel", "stop"].includes(key)) {
+        cancelPending();
+        return;
+      }
+      addMessage("assistant", "Please reply yes or no to confirm the last request.");
+      return;
+    }
+
+    if (pendingCreate) {
+      const handled = await continueCreateFlow(raw);
+      if (handled) return;
+    }
+
+    if (pendingEditTarget) {
+      const updates = parseUpdateFieldsOnly(raw);
+      if (Object.keys(updates).length) {
+        if (updates.category) {
+          const category =
+            pickCategory(updates.category, updates.type) ||
+            pickCategory(updates.category, "expense") ||
+            pickCategory(updates.category, "income");
+          if (!category) {
+            addMessage(
+              "assistant",
+              `Choose one of the default categories. Expense: ${formatCategoryList(
+                "expense"
+              )}. Income: ${formatCategoryList("income")}.`
+            );
+            return;
+          }
+          updates.category = category;
+        }
+        const fields = Object.entries(updates)
+          .map(([k, v]) => `${k}=${v}`)
+          .join(", ");
+        confirmAction(
+          `I can update record ${pendingEditTarget.id} with ${fields}.`,
+          { kind: "update", id: pendingEditTarget.id, updates }
+        );
+        return;
+      }
+      addMessage("assistant", "Tell me what to change, like: amount 45 or category dining.");
+      return;
+    }
+
+    if (isLegalQuery(key)) {
+      addMessage(
+        "assistant",
+        "I can’t help with legal or tax advice. I can help with spending insights or records."
+      );
+      return;
+    }
+
+    let llmResult = null;
+    try {
+      const records = await loadAllRecords();
+      const range = detectRange(raw);
+      const context = buildLlmContext(records, range);
+      llmResult = await api.walterlens.chat({ message: raw, context });
+    } catch (err) {
+      llmResult = null;
+    }
+
+    if (llmResult?.reply) {
+      addMessage("assistant", llmResult.reply);
+    }
+
+    if (llmResult?.action?.kind) {
+      const summary =
+        llmResult.actionSummary ||
+        `I can ${llmResult.action.kind} a record.`;
+      if (llmResult.action.kind === "update" && llmResult.action.id) {
+        confirmAction(
+          `${summary} (record ${llmResult.action.id})`,
+          {
+            kind: "update",
+            id: llmResult.action.id,
+            updates: llmResult.action.updates || {},
+          }
+        );
+        return;
+      }
+      if (llmResult.action.kind === "delete" && llmResult.action.id) {
+        confirmAction(`${summary} (record ${llmResult.action.id})`, {
+          kind: "delete",
+          id: llmResult.action.id,
+        });
+        return;
+      }
+      if (llmResult.action.kind === "create") {
+        const payload = llmResult.action.payload || {};
+        if (payload?.type && payload?.category && payload?.amount !== undefined) {
+          const category = pickCategory(payload.category, payload.type);
+          if (!category) {
+            addMessage(
+              "assistant",
+              `Choose one of the default categories: ${formatCategoryList(payload.type)}.`
+            );
+            return;
+          }
+        }
+        if (!payload?.type || !payload?.category || payload?.amount === undefined) {
+          startCreateFlow(payload);
+          return;
+        }
+        confirmAction(summary, { kind: "create", payload });
+        return;
+      }
+    }
+
+    if (llmResult?.intent && llmResult.intent !== "unknown" && llmResult.intent !== "refusal") {
+      return;
+    }
+
+    const intent = detectIntent(raw);
+
+    const deleteIntent = parseRecordDelete(raw);
+    if (deleteIntent) {
+      confirmAction(
+        `I can delete record ${deleteIntent.id}.`,
+        { kind: "delete", id: deleteIntent.id }
+      );
+      return;
+    }
+
+    const editIntent = parseRecordEdits(raw);
+    if (editIntent && Object.keys(editIntent.updates || {}).length) {
+      if (editIntent.updates.category) {
+        const category =
+          pickCategory(editIntent.updates.category, editIntent.updates.type) ||
+          pickCategory(editIntent.updates.category, "expense") ||
+          pickCategory(editIntent.updates.category, "income");
+        if (!category) {
+          addMessage(
+            "assistant",
+            `Choose one of the default categories. Expense: ${formatCategoryList(
+              "expense"
+            )}. Income: ${formatCategoryList("income")}.`
+          );
+          return;
+        }
+        editIntent.updates.category = category;
+      }
+      const fields = Object.entries(editIntent.updates)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(", ");
+      confirmAction(
+        `I can update record ${editIntent.id} with ${fields}.`,
+        { kind: "update", id: editIntent.id, updates: editIntent.updates }
+      );
+      return;
+    }
+
+    const createIntent = parseRecordCreate(raw);
+    if (createIntent) {
+      startCreateFlow(createIntent);
+      return;
+    }
+
+    if (intent === "create") {
+      startCreateFlow();
+      return;
+    }
+
+    if (intent === "list") {
+      await handleListRecords(raw);
+      return;
+    }
+
+    if (intent === "edit") {
+      let records = [];
+      try {
+        records = await loadAllRecords();
+      } catch {
+        addMessage("assistant", "I couldn't load records. Please check your login.");
+        return;
+      }
+      const lookup = parseRecordLookup(raw, records);
+      if (lookup) {
+        pendingEditTarget = { id: lookup.id };
+        addMessage(
+          "assistant",
+          `I found record ${lookup.id}: ${formatRecordLine(lookup)}. What should I change?`
+        );
+        return;
+      }
+    }
+
+    if (intent === "insight") {
+      await handleInsights(raw);
+      return;
+    }
+
+    addMessage(
+      "assistant",
+      pickFallback()
+    );
+  };
+
+  fab.addEventListener("click", () => togglePanel());
+  closeBtn.addEventListener("click", () => togglePanel(false));
+  sendBtn.addEventListener("click", () => {
+    handleMessage(input.value);
+    input.value = "";
+  });
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      handleMessage(input.value);
+      input.value = "";
+    }
+  });
+}
