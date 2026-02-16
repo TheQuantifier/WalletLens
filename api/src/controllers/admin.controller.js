@@ -27,6 +27,22 @@ export const listUsersAdmin = asyncHandler(async (req, res) => {
   res.json({ users });
 });
 
+export const listUserOptionsAdmin = asyncHandler(async (_req, res) => {
+  const { rows } = await query(
+    `
+    SELECT
+      id,
+      username,
+      email,
+      full_name,
+      COALESCE(NULLIF(trim(full_name), ''), NULLIF(trim(username), ''), email) AS display_name
+    FROM users
+    ORDER BY lower(COALESCE(NULLIF(trim(full_name), ''), NULLIF(trim(username), ''), email)) ASC
+    `
+  );
+  res.json({ users: rows });
+});
+
 export const getUserAdmin = asyncHandler(async (req, res) => {
   const user = await findUserById(req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
@@ -191,4 +207,81 @@ export const deleteRecordAdminController = asyncHandler(async (req, res) => {
   });
 
   res.json({ message: "Record deleted", deletedReceipt: deleteReceiptFlag });
+});
+
+export const getAdminStatsController = asyncHandler(async (_req, res) => {
+  const { rows } = await query(
+    `
+    SELECT
+      (SELECT COUNT(*)::int FROM users) AS total_users,
+      (SELECT COUNT(*)::int FROM records) AS total_records,
+      (SELECT COUNT(*)::int FROM receipts) AS total_receipts
+    `
+  );
+  res.json({ stats: rows[0] || { total_users: 0, total_records: 0, total_receipts: 0 } });
+});
+
+export const listReceiptsAdminController = asyncHandler(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 200, 500);
+  const offset = Math.max(Number(req.query.offset) || 0, 0);
+  const userId = req.query.userId ? String(req.query.userId) : "";
+  if (!userId) {
+    return res.status(400).json({ message: "userId is required" });
+  }
+
+  const { rows } = await query(
+    `
+    SELECT
+      receipts.*,
+      users.full_name,
+      users.username,
+      users.email,
+      COALESCE(users.full_name, users.username, users.email) AS user_name
+    FROM receipts
+    JOIN users ON users.id = receipts.user_id
+    WHERE receipts.user_id = $1
+    ORDER BY receipts.created_at DESC
+    LIMIT $2 OFFSET $3
+    `,
+    [userId, limit, offset]
+  );
+
+  res.json({ receipts: rows });
+});
+
+export const listBudgetSheetsAdminController = asyncHandler(async (req, res) => {
+  const limit = Math.min(Number(req.query.limit) || 100, 300);
+  const userId = req.query.userId ? String(req.query.userId) : "";
+  const cadence = req.query.cadence ? String(req.query.cadence) : "";
+  if (!userId) {
+    return res.status(400).json({ message: "userId is required" });
+  }
+
+  const where = ["user_id = $1"];
+  const values = [userId];
+  let i = 2;
+
+  if (cadence) {
+    where.push(`cadence = $${i++}`);
+    values.push(cadence);
+  }
+
+  values.push(limit);
+
+  const { rows } = await query(
+    `
+    SELECT
+      id, user_id, cadence, period,
+      housing, utilities, groceries, transportation, dining, health, entertainment,
+      shopping, membership, miscellaneous, education, giving, savings,
+      custom_categories, created_at, updated_at
+    FROM budget_sheets
+    WHERE ${where.join(" AND ")}
+    ORDER BY created_at DESC
+    LIMIT $${i}
+    `,
+    values
+  );
+
+  res.json({ budgetSheets: rows });
 });

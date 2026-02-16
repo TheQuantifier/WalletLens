@@ -41,17 +41,48 @@
     </section>
 
     <section class="admin-grid">
+      <section class="card admin-panel" id="statsPanel">
+        <div class="admin-panel-header">
+          <div>
+            <h2>Overview</h2>
+            <p class="subtle">Live totals across the platform.</p>
+          </div>
+        </div>
+        <div class="admin-tags">
+          <div class="admin-tag admin-tag--users">
+            <span class="admin-tag-label">Users</span>
+            <strong id="statsUsers">0</strong>
+          </div>
+          <div class="admin-tag admin-tag--records">
+            <span class="admin-tag-label">Records</span>
+            <strong id="statsRecords">0</strong>
+          </div>
+          <div class="admin-tag admin-tag--receipts">
+            <span class="admin-tag-label">Receipts</span>
+            <strong id="statsReceipts">0</strong>
+          </div>
+        </div>
+        <p id="statsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </section>
+
       <section class="card admin-panel" id="usersPanel">
         <div class="admin-panel-header">
           <div>
             <h2>Users</h2>
-            <p class="subtle">Search users and update roles or profile data.</p>
+            <p class="subtle">Enter a username, name, or email to find a user and view related data.</p>
           </div>
           <div class="admin-actions">
-            <input id="userSearch" type="text" placeholder="Search name or email" autocomplete="off" />
-            <button class="btn btn--primary" id="userSearchBtn" type="button">Search</button>
+            <input
+              id="userSearch"
+              type="text"
+              placeholder="Enter username, name, or email"
+              autocomplete="off"
+              list="adminUserOptions"
+            />
+            <button class="btn btn--primary" id="userSearchBtn" type="button">Find User</button>
           </div>
         </div>
+        <datalist id="adminUserOptions"></datalist>
 
         <p id="usersStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
 
@@ -89,62 +120,113 @@
         </div>
       </section>
 
-      <section class="card admin-panel" id="recordsPanel">
-        <div class="admin-panel-header">
-          <div>
-            <h2>Records</h2>
-            <p class="subtle">View and edit records across all users.</p>
+      <section id="userDataSections" class="admin-grid is-hidden">
+        <section class="card admin-panel" id="recordsPanel">
+          <div class="admin-panel-header">
+            <div>
+              <h2>Records</h2>
+              <p id="recordsContext" class="subtle">Search for a user to view records.</p>
+            </div>
+            <div class="admin-actions">
+              <select id="recordsType">
+                <option value="">All types</option>
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+              <button class="btn btn--primary" id="recordsSearchBtn" type="button">Apply Filter</button>
+            </div>
           </div>
-          <div class="admin-actions">
-            <input id="recordsUserId" type="text" placeholder="Filter by name or email" />
-            <select id="recordsType">
-              <option value="">All types</option>
-              <option value="expense">Expense</option>
-              <option value="income">Income</option>
-            </select>
-            <button class="btn btn--primary" id="recordsSearchBtn" type="button">Search</button>
+
+          <p id="recordsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="date">
+                      Date <span class="sort-arrow" data-arrow-for="records:date">↕</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="userName">
+                      User Name <span class="sort-arrow" data-arrow-for="records:userName">↕</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="type">
+                      Type <span class="sort-arrow" data-arrow-for="records:type">↕</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="category">
+                      Category <span class="sort-arrow" data-arrow-for="records:category">↕</span>
+                    </button>
+                  </th>
+                  <th class="num">
+                    <button type="button" class="admin-sort-btn admin-sort-btn--num" data-table="records" data-key="amount">
+                      Amount <span class="sort-arrow" data-arrow-for="records:amount">↕</span>
+                    </button>
+                  </th>
+                  <th class="actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTbody">
+                <tr><td colspan="6" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
           </div>
-        </div>
+        </section>
 
-        <p id="recordsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+        <section class="card admin-panel" id="receiptsPanel">
+          <div class="admin-panel-header">
+            <div>
+              <h2>Receipts</h2>
+              <p class="subtle">Receipts uploaded by the selected user.</p>
+            </div>
+          </div>
+          <p id="receiptsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Date Added</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody id="receiptsTbody">
+                <tr><td colspan="4" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
 
-        <div class="table-wrap">
-          <table class="admin-table">
-            <thead>
-              <tr>
-                <th>
-                  <button type="button" class="admin-sort-btn" data-table="records" data-key="date">
-                    Date <span class="sort-arrow" data-arrow-for="records:date">↕</span>
-                  </button>
-                </th>
-                <th>
-                  <button type="button" class="admin-sort-btn" data-table="records" data-key="userName">
-                    User Name <span class="sort-arrow" data-arrow-for="records:userName">↕</span>
-                  </button>
-                </th>
-                <th>
-                  <button type="button" class="admin-sort-btn" data-table="records" data-key="type">
-                    Type <span class="sort-arrow" data-arrow-for="records:type">↕</span>
-                  </button>
-                </th>
-                <th>
-                  <button type="button" class="admin-sort-btn" data-table="records" data-key="category">
-                    Category <span class="sort-arrow" data-arrow-for="records:category">↕</span>
-                  </button>
-                </th>
-                <th class="num">
-                  <button type="button" class="admin-sort-btn admin-sort-btn--num" data-table="records" data-key="amount">
-                    Amount <span class="sort-arrow" data-arrow-for="records:amount">↕</span>
-                  </button>
-                </th>
-                <th class="actions-col">Actions</th>
-              </tr>
-            </thead>
-            <tbody id="recordsTbody">
-              <tr><td colspan="6" class="subtle">Loading…</td></tr>
-            </tbody>
-          </table>
-        </div>
+        <section class="card admin-panel" id="budgetsPanel">
+          <div class="admin-panel-header">
+            <div>
+              <h2>Budgets</h2>
+              <p class="subtle">Budget sheets for the selected user.</p>
+            </div>
+          </div>
+          <p id="budgetsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Cadence</th>
+                  <th>Period</th>
+                  <th>Created</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody id="budgetsTbody">
+                <tr><td colspan="4" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
       </section>
 
       <section class="card admin-panel" id="settingsPanel">

@@ -31,6 +31,46 @@
   gap: var(--space-5);
 }
 
+.admin-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-3);
+}
+
+.admin-tag {
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  border: 1px solid transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.admin-tag-label {
+  font-size: 0.85rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.admin-tag--users {
+  background: #e6f4ea;
+  border-color: #9fd8ae;
+  color: #1f6f37;
+}
+
+.admin-tag--records {
+  background: #e6efff;
+  border-color: #a6c1ff;
+  color: #1f4fa8;
+}
+
+.admin-tag--receipts {
+  background: #fff2e5;
+  border-color: #ffc691;
+  color: #99530b;
+}
+
 .admin-panel {
   padding: var(--space-5);
 }

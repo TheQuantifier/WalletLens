@@ -502,9 +502,17 @@ export const appSettings = {
 // ADMIN MODULE
 // ======================================================================
 export const admin = {
+  getStats() {
+    return request("/admin/stats");
+  },
+
   listUsers(params = {}) {
     const query = new URLSearchParams(params).toString();
     return request(`/admin/users${query ? `?${query}` : ""}`);
+  },
+
+  listUserOptions() {
+    return request("/admin/users/options");
   },
 
   getUser(id) {
@@ -521,6 +529,16 @@ export const admin = {
   listRecords(params = {}) {
     const query = new URLSearchParams(params).toString();
     return request(`/admin/records${query ? `?${query}` : ""}`);
+  },
+
+  listReceipts(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/admin/receipts${query ? `?${query}` : ""}`);
+  },
+
+  listBudgetSheets(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/admin/budget-sheets${query ? `?${query}` : ""}`);
   },
 
   getRecord(id) {

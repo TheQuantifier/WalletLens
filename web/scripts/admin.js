@@ -2,16 +2,29 @@
 import { api } from "./api.js";
 
 const els = {
+  statsUsers: document.getElementById("statsUsers"),
+  statsRecords: document.getElementById("statsRecords"),
+  statsReceipts: document.getElementById("statsReceipts"),
+  statsStatus: document.getElementById("statsStatus"),
+
   usersTbody: document.getElementById("usersTbody"),
   usersStatus: document.getElementById("usersStatus"),
   userSearch: document.getElementById("userSearch"),
   userSearchBtn: document.getElementById("userSearchBtn"),
+  userOptions: document.getElementById("adminUserOptions"),
+  userDataSections: document.getElementById("userDataSections"),
 
   recordsTbody: document.getElementById("recordsTbody"),
   recordsStatus: document.getElementById("recordsStatus"),
-  recordsUserId: document.getElementById("recordsUserId"),
+  recordsContext: document.getElementById("recordsContext"),
   recordsType: document.getElementById("recordsType"),
   recordsSearchBtn: document.getElementById("recordsSearchBtn"),
+
+  receiptsTbody: document.getElementById("receiptsTbody"),
+  receiptsStatus: document.getElementById("receiptsStatus"),
+
+  budgetsTbody: document.getElementById("budgetsTbody"),
+  budgetsStatus: document.getElementById("budgetsStatus"),
 
   settingsForm: document.getElementById("settingsForm"),
   appNameInput: document.getElementById("appNameInput"),
@@ -39,8 +52,13 @@ const els = {
 };
 
 const state = {
+  selectedUserId: "",
+  selectedUser: null,
+  userOptions: [],
   users: [],
   records: [],
+  receipts: [],
+  budgetSheets: [],
   sorts: {
     users: { key: "", dir: "" },
     records: { key: "", dir: "" },
@@ -54,6 +72,11 @@ function setStatus(el, message, variant = "info") {
   if (variant === "error") el.classList.add("is-error");
   if (variant === "ok") el.classList.add("is-ok");
   if (!message) el.classList.add("is-hidden");
+}
+
+function setText(el, value) {
+  if (!el) return;
+  el.textContent = String(value ?? "");
 }
 
 function openModal(modal) {
@@ -103,6 +126,20 @@ function formatDate(value) {
 
 function normalizeText(value) {
   return String(value || "").toLowerCase().trim();
+}
+
+function formatNumber(value) {
+  const num = Number(value || 0);
+  return new Intl.NumberFormat("en-US").format(Number.isFinite(num) ? num : 0);
+}
+
+function getUserLabel(user) {
+  return user?.display_name || user?.full_name || user?.fullName || user?.username || user?.email || user?.id;
+}
+
+function toggleUserDataSections(show) {
+  if (!els.userDataSections) return;
+  els.userDataSections.classList.toggle("is-hidden", !show);
 }
 
 function getSortableValue(table, row, key) {
@@ -182,11 +219,12 @@ function renderUsers() {
     .map(
       (user) => `
         <tr>
-          <td>${user.full_name || user.fullName || user.username || "—"}</td>
-          <td>${user.email}</td>
-          <td>${user.role}</td>
+          <td>${getUserLabel(user)}</td>
+          <td>${user.email || "—"}</td>
+          <td>${user.role || "user"}</td>
           <td>${formatDate(user.created_at || user.createdAt)}</td>
           <td>
+            <button class="btn btn--link" data-action="view-user" data-id="${user.id}">View Data</button>
             <button class="btn btn--link" data-action="edit-user" data-id="${user.id}">Edit</button>
           </td>
         </tr>
@@ -195,16 +233,205 @@ function renderUsers() {
     .join("");
 }
 
-async function loadUsers() {
-  setStatus(els.usersStatus, "Loading users...");
+function renderUserOptions() {
+  if (!els.userOptions) return;
+  els.userOptions.innerHTML = state.userOptions
+    .map((user) => {
+      const value = getUserLabel(user);
+      return `<option value="${value}"></option>`;
+    })
+    .join("");
+}
+
+function updateRecordsContext() {
+  if (!els.recordsContext) return;
+  const user = state.selectedUser;
+  if (!user) {
+    els.recordsContext.textContent = "Search for a user to view records.";
+    return;
+  }
+  els.recordsContext.textContent = `Showing records for ${getUserLabel(user)}.`;
+}
+
+function renderRecords() {
+  if (!els.recordsTbody) return;
+  const rows = sortRows("records", state.records);
+  if (!rows.length) {
+    const message = state.selectedUserId
+      ? "No records found for this user."
+      : "Search and select a user to view records.";
+    els.recordsTbody.innerHTML = `<tr><td colspan="6" class="subtle">${message}</td></tr>`;
+    return;
+  }
+
+  els.recordsTbody.innerHTML = rows
+    .map(
+      (record) => `
+        <tr>
+          <td>${formatDate(record.date)}</td>
+          <td>${record.user_name || record.full_name || record.username || record.email || record.user_id}</td>
+          <td>${record.type}</td>
+          <td>${record.category || "—"}</td>
+          <td class="num">${Number(record.amount || 0).toFixed(2)}</td>
+          <td>
+            <button class="btn btn--link" data-action="edit-record" data-id="${record.id}">Edit</button>
+            <button class="btn btn--link" data-action="delete-record" data-id="${record.id}">Delete</button>
+          </td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function renderReceipts() {
+  if (!els.receiptsTbody) return;
+  if (!state.receipts.length) {
+    els.receiptsTbody.innerHTML = `<tr><td colspan="4" class="subtle">No receipts found for this user.</td></tr>`;
+    return;
+  }
+
+  els.receiptsTbody.innerHTML = state.receipts
+    .map((receipt) => {
+      const source =
+        receipt.source ||
+        receipt.parsed_data?.source ||
+        receipt.original_filename ||
+        receipt.object_key ||
+        "—";
+      const status = receipt.processing_status || "processed";
+      return `
+        <tr>
+          <td>${formatDate(receipt.created_at || receipt.date_added || receipt.updated_at)}</td>
+          <td>${source}</td>
+          <td>${status}</td>
+          <td class="num">${Number(receipt.amount || 0).toFixed(2)}</td>
+        </tr>
+      `;
+    })
+    .join("");
+}
+
+function renderBudgetSheets() {
+  if (!els.budgetsTbody) return;
+  if (!state.budgetSheets.length) {
+    els.budgetsTbody.innerHTML = `<tr><td colspan="4" class="subtle">No budget sheets found for this user.</td></tr>`;
+    return;
+  }
+
+  els.budgetsTbody.innerHTML = state.budgetSheets
+    .map(
+      (sheet) => `
+        <tr>
+          <td>${sheet.cadence || "—"}</td>
+          <td>${sheet.period || "—"}</td>
+          <td>${formatDate(sheet.created_at)}</td>
+          <td>${formatDate(sheet.updated_at)}</td>
+        </tr>
+      `
+    )
+    .join("");
+}
+
+function resetUserScopedData() {
+  state.selectedUserId = "";
+  state.selectedUser = null;
+  state.records = [];
+  state.receipts = [];
+  state.budgetSheets = [];
+  toggleUserDataSections(false);
+  updateRecordsContext();
+  renderRecords();
+  renderReceipts();
+  renderBudgetSheets();
+}
+
+function resolveUserForQuery(users, query) {
+  const normalized = normalizeText(query);
+  if (!normalized) return users.length === 1 ? users[0] : null;
+
+  const exact = users.find((user) => {
+    const display = normalizeText(getUserLabel(user));
+    return (
+      normalizeText(user.username) === normalized ||
+      normalizeText(user.email) === normalized ||
+      normalizeText(user.full_name || user.fullName || "") === normalized ||
+      display === normalized
+    );
+  });
+  return exact || (users.length === 1 ? users[0] : null);
+}
+
+async function loadStats() {
   try {
-    const q = els.userSearch?.value?.trim() || "";
+    const { stats } = await api.admin.getStats();
+    setText(els.statsUsers, formatNumber(stats?.total_users));
+    setText(els.statsRecords, formatNumber(stats?.total_records));
+    setText(els.statsReceipts, formatNumber(stats?.total_receipts));
+    setStatus(els.statsStatus, "");
+  } catch (err) {
+    console.error(err);
+    setStatus(els.statsStatus, err.message || "Failed to load overview stats.", "error");
+  }
+}
+
+async function loadUserOptions() {
+  try {
+    const { users } = await api.admin.listUserOptions();
+    state.userOptions = users || [];
+    renderUserOptions();
+  } catch (err) {
+    console.error(err);
+    setStatus(els.usersStatus, err.message || "Failed to load user dropdown options.", "error");
+  }
+}
+
+function findUserFromSearchInput(raw) {
+  const normalized = normalizeText(raw);
+  if (!normalized) return null;
+  return (
+    state.userOptions.find((user) => {
+      return (
+        normalizeText(user.username) === normalized ||
+        normalizeText(user.email) === normalized ||
+        normalizeText(getUserLabel(user)) === normalized
+      );
+    }) || null
+  );
+}
+
+async function loadUsers() {
+  const q = els.userSearch?.value?.trim() || "";
+  if (!q) {
+    state.users = [];
+    renderUsers();
+    resetUserScopedData();
+    setStatus(els.usersStatus, "Enter a username, name, or email to search.", "error");
+    return;
+  }
+
+  setStatus(els.usersStatus, "Searching users...");
+  try {
     const { users } = await api.admin.listUsers({ q, limit: 50, offset: 0 });
     state.users = users || [];
     renderUsers();
-    setStatus(els.usersStatus, "");
+    if (!state.users.length) {
+      setStatus(els.usersStatus, "No users found.", "error");
+      resetUserScopedData();
+      return;
+    }
+
+    const optionMatch = findUserFromSearchInput(q);
+    const targetUser = optionMatch || resolveUserForQuery(state.users, q);
+    if (targetUser) {
+      await loadUserDataForUser(targetUser);
+      setStatus(els.usersStatus, `Found ${state.users.length} user(s).`);
+    } else {
+      resetUserScopedData();
+      setStatus(els.usersStatus, "Multiple users matched. Select one with View Data.");
+    }
   } catch (err) {
     console.error(err);
+    resetUserScopedData();
     setStatus(els.usersStatus, err.message || "Failed to load users.", "error");
   }
 }
@@ -234,7 +461,7 @@ async function saveUser(event) {
       role: els.userRole.value,
     });
     setStatus(els.userStatus, "User updated.", "ok");
-    await loadUsers();
+    await Promise.all([loadUsers(), loadUserOptions(), loadStats()]);
     closeModal(els.userModal);
   } catch (err) {
     console.error(err);
@@ -242,40 +469,17 @@ async function saveUser(event) {
   }
 }
 
-function renderRecords() {
-  if (!els.recordsTbody) return;
-  const rows = sortRows("records", state.records);
-  if (!rows.length) {
-    els.recordsTbody.innerHTML = `<tr><td colspan="6" class="subtle">No records found.</td></tr>`;
+async function loadRecords() {
+  if (!state.selectedUserId) {
+    state.records = [];
+    renderRecords();
     return;
   }
 
-  els.recordsTbody.innerHTML = rows
-    .map(
-      (record) => `
-        <tr>
-          <td>${formatDate(record.date)}</td>
-          <td>${record.user_name || record.full_name || record.username || record.email || record.user_id}</td>
-          <td>${record.type}</td>
-          <td>${record.category || "—"}</td>
-          <td class="num">${Number(record.amount || 0).toFixed(2)}</td>
-          <td>
-            <button class="btn btn--link" data-action="edit-record" data-id="${record.id}">Edit</button>
-            <button class="btn btn--link" data-action="delete-record" data-id="${record.id}">Delete</button>
-          </td>
-        </tr>
-      `
-    )
-    .join("");
-}
-
-async function loadRecords() {
   setStatus(els.recordsStatus, "Loading records...");
   try {
-    const userQuery = els.recordsUserId?.value?.trim() || "";
     const type = els.recordsType?.value || "";
-    const params = { limit: 100, offset: 0 };
-    if (userQuery) params.q = userQuery;
+    const params = { limit: 100, offset: 0, userId: state.selectedUserId };
     if (type) params.type = type;
 
     const { records } = await api.admin.listRecords(params);
@@ -286,6 +490,64 @@ async function loadRecords() {
     console.error(err);
     setStatus(els.recordsStatus, err.message || "Failed to load records.", "error");
   }
+}
+
+async function loadReceipts() {
+  if (!state.selectedUserId) {
+    state.receipts = [];
+    renderReceipts();
+    return;
+  }
+
+  setStatus(els.receiptsStatus, "Loading receipts...");
+  try {
+    const { receipts } = await api.admin.listReceipts({
+      userId: state.selectedUserId,
+      limit: 100,
+      offset: 0,
+    });
+    state.receipts = receipts || [];
+    renderReceipts();
+    setStatus(els.receiptsStatus, "");
+  } catch (err) {
+    console.error(err);
+    setStatus(els.receiptsStatus, err.message || "Failed to load receipts.", "error");
+  }
+}
+
+async function loadBudgetSheets() {
+  if (!state.selectedUserId) {
+    state.budgetSheets = [];
+    renderBudgetSheets();
+    return;
+  }
+
+  setStatus(els.budgetsStatus, "Loading budgets...");
+  try {
+    const { budgetSheets } = await api.admin.listBudgetSheets({
+      userId: state.selectedUserId,
+      limit: 100,
+    });
+    state.budgetSheets = budgetSheets || [];
+    renderBudgetSheets();
+    setStatus(els.budgetsStatus, "");
+  } catch (err) {
+    console.error(err);
+    setStatus(els.budgetsStatus, err.message || "Failed to load budgets.", "error");
+  }
+}
+
+async function loadUserDataForUser(user) {
+  if (!user?.id) {
+    resetUserScopedData();
+    return;
+  }
+
+  state.selectedUserId = user.id;
+  state.selectedUser = user;
+  toggleUserDataSections(true);
+  updateRecordsContext();
+  await Promise.all([loadRecords(), loadReceipts(), loadBudgetSheets()]);
 }
 
 function openRecordModal(record) {
@@ -332,7 +594,7 @@ async function deleteRecord(id) {
   setStatus(els.recordsStatus, "Deleting record...");
   try {
     await api.admin.deleteRecord(id, deleteReceipt);
-    await loadRecords();
+    await Promise.all([loadRecords(), loadReceipts(), loadStats()]);
     setStatus(els.recordsStatus, "Record deleted.", "ok");
   } catch (err) {
     console.error(err);
@@ -380,6 +642,17 @@ async function saveSettings(event) {
   }
 }
 
+function tryOpenUserDropdown() {
+  if (!els.userSearch) return;
+  if (typeof els.userSearch.showPicker === "function") {
+    try {
+      els.userSearch.showPicker();
+    } catch {
+      // no-op
+    }
+  }
+}
+
 function bindEvents() {
   document.querySelectorAll(".admin-sort-btn[data-table][data-key]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -398,10 +671,23 @@ function bindEvents() {
         loadUsers();
       }
     });
+
+    els.userSearch.addEventListener("change", () => {
+      if (els.userSearch.value.trim()) {
+        loadUsers();
+      }
+    });
+
+    els.userSearch.addEventListener("click", tryOpenUserDropdown);
+    els.userSearch.addEventListener("focus", tryOpenUserDropdown);
   }
 
   if (els.recordsSearchBtn) {
     els.recordsSearchBtn.addEventListener("click", loadRecords);
+  }
+
+  if (els.recordsType) {
+    els.recordsType.addEventListener("change", loadRecords);
   }
 
   if (els.userForm) {
@@ -428,6 +714,11 @@ function bindEvents() {
       openUserModal(user);
     }
 
+    if (action === "view-user") {
+      const user = state.users.find((u) => u.id === id);
+      loadUserDataForUser(user);
+    }
+
     if (action === "edit-record") {
       const record = state.records.find((r) => r.id === id);
       openRecordModal(record);
@@ -445,9 +736,18 @@ async function init() {
   bindModalClose();
   bindEvents();
   updateSortArrows();
-  await loadUsers();
-  await loadRecords();
-  await loadSettings();
+  toggleUserDataSections(false);
+  renderUsers();
+  renderRecords();
+  renderReceipts();
+  renderBudgetSheets();
+  setStatus(els.usersStatus, "");
+  setStatus(els.recordsStatus, "");
+  setStatus(els.receiptsStatus, "");
+  setStatus(els.budgetsStatus, "");
+  updateRecordsContext();
+
+  await Promise.all([loadStats(), loadUserOptions(), loadSettings()]);
 }
 
 init();
