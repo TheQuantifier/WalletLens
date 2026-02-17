@@ -237,6 +237,10 @@ export const records = {
     return request(`/records${query ? `?${query}` : ""}`);
   },
 
+  categories() {
+    return request("/records/categories");
+  },
+
   stats() {
     return request("/records/stats");
   },
@@ -268,6 +272,18 @@ export const records = {
     const query =
       deleteReceipt === undefined ? "" : `?deleteReceipt=${deleteReceipt}`;
     return request(`/records/${id}${query}`, { method: "DELETE" });
+  },
+};
+
+// ======================================================================
+// WALTERLENS MODULE
+// ======================================================================
+export const walterlens = {
+  chat({ message, context }) {
+    return request("/walterlens/chat", {
+      method: "POST",
+      body: JSON.stringify({ message, context }),
+    });
   },
 };
 
@@ -634,6 +650,7 @@ export const api = {
   auth,
   records,
   receipts,
+  walterlens,
   budgetSheets,
   fxRates,
   activity,

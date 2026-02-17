@@ -849,3 +849,199 @@ textarea:focus-visible {
 :root[data-theme="dark"] .footer-careers {
   color: #ffffff;
 }
+
+/* =========================================================
+   WALTERLENS CHAT WIDGET
+   ========================================================= */
+
+.walterlens-widget {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 1200;
+}
+
+.walterlens-fab {
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 10px 20px rgba(0,0,0,0.18);
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.walterlens-fab:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 22px rgba(0,0,0,0.22);
+}
+
+.walterlens-fab:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+.walterlens-fab__logo {
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.walterlens-panel {
+  position: absolute;
+  right: 0;
+  bottom: 72px;
+  width: min(360px, calc(100vw - 2rem));
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: 0 16px 40px rgba(0,0,0,0.18);
+  display: flex;
+  flex-direction: column;
+  opacity: 0;
+  transform: translateX(110%);
+  pointer-events: none;
+  transition: transform 0.22s ease, opacity 0.22s ease;
+}
+
+.walterlens-panel.is-open {
+  opacity: 1;
+  transform: translateX(0);
+  pointer-events: auto;
+}
+
+.walterlens-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.9rem 1rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  gap: 0.75rem;
+}
+
+.walterlens-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.walterlens-title__logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+}
+
+.walterlens-header h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.walterlens-header p {
+  margin: 0.1rem 0 0;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.walterlens-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.75rem 0.9rem 0;
+}
+
+.walterlens-suggestion {
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.walterlens-suggestion:hover {
+  border-color: var(--accent);
+}
+
+.walterlens-close {
+  border: none;
+  background: transparent;
+  font-size: 1.3rem;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.walterlens-messages {
+  padding: 0.9rem 1rem;
+  display: grid;
+  gap: 0.6rem;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.walterlens-msg {
+  padding: 0.55rem 0.7rem;
+  border-radius: 12px;
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.walterlens-msg--assistant {
+  background: rgba(0,87,184,0.08);
+  color: var(--text);
+  justify-self: start;
+}
+
+.walterlens-msg--user {
+  background: rgba(0,163,224,0.12);
+  color: var(--text);
+  justify-self: end;
+}
+
+.walterlens-input {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-top: 1px solid var(--border);
+  align-items: center;
+}
+
+.walterlens-input input {
+  flex: 1;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.6rem 0.7rem;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.walterlens-input input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.walterlens-send {
+  border: none;
+  background: var(--primary);
+  color: #fff;
+  border-radius: 10px;
+  padding: 0.6rem 0.9rem;
+  cursor: pointer;
+}
+
+@media (max-width: 720px) {
+  .walterlens-panel {
+    right: 0;
+    bottom: 68px;
+  }
+}

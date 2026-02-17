@@ -12,6 +12,8 @@ import {
 
 import { query } from "../config/db.js";
 import { logActivity } from "../services/activity.service.js";
+import { findUserById } from "../models/user.model.js";
+import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../constants/categories.js";
 
 // ==========================================================
 // Helper: Parse YYYY-MM-DD into a stable UTC-noon Date
@@ -62,6 +64,36 @@ export const getAll = asyncHandler(async (req, res) => {
 export const getStats = asyncHandler(async (req, res) => {
   const totalRecords = await countRecordsByUser(req.user.id);
   res.json({ totalRecords });
+});
+
+// ==========================================================
+// GET /api/records/categories
+// ==========================================================
+export const getCategories = asyncHandler(async (req, res) => {
+  const user = await findUserById(req.user.id);
+  const customExpense = Array.isArray(user?.custom_expense_categories)
+    ? user.custom_expense_categories
+    : [];
+  const customIncome = Array.isArray(user?.custom_income_categories)
+    ? user.custom_income_categories
+    : [];
+
+  const merge = (base, custom) => {
+    const seen = new Set();
+    const out = [];
+    [...base, ...custom].forEach((name) => {
+      const key = String(name || "").trim().toLowerCase();
+      if (!key || seen.has(key)) return;
+      seen.add(key);
+      out.push(String(name).trim());
+    });
+    return out;
+  };
+
+  res.json({
+    expense: merge(EXPENSE_CATEGORIES, customExpense),
+    income: merge(INCOME_CATEGORIES, customIncome),
+  });
 });
 
 // ==========================================================

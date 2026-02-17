@@ -20,6 +20,7 @@ import { api } from "./api.js";
 
     toggleExp: $("#toggle-expenses"),
     toggleInc: $("#toggle-income"),
+
   };
 
   let cache = [];
@@ -349,6 +350,7 @@ import { api } from "./api.js";
     el.textContent = text;
   };
 
+
   const computeAndRender = () => {
     const rangeVal = els.range?.value || "all";
     const normalized = normalize(cache);
@@ -606,4 +608,3 @@ import { api } from "./api.js";
     load();
   });
 })();
-

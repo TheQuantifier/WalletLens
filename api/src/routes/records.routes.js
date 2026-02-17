@@ -27,6 +27,7 @@ router.param("id", (req, res, next, id) => {
 |--------------------------------------------------------------------------
 */
 router.get("/stats", auth, controller.getStats);
+router.get("/categories", auth, controller.getCategories);
 router.get("/", auth, controller.getAll);
 
 /*
