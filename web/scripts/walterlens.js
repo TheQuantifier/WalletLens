@@ -15,7 +15,7 @@ const SUGGESTION_PROMPTS = [
   "Show expenses last 30 days",
   "Add record",
   "Add expense 12.50 coffee today",
-  "Edit record 2d4221f0-120f-4f48-92de-b34f9a8fce4d amount 45",
+  "Edit record",
 ];
 
 const PUBLIC_SUGGESTION_PROMPTS = [
@@ -967,10 +967,116 @@ const parseRecordCreateSeed = (text) => {
 
 const parseRecordDelete = (text) => {
   const match = text.match(
-    new RegExp(`\\bdelete\\s+(?:record|transaction)\\s+#?${RECORD_ID_PATTERN}\\b`, "i")
+    new RegExp(`\\b(?:delete|remove)\\s+(?:record|transaction)\\s+#?${RECORD_ID_PATTERN}\\b`, "i")
   );
   if (!match) return null;
   return { id: match[1] };
+};
+
+const parseRecordIdReference = (text) => {
+  const match = text.match(
+    new RegExp(`\\b(?:record|transaction)\\s+#?${RECORD_ID_PATTERN}\\b`, "i")
+  );
+  return match ? match[1] : "";
+};
+
+const parseReferenceDate = (text) => {
+  const dateMatch = text.match(/\b(\d{4}-\d{2}-\d{2}|today|yesterday)\b/i);
+  if (dateMatch) {
+    const rel = relativeDateToISO(dateMatch[1]);
+    return rel || dateMatch[1];
+  }
+  return parseMonthNameDate(text) || "";
+};
+
+const parseReferenceAmount = (text) => {
+  const amountMatch =
+    text.match(/\b(?:amount|for|of)\s+\$?([0-9]+(?:\.[0-9]{1,2})?)\b/i) ||
+    text.match(/\$\s*([0-9]+(?:\.[0-9]{1,2})?)\b/i);
+  if (amountMatch) {
+    const amount = Number(amountMatch[1]);
+    return Number.isFinite(amount) ? amount : null;
+  }
+  const onlyNumber = String(text || "").trim().match(/^([0-9]+(?:\.[0-9]{1,2})?)$/);
+  if (!onlyNumber) return null;
+  const amount = Number(onlyNumber[1]);
+  return Number.isFinite(amount) ? amount : null;
+};
+
+const parseRecordReferenceHints = (text, records = []) => {
+  const key = normalizeText(text);
+  const typeMatch = key.match(/\b(expense|expenses|income)\b/);
+  const type =
+    typeMatch && typeMatch[1].includes("income") ? "income" : typeMatch ? "expense" : "";
+  const categories = [...new Set((records || []).map((r) => r.category).filter(Boolean))];
+  const categoryHint = extractCategoryHint(text);
+  const category =
+    (categoryHint ? pickBestMatch(categoryHint, categories) : null) ||
+    pickBestMatch(text, categories) ||
+    "";
+  const date = parseReferenceDate(text);
+  const amount = parseReferenceAmount(text);
+  const noteMatch = text.match(/\bnote\s+(.+)$/i);
+  const note = noteMatch ? noteMatch[1].trim() : "";
+
+  const freeText = text
+    .replace(/\b(edit|update|change|delete|remove)\b/gi, " ")
+    .replace(/\b(record|transaction)\b/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return { type, category, date, amount, note, freeText };
+};
+
+const filterRecordsByReferenceHints = (records, hints = {}) => {
+  let out = records.slice();
+  if (hints.type) {
+    out = out.filter((r) => normalizeText(r.type) === normalizeText(hints.type));
+  }
+  if (hints.category) {
+    out = out.filter(
+      (r) => normalizeText(r.category || "") === normalizeText(hints.category || "")
+    );
+  }
+  if (hints.date) {
+    out = out.filter((r) => {
+      const d = parseISODate(r?.date);
+      if (!d || Number.isNaN(d.getTime())) return false;
+      return formatDateOnly(d) === hints.date;
+    });
+  }
+  if (hints.amount !== null && hints.amount !== undefined) {
+    out = out.filter((r) => Math.abs(Number(r.amount || 0) - Number(hints.amount)) < 0.01);
+  }
+  if (hints.note) {
+    out = out.filter((r) => scoreMatch(hints.note, r?.note || "") >= 0.45);
+  }
+  if (hints.freeText) {
+    out = out.filter(
+      (r) =>
+        scoreMatch(hints.freeText, r?.note || "") >= 0.45 ||
+        scoreMatch(hints.freeText, r?.category || "") >= 0.45
+    );
+  }
+  return out;
+};
+
+const recordExactTs = (record) => {
+  const d1 = parseISODate(record?.created_at || record?.createdAt);
+  if (d1 && !Number.isNaN(d1.getTime())) return d1.getTime();
+  const d2 = parseISODate(record?.date);
+  if (d2 && !Number.isNaN(d2.getTime())) return d2.getTime();
+  return 0;
+};
+
+const formatRecordWithExactTime = (record, orderLabel) => {
+  const idLabel = record?.id ? `id:${record.id}` : "id:unknown";
+  const dt = parseISODate(record?.created_at || record?.createdAt || record?.date);
+  const timeLabel = dt && !Number.isNaN(dt.getTime()) ? dt.toLocaleString() : "unknown time";
+  const typeLabel = record?.type === "income" ? "Income" : "Expense";
+  const category = record?.category || "Uncategorized";
+  const amountLabel = fmtMoney(record?.amount || 0, record?.currency || "USD");
+  return `${orderLabel}. ${idLabel} · ${timeLabel} · ${typeLabel} · ${category} · ${amountLabel}`;
 };
 
 const parseRecordLookup = (text, records) => {
@@ -1140,6 +1246,7 @@ export function initWalterLens() {
   let pendingCreate = null;
   let pendingEditField = null;
   let pendingEditRecord = null;
+  let pendingRecordResolution = null;
 
   let isHandlingMessage = false;
   let responseBuffer = [];
@@ -1217,6 +1324,7 @@ export function initWalterLens() {
     pendingCreate = null;
     pendingEditField = null;
     pendingEditRecord = null;
+    pendingRecordResolution = null;
     try {
       if (action.kind === "update") {
         await api.records.update(action.id, action.updates);
@@ -1242,7 +1350,188 @@ export function initWalterLens() {
     pendingCreate = null;
     pendingEditField = null;
     pendingEditRecord = null;
+    pendingRecordResolution = null;
     addMessage("assistant", "Cancelled. No changes were made.");
+  };
+
+  const completeRecordResolution = (record, mode) => {
+    const proposedUpdates =
+      mode === "edit" &&
+      pendingRecordResolution?.proposedUpdates &&
+      Object.keys(pendingRecordResolution.proposedUpdates).length
+        ? pendingRecordResolution.proposedUpdates
+        : null;
+    pendingRecordResolution = null;
+    if (!record?.id) {
+      addMessage("assistant", "I couldn't resolve a specific record. Please edit directly from Records.");
+      return true;
+    }
+
+    if (mode === "delete") {
+      confirmAction("I can delete that record.", { kind: "delete", id: record.id });
+      return true;
+    }
+
+    if (proposedUpdates) {
+      const fields = Object.entries(proposedUpdates)
+        .map(([k, v]) => `${k}=${v}`)
+        .join(", ");
+      confirmAction(
+        `I can update that record with ${fields}.`,
+        { kind: "update", id: record.id, updates: proposedUpdates }
+      );
+      return true;
+    }
+
+    pendingEditTarget = { id: record.id };
+    pendingEditRecord = record;
+    pendingEditField = null;
+    addMessage("assistant", `What would you like to edit for ${formatRecordDisplay(record)}?`);
+    return true;
+  };
+
+  const askForResolutionDate = () => {
+    addMessage(
+      "assistant",
+      "I found multiple matching records. Please provide the date first (YYYY-MM-DD, today, or yesterday)."
+    );
+  };
+
+  const askForResolutionAmount = () => {
+    addMessage(
+      "assistant",
+      "I still found multiple records. Please provide the exact amount next (for example, 24.99)."
+    );
+  };
+
+  const askForResolutionOrder = (matches) => {
+    const ordered = matches
+      .slice()
+      .sort((a, b) => recordExactTs(a) - recordExactTs(b))
+      .slice(0, 2);
+    addMessage(
+      "assistant",
+      [
+        "There are still two exact matches. Choose by exact date/time order:",
+        formatRecordWithExactTime(ordered[0], 1),
+        formatRecordWithExactTime(ordered[1], 2),
+        'Reply "1" or "2".',
+      ].join("\n")
+    );
+    return ordered;
+  };
+
+  const failDuplicateResolution = () => {
+    pendingRecordResolution = null;
+    addMessage(
+      "assistant",
+      "I found duplicate records and can't safely choose one. Please edit or delete it directly in the Records page."
+    );
+    return true;
+  };
+
+  const advanceRecordResolution = () => {
+    if (!pendingRecordResolution) return false;
+    const state = pendingRecordResolution;
+    const matches = filterRecordsByReferenceHints(state.records, state.hints);
+    state.matches = matches;
+
+    if (!matches.length) {
+      addMessage("assistant", "No records matched those details. Please try a different date or amount.");
+      return true;
+    }
+    if (matches.length === 1) {
+      return completeRecordResolution(matches[0], state.mode);
+    }
+
+    if (!state.hints.date) {
+      state.step = "need_date";
+      askForResolutionDate();
+      return true;
+    }
+    if (state.hints.amount === null || state.hints.amount === undefined) {
+      state.step = "need_amount";
+      askForResolutionAmount();
+      return true;
+    }
+    if (matches.length === 2) {
+      state.step = "choose_exact";
+      state.ordered = askForResolutionOrder(matches);
+      return true;
+    }
+    return failDuplicateResolution();
+  };
+
+  const startRecordResolution = (mode, rawText, records, options = {}) => {
+    const hints = parseRecordReferenceHints(rawText, records);
+    if (!hints.type && !hints.category && !hints.date && hints.amount === null && !hints.note && !hints.freeText) {
+      addMessage(
+        "assistant",
+        "Please include identifying details like category, type, date, or amount so I can find the right record."
+      );
+      return true;
+    }
+    pendingRecordResolution = {
+      mode,
+      rawText,
+      records,
+      hints,
+      proposedUpdates:
+        options?.proposedUpdates && typeof options.proposedUpdates === "object"
+          ? options.proposedUpdates
+          : null,
+      matches: [],
+      ordered: [],
+      step: "initial",
+    };
+    return advanceRecordResolution();
+  };
+
+  const continueRecordResolution = (rawInput) => {
+    if (!pendingRecordResolution) return false;
+    const state = pendingRecordResolution;
+    const key = normalizeText(rawInput);
+
+    if (["cancel", "stop"].includes(key)) {
+      pendingRecordResolution = null;
+      addMessage("assistant", "Cancelled target selection.");
+      return true;
+    }
+
+    if (state.step === "need_date") {
+      const date = parseReferenceDate(rawInput);
+      if (!date) {
+        askForResolutionDate();
+        return true;
+      }
+      state.hints.date = date;
+      return advanceRecordResolution();
+    }
+
+    if (state.step === "need_amount") {
+      const amount = parseReferenceAmount(rawInput);
+      if (amount === null || amount === undefined) {
+        askForResolutionAmount();
+        return true;
+      }
+      state.hints.amount = amount;
+      return advanceRecordResolution();
+    }
+
+    if (state.step === "choose_exact") {
+      const ordered = Array.isArray(state.ordered) ? state.ordered : [];
+      const pickFirst = ["1", "first", "earliest", "older"].includes(key);
+      const pickSecond = ["2", "second", "latest", "newer"].includes(key);
+      if (!pickFirst && !pickSecond) {
+        addMessage("assistant", 'Please reply "1" or "2".');
+        return true;
+      }
+      const record = pickSecond ? ordered[1] : ordered[0];
+      if (!record) return failDuplicateResolution();
+      return completeRecordResolution(record, state.mode);
+    }
+
+    return advanceRecordResolution();
   };
 
   const parseUpdateFieldsOnly = (text) => {
@@ -1640,6 +1929,11 @@ export function initWalterLens() {
       if (handled) return;
     }
 
+    if (pendingRecordResolution) {
+      const handled = continueRecordResolution(raw);
+      if (handled) return;
+    }
+
     if (pendingEditTarget) {
       if (!pendingEditRecord && pendingEditTarget.id) {
         try {
@@ -1693,11 +1987,57 @@ export function initWalterLens() {
       return;
     }
 
+      const earlyIntent = detectIntent(raw);
+      if (earlyIntent === "edit" || earlyIntent === "delete") {
+        const hasRecordScope =
+          /\b(record|transaction|expense|income|category|amount|note|date|today|yesterday)\b/i.test(
+            raw
+          ) || Boolean(parseRecordIdReference(raw));
+        if (!hasRecordScope) {
+          // Skip record resolution for non-record uses of "edit/delete/change".
+        } else {
+        let records = [];
+        try {
+          records = await loadAllRecords();
+        } catch {
+          addMessage("assistant", "I couldn't load records. Please check your login.");
+          return;
+        }
+
+        const idRef = parseRecordIdReference(raw);
+        if (idRef) {
+          const byId =
+            (records || []).find((r) => String(r?.id || "").toLowerCase() === String(idRef).toLowerCase()) ||
+            null;
+          if (!byId) {
+            addMessage("assistant", "I couldn't find that record id.");
+            return;
+          }
+          if (earlyIntent === "delete") {
+            confirmAction("I can delete that record.", { kind: "delete", id: byId.id });
+            return;
+          }
+          pendingEditTarget = { id: byId.id };
+          pendingEditRecord = byId;
+          pendingEditField = null;
+          addMessage(
+            "assistant",
+            `What would you like to edit for ${formatRecordDisplay(byId)}?`
+          );
+          return;
+        }
+
+        const resolved = startRecordResolution(earlyIntent, raw, records);
+        if (resolved) return;
+        }
+      }
+
       let llmResult = null;
+      let llmRecords = [];
       try {
-        const records = await loadAllRecords();
+        llmRecords = await loadAllRecords();
         const range = detectRange(raw);
-        const context = buildLlmContext(records, range);
+        const context = buildLlmContext(llmRecords, range);
         llmResult = await api.walterlens.chat({ message: raw, context });
       } catch (err) {
         llmResult = null;
@@ -1708,6 +2048,25 @@ export function initWalterLens() {
           llmResult.actionSummary ||
           `I can ${llmResult.action.kind} a record.`;
         if (llmResult.action.kind === "update" && llmResult.action.id) {
+          const userProvidedId = Boolean(parseRecordIdReference(raw));
+          const idMatch = (llmRecords || []).find(
+            (r) =>
+              String(r?.id || "").toLowerCase() ===
+              String(llmResult.action.id || "").toLowerCase()
+          );
+          if (!userProvidedId) {
+            const resolved = startRecordResolution("edit", raw, llmRecords || [], {
+              proposedUpdates: llmResult.action.updates || {},
+            });
+            if (resolved) return;
+          }
+          if (!idMatch) {
+            addMessage(
+              "assistant",
+              "I couldn't safely identify a single record from that request. Please include date and amount, or edit it directly in Records."
+            );
+            return;
+          }
           confirmAction(summary, {
             kind: "update",
             id: llmResult.action.id,
@@ -1716,6 +2075,23 @@ export function initWalterLens() {
           return;
         }
         if (llmResult.action.kind === "delete" && llmResult.action.id) {
+          const userProvidedId = Boolean(parseRecordIdReference(raw));
+          const idMatch = (llmRecords || []).find(
+            (r) =>
+              String(r?.id || "").toLowerCase() ===
+              String(llmResult.action.id || "").toLowerCase()
+          );
+          if (!userProvidedId) {
+            const resolved = startRecordResolution("delete", raw, llmRecords || []);
+            if (resolved) return;
+          }
+          if (!idMatch) {
+            addMessage(
+              "assistant",
+              "I couldn't safely identify a single record from that request. Please include date and amount, or delete it directly in Records."
+            );
+            return;
+          }
           confirmAction(summary, {
             kind: "delete",
             id: llmResult.action.id,
