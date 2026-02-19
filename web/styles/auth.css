@@ -663,8 +663,8 @@ input:-webkit-autofill {
 }
 
 :root[data-theme="dark"] .nf-about {
-  background: #111418;
-  border-color: #2a2e35;
+  background: transparent;
+  border-color: transparent;
 }
 
 :root[data-theme="dark"] .nf-about-card {
@@ -703,8 +703,18 @@ input:-webkit-autofill {
    ========================================================= */
 
 :root[data-theme="dark"] .nf-hero {
-  background: #000 !important;
+  background: transparent !important;
   color: var(--primary) !important;
+}
+
+:root[data-theme="dark"] .main.main--login,
+:root[data-theme="dark"] .main.main--register {
+  border: 1px solid transparent;
+  border-radius: 24px;
+  background:
+    linear-gradient(155deg, rgba(5, 8, 22, 0.97) 0%, rgba(28, 10, 52, 0.95) 52%, rgba(10, 26, 66, 0.95) 100%) padding-box,
+    linear-gradient(145deg, rgba(162, 120, 255, 0.78) 0%, rgba(76, 137, 255, 0.68) 100%) border-box;
+  box-shadow: 0 24px 50px rgba(0, 0, 0, 0.45);
 }
 
 :root[data-theme="dark"] .nf-hero .nf-title,

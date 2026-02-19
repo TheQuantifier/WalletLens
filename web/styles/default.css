@@ -903,14 +903,14 @@ textarea:focus-visible {
   display: flex;
   flex-direction: column;
   opacity: 0;
-  transform: translateX(110%);
+  transform: translateY(110%);
   pointer-events: none;
   transition: transform 0.22s ease, opacity 0.22s ease;
 }
 
 .walterlens-panel.is-open {
   opacity: 1;
-  transform: translateX(0);
+  transform: translateY(0);
   pointer-events: auto;
 }
 
