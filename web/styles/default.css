@@ -866,8 +866,8 @@ textarea:focus-visible {
   height: 58px;
   border-radius: 50%;
   border: none;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: #fff;
+  background: transparent;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -887,8 +887,11 @@ textarea:focus-visible {
 }
 
 .walterlens-fab__logo {
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .walterlens-panel {
@@ -932,13 +935,9 @@ textarea:focus-visible {
 .walterlens-title__logo {
   width: 36px;
   height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--primary), var(--accent));
-  color: #fff;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
 }
 
 .walterlens-header h3 {

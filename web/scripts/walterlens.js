@@ -1263,12 +1263,12 @@ export function initWalterLens() {
   root.className = "walterlens-widget";
   root.innerHTML = `
     <button class="walterlens-fab" aria-expanded="false" aria-controls="walterlens-panel">
-      <span class="walterlens-fab__logo">WL</span>
+      <img class="walterlens-fab__logo" src="images/walterlens.jpeg" alt="WalterLens" />
     </button>
     <section id="walterlens-panel" class="walterlens-panel" aria-hidden="true" role="dialog" aria-label="WalterLens Advisor">
       <div class="walterlens-header">
         <div class="walterlens-title">
-          <span class="walterlens-title__logo">WL</span>
+          <img class="walterlens-title__logo" src="images/walterlens.jpeg" alt="WalterLens" />
           <div>
             <h3>WalterLens</h3>
             <p>${headerSubtitle}</p>
