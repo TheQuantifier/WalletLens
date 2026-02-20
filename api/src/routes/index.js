@@ -11,6 +11,7 @@ import supportRoutes from "./support.routes.js";
 import adminRoutes from "./admin.routes.js";
 import appSettingsRoutes from "./app_settings.routes.js";
 import walterlensRoutes from "./walterlens.routes.js";
+import netWorthRoutes from "./net_worth.routes.js";
 
 const router = express.Router();
 
@@ -24,5 +25,6 @@ router.use("/support", supportRoutes);
 router.use("/admin", adminRoutes);
 router.use("/app-settings", appSettingsRoutes);
 router.use("/walterlens", walterlensRoutes);
+router.use("/net-worth", netWorthRoutes);
 
 export default router;

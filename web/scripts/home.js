@@ -43,6 +43,8 @@ import { api } from "./api.js";
   let currentComputed = null;
   let currentNetWorth = null;
 
+  const NETWORTH_ITEMS_KEY = "netWorthItems";
+
   const setText = (sel, value) => {
     const el = $(sel);
     if (el) el.textContent = value;
@@ -144,6 +146,41 @@ import { api } from "./api.js";
 
   const sumAccountBalances = (accounts) =>
     (accounts || []).reduce((sum, acc) => sum + getAccountBalance(acc), 0);
+
+  const loadNetWorthItems = async () => {
+    try {
+      const data = await api.netWorth.list();
+      const items = Array.isArray(data?.items) ? data.items : data;
+      return Array.isArray(items) ? items : [];
+    } catch {
+      const raw = localStorage.getItem(NETWORTH_ITEMS_KEY);
+      if (!raw) return [];
+      try {
+        const parsed = JSON.parse(raw);
+        return Array.isArray(parsed) ? parsed : [];
+      } catch {
+        return [];
+      }
+    }
+  };
+
+  const saveNetWorthItems = (items) => {
+    localStorage.setItem(NETWORTH_ITEMS_KEY, JSON.stringify(items || []));
+  };
+
+  const splitNetWorthItems = (items) => {
+    const assets = [];
+    const liabilities = [];
+    (items || []).forEach((item) => {
+      if (!item || !item.name || !Number.isFinite(Number(item.amount))) return;
+      const payload = { ...item, amount: Number(item.amount) };
+      if (item.type === "liability") liabilities.push(payload);
+      else assets.push(payload);
+    });
+    assets.sort((a, b) => b.amount - a.amount);
+    liabilities.sort((a, b) => b.amount - a.amount);
+    return { assets, liabilities };
+  };
 
   const getRecordBankId = (record) =>
     record?.bankId ||
@@ -386,7 +423,7 @@ import { api } from "./api.js";
     // Clear in CSS pixels (since we've scaled the context).
     ctx.clearRect(0, 0, parentWidth, 300);
 
-    const P = { t: 20, r: 20, b: 70, l: 40 };
+    const P = { t: 20, r: 20, b: 70, l: 78 };
     const innerW = canvas.width / dpr - P.l - P.r;
     const innerH = canvas.height / dpr - P.t - P.b;
 
@@ -435,7 +472,7 @@ import { api } from "./api.js";
     ctx.textAlign = "center";
     ctx.fillText("Category", P.l + innerW / 2, P.t + innerH + 52);
     ctx.save();
-    ctx.translate(12, P.t + innerH / 2);
+    ctx.translate(28, P.t + innerH / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.fillText("Amount", 0, 0);
     ctx.restore();
@@ -470,7 +507,7 @@ import { api } from "./api.js";
 
     if (!series?.length) return;
 
-    const P = { t: 20, r: 20, b: 45, l: 40 };
+    const P = { t: 20, r: 20, b: 45, l: 78 };
     const innerW = canvas.width / dpr - P.l - P.r;
     const innerH = canvas.height / dpr - P.t - P.b;
 
@@ -523,8 +560,8 @@ import { api } from "./api.js";
     ctx.fillStyle = "#6b7280";
     ctx.font = "12px system-ui";
     ctx.textAlign = "right";
-    ctx.fillText(fmtMoney(yMax, currency), P.l - 6, P.t + 4);
-    ctx.fillText(fmtMoney(yMin, currency), P.l - 6, P.t + innerH);
+    ctx.fillText(fmtMoney(yMax, currency), P.l - 10, P.t + 4);
+    ctx.fillText(fmtMoney(yMin, currency), P.l - 10, P.t + innerH);
 
     ctx.textAlign = "center";
     series.forEach((p, i) => {
@@ -538,7 +575,7 @@ import { api } from "./api.js";
     ctx.textAlign = "center";
     ctx.fillText("Month", P.l + innerW / 2, P.t + innerH + 38);
     ctx.save();
-    ctx.translate(12, P.t + innerH / 2);
+    ctx.translate(28, P.t + innerH / 2);
     ctx.rotate(-Math.PI / 2);
     ctx.fillText("Net Worth", 0, 0);
     ctx.restore();
@@ -735,54 +772,27 @@ import { api } from "./api.js";
     return months;
   }
 
-  function getNetWorthData(records, currency, netBalance, accounts) {
-    const stored = localStorage.getItem("netWorthData");
-    const baseBalance = (Number(netBalance) || 0) + sumAccountBalances(accounts);
-    const hasRecords = Array.isArray(records) && records.length > 0;
-    const hasAccounts = Array.isArray(accounts) && accounts.length > 0;
-    if (stored) {
-      try {
-        const parsed = JSON.parse(stored);
-        if (parsed?.assets && parsed?.liabilities && parsed?.trend) {
-          return {
-            ...parsed,
-            baseBalance,
-            hasData: true,
-          };
-        }
-      } catch {
-        // fall through to demo
-      }
-    }
+  async function getNetWorthData(records, currency) {
+    const items = await loadNetWorthItems();
+    const { assets, liabilities } = splitNetWorthItems(items);
+    const hasData = assets.length > 0 || liabilities.length > 0;
+    const assetsTotal = assets.reduce((s, a) => s + a.amount, 0);
+    const liabilitiesTotal = liabilities.reduce((s, l) => s + l.amount, 0);
+    const netWorthNow = assetsTotal - liabilitiesTotal;
 
-    if (!hasRecords) {
-      return {
-        currency,
-        asOf: null,
-        assets: [],
-        liabilities: [],
-        trend: [],
-        baseBalance,
-        hasData: hasAccounts || Number(netBalance) !== 0,
-      };
-    }
-
-    const base = 0;
-    const months = buildMonthlyNet(records, 12);
-    let running = base;
-    const trend = months.map((m) => {
-      running += m.net;
-      return { label: m.label, value: Math.max(0, running) };
-    });
+    const months = buildMonthlyNet([], 12);
+    const trend = hasData
+      ? months.map((m) => ({ label: m.label, value: netWorthNow }))
+      : [];
 
     return {
       currency,
-      asOf: new Date().toISOString(),
-      assets: [],
-      liabilities: [],
-      trend: trend.map((t) => ({ ...t, value: t.value + baseBalance })),
-      baseBalance,
-      hasData: true,
+      asOf: hasData ? new Date().toISOString() : null,
+      assets,
+      liabilities,
+      trend,
+      baseBalance: 0,
+      hasData,
     };
   }
 
@@ -790,7 +800,7 @@ import { api } from "./api.js";
     if (!data) return;
     const assetsTotal = (data.assets || []).reduce((s, a) => s + a.amount, 0);
     const liabilitiesTotal = (data.liabilities || []).reduce((s, l) => s + l.amount, 0);
-    const netWorth = (data.baseBalance || 0) + assetsTotal - liabilitiesTotal;
+    const netWorth = assetsTotal - liabilitiesTotal;
 
     if (!data.hasData && !data.assets?.length && !data.liabilities?.length && !data.trend?.length) {
       setText("#netWorthTotal", "—");
@@ -821,7 +831,7 @@ import { api } from "./api.js";
     if (assetsList) assetsList.innerHTML = "";
     if (liabilitiesList) liabilitiesList.innerHTML = "";
 
-    const renderList = (el, items) => {
+    const renderList = (el, items, type) => {
       if (!el) return;
       if (!items?.length) {
         const li = document.createElement("li");
@@ -832,23 +842,61 @@ import { api } from "./api.js";
       }
       items.forEach((item) => {
         const li = document.createElement("li");
+        li.className = "networth-item";
         const name = document.createElement("span");
+        name.className = "networth-item__name";
         name.textContent = item.name;
         const value = document.createElement("span");
         value.textContent = fmtMoney(item.amount, data.currency);
+        const del = document.createElement("button");
+        del.type = "button";
+        del.className = "networth-item__remove";
+        del.textContent = "Remove";
+        del.addEventListener("click", () => removeNetWorthItem(item.id));
         li.appendChild(name);
         li.appendChild(value);
+        li.appendChild(del);
         el.appendChild(li);
       });
     };
 
-    renderList(assetsList, data.assets);
-    renderList(liabilitiesList, data.liabilities);
+    renderList(assetsList, data.assets, "asset");
+    renderList(liabilitiesList, data.liabilities, "liability");
 
     if (data.trend?.length) {
       drawNetWorthChart($("#netWorthChart"), data.trend, data.currency);
     }
   }
+
+  const addNetWorthItem = async (type, name, amount) => {
+    try {
+      const res = await api.netWorth.create({ type, name, amount });
+      return res?.item || null;
+    } catch {
+      const items = await loadNetWorthItems();
+      const next = {
+        id: crypto?.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random()),
+        type,
+        name: String(name || "").trim(),
+        amount: Number(amount),
+        createdAt: new Date().toISOString(),
+      };
+      items.push(next);
+      saveNetWorthItems(items);
+      return next;
+    }
+  };
+
+  const removeNetWorthItem = async (id) => {
+    try {
+      await api.netWorth.remove(id);
+    } catch {
+      const items = await loadNetWorthItems();
+      const next = items.filter((item) => item.id !== id);
+      saveNetWorthItems(next);
+    }
+    window.location.reload();
+  };
 
   function setupBankFilter(accounts, onChange) {
     const wrap = $("#kpiBankWrap");
@@ -1055,6 +1103,8 @@ import { api } from "./api.js";
     const customList = $("#txnCustomCategories");
 
     const btnAddTxn = $("#btnAddTxn");
+    const assetForm = $("#assetForm");
+    const liabilityForm = $("#liabilityForm");
 
     const closeModal = () => modal?.classList.add("hidden");
     const openModal = () => modal?.classList.remove("hidden");
@@ -1190,6 +1240,24 @@ import { api } from "./api.js";
       }
       closeCustomModal();
     });
+
+    assetForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = $("#assetName")?.value || "";
+      const amount = Number($("#assetAmount")?.value || 0);
+      if (!name.trim() || !Number.isFinite(amount) || amount <= 0) return;
+      await addNetWorthItem("asset", name, amount);
+      window.location.reload();
+    });
+
+    liabilityForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const name = $("#liabilityName")?.value || "";
+      const amount = Number($("#liabilityAmount")?.value || 0);
+      if (!name.trim() || !Number.isFinite(amount) || amount <= 0) return;
+      await addNetWorthItem("liability", name, amount);
+      window.location.reload();
+    });
   }
 
   async function personalizeWelcome() {
@@ -1205,7 +1273,7 @@ import { api } from "./api.js";
   // ============================================================
   //  INIT
   // ============================================================
-  function renderDashboard(records, dashboardView, accounts) {
+  async function renderDashboard(records, dashboardView, accounts) {
     const viewLabel =
       dashboardView === "Weekly"
         ? "This Week"
@@ -1222,14 +1290,7 @@ import { api } from "./api.js";
     const filteredRecords = filterRecordsByView(bankRecords, dashboardView);
 
     const computed = computeOverview(filteredRecords);
-    const accountsInView =
-      bankId === "all" ? accounts : (accounts || []).filter((acc) => acc.id === bankId);
-    const netWorthData = getNetWorthData(
-      bankRecords,
-      computed.currency,
-      computed.net_balance,
-      accountsInView
-    );
+    const netWorthData = await getNetWorthData(bankRecords, computed.currency);
 
     currentComputed = computed;
     currentNetWorth = netWorthData;
@@ -1256,12 +1317,17 @@ import { api } from "./api.js";
 
       const savedSettings =
         JSON.parse(localStorage.getItem("userSettings")) || {};
-
-      const dashboardView = savedSettings.dashboardView || "Monthly";
+      const legacyView = savedSettings.dashboardView;
+      const storedView =
+        localStorage.getItem("settings_dashboard_view") ||
+        localStorage.getItem("defaultDashboardView");
+      const dashboardView = storedView || legacyView || "Monthly";
       const accounts = loadLinkedAccounts();
 
-      setupBankFilter(accounts, () => renderDashboard(records, dashboardView, accounts));
-      renderDashboard(records, dashboardView, accounts);
+      setupBankFilter(accounts, () => {
+        renderDashboard(records, dashboardView, accounts);
+      });
+      await renderDashboard(records, dashboardView, accounts);
 
       const redraw = debounce(() => {
         if (!currentComputed) return;

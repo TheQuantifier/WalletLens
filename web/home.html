@@ -81,6 +81,11 @@
           <div class="breakdown-col">
             <h3>Assets</h3>
             <ul id="assetsList" class="networth-list"></ul>
+            <form class="networth-form" id="assetForm">
+              <input type="text" id="assetName" placeholder="Asset name (e.g., House)" required />
+              <input type="number" id="assetAmount" placeholder="Amount" min="0" step="0.01" required />
+              <button class="btn" type="submit">Add</button>
+            </form>
             <div class="breakdown-total">
               <span>Total Assets</span>
               <strong id="assetsTotal">—</strong>
@@ -89,6 +94,11 @@
           <div class="breakdown-col">
             <h3>Liabilities</h3>
             <ul id="liabilitiesList" class="networth-list"></ul>
+            <form class="networth-form" id="liabilityForm">
+              <input type="text" id="liabilityName" placeholder="Liability name (e.g., Credit Card)" required />
+              <input type="number" id="liabilityAmount" placeholder="Amount" min="0" step="0.01" required />
+              <button class="btn" type="submit">Add</button>
+            </form>
             <div class="breakdown-total">
               <span>Total Liabilities</span>
               <strong id="liabilitiesTotal">—</strong>
@@ -260,5 +270,4 @@
   <script src="scripts/home.js" type="module" defer></script>
 </body>
 </html>
-
 

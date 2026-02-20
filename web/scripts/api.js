@@ -276,6 +276,33 @@ export const records = {
 };
 
 // ======================================================================
+// NET WORTH MODULE
+// ======================================================================
+export const netWorth = {
+  list() {
+    return request("/net-worth");
+  },
+
+  create({ type, name, amount }) {
+    return request("/net-worth", {
+      method: "POST",
+      body: JSON.stringify({ type, name, amount }),
+    });
+  },
+
+  update(id, updates) {
+    return request(`/net-worth/${id}`, {
+      method: "PUT",
+      body: JSON.stringify(updates),
+    });
+  },
+
+  remove(id) {
+    return request(`/net-worth/${id}`, { method: "DELETE" });
+  },
+};
+
+// ======================================================================
 // WALTERLENS MODULE
 // ======================================================================
 export const walterlens = {
@@ -651,6 +678,7 @@ export const api = {
   records,
   receipts,
   walterlens,
+  netWorth,
   budgetSheets,
   fxRates,
   activity,

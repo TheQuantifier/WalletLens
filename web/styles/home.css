@@ -208,6 +208,55 @@
   border-bottom: 1px dashed var(--border);
 }
 
+.networth-list .networth-item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.networth-item__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.networth-item__remove {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 0.2rem 0.45rem;
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: 0.85rem;
+}
+
+.networth-item__remove:hover {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+.networth-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) auto;
+  gap: 0.5rem;
+  margin-top: 0.65rem;
+}
+
+.networth-form input {
+  width: 100%;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+.networth-form input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .networth-list li:last-child {
   border-bottom: 0;
 }
