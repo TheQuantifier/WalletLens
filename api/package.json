@@ -10,6 +10,7 @@
     "worker": "node src/worker.js",
     "migrate": "node src/db/run_migrations.js",
     "test": "node --test src/tests/**/*.test.js",
+    "test:walterlens-matrix": "node src/tests/walterlens.matrix.mjs",
     "seed": "node src/db/seed.js",
     "cleanup:sessions": "node src/jobs/cleanup_sessions.js",
     "replace:categories": "node scripts/replaceCategories.js"

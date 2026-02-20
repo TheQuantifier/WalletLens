@@ -563,9 +563,11 @@ const detectPublicTopic = (question) => {
     return "help";
   }
   if (
-    /\b(what is|what does|this app|app for|walletlens|walletwise|feature|features|about|scan|receipt|ocr|upload)\b/.test(
+    /\b(walletlens|walletwise|this app|app for|what is walletlens|what does walletlens)\b/.test(
       key
-    )
+    ) ||
+    (/\b(feature|features|about|scan|receipt|ocr|upload)\b/.test(key) &&
+      /\b(walletlens|walletwise|this app|your app)\b/.test(key))
   ) {
     return "about";
   }
@@ -1138,13 +1140,65 @@ const detectIntent = (text) => {
   if (/\b(delete|remove)\b/.test(key)) return "delete";
   if (/\b(add|create|log)\b/.test(key)) return "create";
   if (/\b(edit|update|change)\b/.test(key)) return "edit";
-  if (/\b(show|list|display)\b/.test(key)) {
-    if (/\b(record|transaction|entries)\b/.test(key)) return "list";
-    if (/\b(spending|expenses|income|summary|insight)\b/.test(key)) return "insight";
+  if (/\b(what|which)\b/.test(key) && /\b(record|records|transaction|transactions|entries)\b/.test(key)) {
     return "list";
   }
-  if (/\b(spending|save|reduce|afford|top|insight|summary)\b/.test(key)) return "insight";
+  if (/\b(what|which)\b/.test(key) && /\b(spend|spent|spending|expenses|income|net|balance|budget)\b/.test(key)) {
+    return "insight";
+  }
+  if (/\b(show|list|display)\b/.test(key)) {
+    if (/\b(record|transaction|entries)\b/.test(key)) return "list";
+    if (/\b(spend|spent|spending|expenses|income|summary|insight|total|net|balance|budget|cash flow)\b/.test(key)) return "insight";
+    return "list";
+  }
+  if (
+    /\b(spend|spent|spending|overspend|expense|expenses|income|earned|earn|make|made|save|reduce|afford|top|insight|summary|total|net|balance|budget|cash flow|surplus|deficit|left over|average|trend)\b/.test(
+      key
+    )
+  ) {
+    return "insight";
+  }
   return "unknown";
+};
+
+const isFinancialQuestion = (text) => {
+  const key = normalizeText(text);
+  return /\b(spend|spent|spending|overspend|expense|expenses|income|earned|earn|make|made|record|records|transaction|transactions|budget|budgets|category|categories|receipt|receipts|save|saving|savings|total|net|balance|cash flow|surplus|deficit|left over|average|trend|report|reports|finance|financial)\b/.test(
+    key
+  );
+};
+
+export const __walterlensTest = {
+  detectIntent,
+  isFinancialQuestion,
+  detectRange,
+};
+
+const isLlmFinanceRelevant = (llmResult) => {
+  if (!llmResult) return false;
+  if (llmResult?.action?.kind) return true;
+  if (llmResult?.relevant === true || llmResult?.isRelevant === true) return true;
+  if (llmResult?.meta?.relevant === true || llmResult?.metadata?.relevant === true) return true;
+  const intent = normalizeKey(llmResult?.intent);
+  if (!intent) return false;
+  return !["unknown", "refusal", "out_of_scope", "irrelevant", "other"].includes(intent);
+};
+
+const isReceiptCapabilityQuestion = (text) => {
+  const key = normalizeText(text);
+  return (
+    /\b(receipt|receipts)\b/.test(key) &&
+    /\b(scan|scanned|upload|uploaded|ocr|parse|extract|support|can|does|able)\b/.test(key)
+  );
+};
+
+const isReceiptHistoryQuestion = (text) => {
+  const key = normalizeText(text);
+  if (!/\b(receipt|receipts)\b/.test(key)) return false;
+  if (/\b(what|which|show|list|have|did i|my)\b/.test(key) && /\b(scan|scanned|upload|uploaded)\b/.test(key)) {
+    return true;
+  }
+  return /\b(what|which|show|list|my)\b/.test(key) && /\b(receipt|receipts)\b/.test(key);
 };
 
 const extractCategoryFromText = (text, categories) => {
@@ -1770,6 +1824,16 @@ export function initWalterLens() {
       ? scoped.filter((r) => normalizeText(r.category) === normalizeText(category))
       : scoped;
     const categorySummary = category ? summarizeSpending(scopedByCategory) : null;
+    const rangeLabel = range?.label ? ` for ${range.label}` : "";
+    const hasExpenseTerms = /\b(spend|spent|spending|expense|expenses)\b/.test(key);
+    const hasIncomeTerms = /\b(income|earned|earn|made|make)\b/.test(key);
+    const asksHowMuch = /\b(how much|total|sum)\b/.test(key);
+    const asksCount = /\b(how many|count|number of)\b/.test(key);
+
+    if (!scoped.length) {
+      addMessage("assistant", `I couldn't find any records${rangeLabel}.`);
+      return;
+    }
 
     if (key.includes("save") || key.includes("reduce") || key.includes("cut")) {
       const discretionary = topCats.filter((c) => !isProtectedCategory(c.name));
@@ -1788,7 +1852,66 @@ export function initWalterLens() {
       return;
     }
 
-    if (key.includes("spending") || key.includes("top") || key.includes("where")) {
+    if (asksHowMuch && hasIncomeTerms && !hasExpenseTerms) {
+      addMessage("assistant", `You earned ${fmtMoney(totalInc)}${rangeLabel}.`);
+      return;
+    }
+
+    if (asksCount) {
+      const expenseCount = scoped.filter((r) => r?.type === "expense").length;
+      const incomeCount = scoped.filter((r) => r?.type === "income").length;
+      if (hasExpenseTerms && !hasIncomeTerms) {
+        addMessage("assistant", `You have ${expenseCount} expense records${rangeLabel}.`);
+        return;
+      }
+      if (hasIncomeTerms && !hasExpenseTerms) {
+        addMessage("assistant", `You have ${incomeCount} income records${rangeLabel}.`);
+        return;
+      }
+      addMessage("assistant", `You have ${scoped.length} total records${rangeLabel}.`);
+      return;
+    }
+
+    if (asksHowMuch && hasExpenseTerms && categorySummary) {
+      addMessage(
+        "assistant",
+        `You spent ${fmtMoney(categorySummary.totalExp)} on ${category}${rangeLabel}.`
+      );
+      return;
+    }
+
+    if (asksHowMuch && hasExpenseTerms) {
+      addMessage("assistant", `You spent ${fmtMoney(totalExp)}${rangeLabel}.`);
+      return;
+    }
+
+    if (hasExpenseTerms && !hasIncomeTerms) {
+      addMessage("assistant", `You spent ${fmtMoney(totalExp)}${rangeLabel}.`);
+      return;
+    }
+
+    if (hasIncomeTerms && !hasExpenseTerms) {
+      addMessage("assistant", `You earned ${fmtMoney(totalInc)}${rangeLabel}.`);
+      return;
+    }
+
+    if (/\b(net|balance|cash flow|surplus|deficit|left over)\b/.test(key)) {
+      const net = totalInc - totalExp;
+      if (net >= 0) {
+        addMessage("assistant", `Your net is ${fmtMoney(net)}${rangeLabel}.`);
+      } else {
+        addMessage("assistant", `Your net is -${fmtMoney(Math.abs(net))}${rangeLabel}.`);
+      }
+      return;
+    }
+
+    if (
+      key.includes("spend") ||
+      key.includes("spent") ||
+      key.includes("spending") ||
+      key.includes("top") ||
+      key.includes("where")
+    ) {
       const summary = categorySummary || { topCats };
       const label = category ? `in ${category}` : "overall";
       if (!summary.topCats?.length) {
@@ -1804,16 +1927,33 @@ export function initWalterLens() {
     }
 
     const net = totalInc - totalExp;
-    const rangeLabel = range?.label ? ` for ${range.label}` : "";
+    if (/\baverage\b/.test(key) && hasExpenseTerms) {
+      const uniqueDays = new Set(
+        scoped
+          .filter((r) => r?.type === "expense")
+          .map((r) => {
+            const d = parseISODate(r?.date);
+            return d && !Number.isNaN(d.getTime()) ? formatDateOnly(d) : "";
+          })
+          .filter(Boolean)
+      ).size;
+      const days = Math.max(1, uniqueDays);
+      addMessage(
+        "assistant",
+        `Your average expense is ${fmtMoney(totalExp / days)} per active day${rangeLabel}.`
+      );
+      return;
+    }
+
     if (net > 0) {
       addMessage(
         "assistant",
-        `You saved ${fmtMoney(net)}${rangeLabel}. Want to set a goal or plan something fun?`
+        `You saved ${fmtMoney(net)}${rangeLabel}.`
       );
     } else {
       addMessage(
         "assistant",
-        `You're spending ${fmtMoney(Math.abs(net))} more than income${rangeLabel}. Want help trimming discretionary spend?`
+        `You're spending ${fmtMoney(Math.abs(net))} more than income${rangeLabel}.`
       );
     }
   };
@@ -1862,6 +2002,38 @@ export function initWalterLens() {
     if (hasMultipleCurrencies(filtered)) {
       addMessage("assistant", "Note: totals are not converted across currencies.");
     }
+  };
+
+  const handleListReceipts = async () => {
+    let receipts = [];
+    try {
+      receipts = await api.receipts.getAll();
+    } catch (err) {
+      addMessage("assistant", "I couldn't load receipts. Please try again in a moment.");
+      return;
+    }
+
+    if (!Array.isArray(receipts) || !receipts.length) {
+      addMessage("assistant", "You haven't scanned any receipts yet.");
+      return;
+    }
+
+    const sorted = receipts
+      .slice()
+      .sort((a, b) => new Date(b?.created_at || b?.createdAt || 0) - new Date(a?.created_at || a?.createdAt || 0));
+
+    addMessage("assistant", `You have ${sorted.length} scanned receipt${sorted.length === 1 ? "" : "s"}.`);
+
+    sorted.slice(0, 5).forEach((receipt) => {
+      const summary = api.getReceiptSummary ? api.getReceiptSummary(receipt) : {};
+      const rawDate = summary?.date || receipt?.date || receipt?.created_at || receipt?.createdAt || "";
+      const d = parseISODate(rawDate);
+      const safeDate = d && !Number.isNaN(d.getTime()) ? formatDateOnly(d) : "unknown date";
+      const source = summary?.source || "Unknown source";
+      const amount = Number(summary?.amount || receipt?.amount || 0);
+      const amountLabel = Number.isFinite(amount) && amount > 0 ? fmtMoney(amount) : "unknown amount";
+      addMessage("assistant", `- ${source}: ${amountLabel} (${safeDate})`);
+    });
   };
 
   const isPrivateDataQuestion = (text) => {
@@ -1986,6 +2158,25 @@ export function initWalterLens() {
       addMessage("assistant", "Please provide a new value.");
       return;
     }
+
+      if (isPublicInfoQuestion(raw)) {
+        const publicReply = await answerPublicQuestion(raw);
+        addMessage("assistant", publicReply);
+        return;
+      }
+
+      if (isReceiptCapabilityQuestion(raw)) {
+        addMessage(
+          "assistant",
+          "Yes. WalletLens supports receipt scanning/upload with OCR extraction and can create linked records from parsed receipts."
+        );
+        return;
+      }
+
+      if (isReceiptHistoryQuestion(raw)) {
+        await handleListReceipts();
+        return;
+      }
 
       const earlyIntent = detectIntent(raw);
       if (earlyIntent === "edit" || earlyIntent === "delete") {
@@ -2121,11 +2312,21 @@ export function initWalterLens() {
         return;
       }
 
-      if (llmResult?.reply) {
-        addMessage("assistant", llmResult.reply);
-      }
+      const localIntent = detectIntent(raw);
+      const parsedSeed = parseRecordCreateSeed(raw);
+      const parsedCreate = parseRecordCreate(raw);
+      const parsedDelete = parseRecordDelete(raw);
+      const parsedEdits = parseRecordEdits(raw);
+      const hasDeterministicPath =
+        localIntent !== "unknown" ||
+        Boolean(parsedSeed) ||
+        Boolean(parsedCreate) ||
+        Boolean(parsedDelete) ||
+        Boolean(parsedEdits && Object.keys(parsedEdits.updates || {}).length);
+      const llmRelevant = isLlmFinanceRelevant(llmResult);
 
-      if (llmResult?.intent && llmResult.intent !== "unknown" && llmResult.intent !== "refusal") {
+      if (!hasDeterministicPath && llmRelevant && llmResult?.reply) {
+        addMessage("assistant", llmResult.reply);
         return;
       }
 
@@ -2144,13 +2345,13 @@ export function initWalterLens() {
         return;
       }
 
-      const createSeed = parseRecordCreateSeed(raw);
+      const createSeed = parsedSeed;
       if (createSeed) {
         startCreateFlow({ ...createSeed, rawText: raw });
         return;
       }
 
-      const earlyCreate = parseRecordCreate(raw);
+      const earlyCreate = parsedCreate;
       if (earlyCreate && earlyCreate.amount !== undefined) {
         const category =
           pickCategory(earlyCreate.category, earlyCreate.type) ||
@@ -2164,15 +2365,15 @@ export function initWalterLens() {
         }
       }
 
-      const intent = detectIntent(raw);
+      const intent = localIntent;
 
-      const deleteIntent = parseRecordDelete(raw);
+      const deleteIntent = parsedDelete;
       if (deleteIntent) {
         confirmAction("I can delete that record.", { kind: "delete", id: deleteIntent.id });
         return;
       }
 
-      const editIntent = parseRecordEdits(raw);
+      const editIntent = parsedEdits;
       if (editIntent && Object.keys(editIntent.updates || {}).length) {
         if (editIntent.updates.category) {
           const category =
@@ -2200,7 +2401,7 @@ export function initWalterLens() {
         return;
       }
 
-      const createIntent = parseRecordCreate(raw);
+      const createIntent = parsedCreate;
       if (createIntent) {
         startCreateFlow(createIntent);
         return;
@@ -2242,7 +2443,15 @@ export function initWalterLens() {
         return;
       }
 
-      addMessage("assistant", pickFallback());
+      if (isFinancialQuestion(raw)) {
+        await handleInsights(raw);
+        return;
+      }
+
+      addMessage(
+        "assistant",
+        "I can't do that. I can help with finance questions about spending, income, budgets, and records."
+      );
     } finally {
       flushResponses();
     }
