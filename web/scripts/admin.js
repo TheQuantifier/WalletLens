@@ -8,6 +8,9 @@ const els = {
   statsStatus: document.getElementById("statsStatus"),
 
   usersTbody: document.getElementById("usersTbody"),
+  usersPanel: document.getElementById("usersPanel"),
+  usersPanelBody: document.getElementById("usersPanelBody"),
+  toggleUsersPanelBtn: document.getElementById("toggleUsersPanelBtn"),
   usersStatus: document.getElementById("usersStatus"),
   userSearch: document.getElementById("userSearch"),
   userSearchBtn: document.getElementById("userSearchBtn"),
@@ -38,6 +41,9 @@ const els = {
   achievementIconInput: document.getElementById("achievementIconInput"),
   achievementMetricInput: document.getElementById("achievementMetricInput"),
   achievementTargetInput: document.getElementById("achievementTargetInput"),
+  achievementTargetBooleanInput: document.getElementById("achievementTargetBooleanInput"),
+  achievementTargetNumberWrap: document.getElementById("achievementTargetNumberWrap"),
+  achievementTargetBooleanWrap: document.getElementById("achievementTargetBooleanWrap"),
   addAchievementBtn: document.getElementById("addAchievementBtn"),
   adminAchievementsList: document.getElementById("adminAchievementsList"),
   settingsStatus: document.getElementById("settingsStatus"),
@@ -85,8 +91,20 @@ const ACHIEVEMENT_METRICS = new Set([
   "records_total",
   "records_income",
   "records_expense",
+  "receipts_total",
   "budgets_total",
   "net_worth_total",
+  "account_age_years",
+  "dual_auth_enabled",
+  "two_fa_enabled",
+  "google_signin_enabled",
+  "avatar_selected",
+]);
+const BOOLEAN_ACHIEVEMENT_METRICS = new Set([
+  "dual_auth_enabled",
+  "two_fa_enabled",
+  "google_signin_enabled",
+  "avatar_selected",
 ]);
 
 function escapeHtml(value) {
@@ -173,6 +191,18 @@ function getUserLabel(user) {
 function toggleUserDataSections(show) {
   if (!els.userDataSections) return;
   els.userDataSections.classList.toggle("is-hidden", !show);
+}
+
+function setUsersPanelCollapsed(collapsed) {
+  if (!els.usersPanel) return;
+  els.usersPanel.classList.toggle("is-collapsed", collapsed);
+  if (els.usersPanelBody) {
+    els.usersPanelBody.hidden = collapsed;
+  }
+  if (els.toggleUsersPanelBtn) {
+    els.toggleUsersPanelBtn.textContent = collapsed ? "Expand" : "Collapse";
+    els.toggleUsersPanelBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  }
 }
 
 function getSortableValue(table, row, key) {
@@ -406,6 +436,21 @@ function normalizeAchievementKey(value) {
     .replace(/[^a-z0-9_]+/g, "_");
 }
 
+function isBooleanAchievementMetric(metric) {
+  return BOOLEAN_ACHIEVEMENT_METRICS.has(String(metric || "").trim());
+}
+
+function syncAchievementTargetInput() {
+  const metric = String(els.achievementMetricInput?.value || "").trim();
+  const isBoolean = isBooleanAchievementMetric(metric);
+  if (els.achievementTargetNumberWrap) {
+    els.achievementTargetNumberWrap.classList.toggle("is-hidden", isBoolean);
+  }
+  if (els.achievementTargetBooleanWrap) {
+    els.achievementTargetBooleanWrap.classList.toggle("is-hidden", !isBoolean);
+  }
+}
+
 function renderSettingsAchievements() {
   if (!els.adminAchievementsList) return;
   if (!state.settingsAchievements.length) {
@@ -420,7 +465,7 @@ function renderSettingsAchievements() {
         <div class="admin-achievement-item">
           <div>
             <strong>${escapeHtml(item.icon || "🏆")} ${escapeHtml(item.title)}</strong>
-            <p class="meta">${escapeHtml(item.key)} • ${escapeHtml(item.metric)} • target ${Number(item.target || 0)}</p>
+            <p class="meta">${escapeHtml(item.key)} • ${escapeHtml(item.metric)} • target ${escapeHtml(String(item.target))}</p>
             <p class="meta">${escapeHtml(item.description)}</p>
           </div>
           <div class="admin-actions">
@@ -438,9 +483,15 @@ function addAchievementFromInputs() {
   const description = String(els.achievementDescriptionInput?.value || "").trim();
   const icon = String(els.achievementIconInput?.value || "🏆").trim() || "🏆";
   const metric = String(els.achievementMetricInput?.value || "").trim();
-  const target = Number(els.achievementTargetInput?.value || 0);
+  const isBoolean = isBooleanAchievementMetric(metric);
+  const target = isBoolean
+    ? String(els.achievementTargetBooleanInput?.value || "true") === "true"
+    : Number(els.achievementTargetInput?.value || 0);
 
-  if (!key || !title || !description || !ACHIEVEMENT_METRICS.has(metric) || !Number.isFinite(target) || target < 1) {
+  const hasValidTarget = isBoolean
+    ? typeof target === "boolean"
+    : Number.isFinite(target) && target > 0;
+  if (!key || !title || !description || !ACHIEVEMENT_METRICS.has(metric) || !hasValidTarget) {
     setStatus(els.settingsStatus, "Fill all achievement fields with valid values.", "error");
     return;
   }
@@ -456,7 +507,7 @@ function addAchievementFromInputs() {
     description,
     icon,
     metric,
-    target: Math.floor(target),
+    target,
   });
 
   if (els.achievementKeyInput) els.achievementKeyInput.value = "";
@@ -464,6 +515,8 @@ function addAchievementFromInputs() {
   if (els.achievementDescriptionInput) els.achievementDescriptionInput.value = "";
   if (els.achievementIconInput) els.achievementIconInput.value = "";
   if (els.achievementTargetInput) els.achievementTargetInput.value = "1";
+  if (els.achievementTargetBooleanInput) els.achievementTargetBooleanInput.value = "true";
+  syncAchievementTargetInput();
   renderSettingsAchievements();
   setStatus(els.settingsStatus, "Achievement added. Save settings to apply.", "ok");
 }
@@ -867,8 +920,17 @@ function bindEvents() {
   if (els.settingsForm) {
     els.settingsForm.addEventListener("submit", saveSettings);
   }
+  if (els.toggleUsersPanelBtn) {
+    els.toggleUsersPanelBtn.addEventListener("click", () => {
+      const collapsed = els.usersPanel?.classList.contains("is-collapsed");
+      setUsersPanelCollapsed(!collapsed);
+    });
+  }
   if (els.addAchievementBtn) {
     els.addAchievementBtn.addEventListener("click", addAchievementFromInputs);
+  }
+  if (els.achievementMetricInput) {
+    els.achievementMetricInput.addEventListener("change", syncAchievementTargetInput);
   }
 
   document.addEventListener("click", (event) => {
@@ -923,6 +985,8 @@ async function init() {
   setStatus(els.receiptsStatus, "");
   setStatus(els.budgetsStatus, "");
   updateRecordsContext();
+  setUsersPanelCollapsed(true);
+  syncAchievementTargetInput();
 
   await Promise.all([
     loadStats(),

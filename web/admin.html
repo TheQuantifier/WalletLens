@@ -65,12 +65,15 @@
         <p id="statsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
       </section>
 
-      <section class="card admin-panel" id="usersPanel">
+      <section class="card admin-panel is-collapsed" id="usersPanel">
         <div class="admin-panel-header">
           <div>
             <h2>Users</h2>
             <p class="subtle">Enter a username, name, or email to find a user and view related data.</p>
           </div>
+          <button class="btn" id="toggleUsersPanelBtn" type="button" aria-expanded="false" aria-controls="usersPanelBody">
+            Expand
+          </button>
           <div class="admin-actions">
             <input
               id="userSearch"
@@ -82,6 +85,7 @@
             <button class="btn btn--primary" id="userSearchBtn" type="button">Find User</button>
           </div>
         </div>
+        <div id="usersPanelBody">
         <datalist id="adminUserOptions"></datalist>
 
         <p id="usersStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
@@ -123,6 +127,7 @@
           <span id="usersPageInfo" class="subtle">Page 1 of 1</span>
           <button class="btn" id="usersNextPage" type="button" disabled>Next →</button>
         </nav>
+        </div>
       </section>
 
       <section id="userDataSections" class="admin-grid is-hidden">
@@ -285,13 +290,26 @@
                   <option value="records_total">records_total</option>
                   <option value="records_income">records_income</option>
                   <option value="records_expense">records_expense</option>
+                  <option value="receipts_total">receipts_total</option>
                   <option value="budgets_total">budgets_total</option>
                   <option value="net_worth_total">net_worth_total</option>
+                  <option value="account_age_years">account_age_years</option>
+                  <option value="dual_auth_enabled">dual_auth_enabled</option>
+                  <option value="two_fa_enabled">two_fa_enabled</option>
+                  <option value="google_signin_enabled">google_signin_enabled</option>
+                  <option value="avatar_selected">avatar_selected</option>
                 </select>
               </label>
-              <label>
+              <label id="achievementTargetNumberWrap">
                 <span>Target</span>
-                <input id="achievementTargetInput" type="number" min="1" step="1" value="1" />
+                <input id="achievementTargetInput" type="number" min="0.01" step="0.01" value="1" />
+              </label>
+              <label id="achievementTargetBooleanWrap" class="is-hidden">
+                <span>Target</span>
+                <select id="achievementTargetBooleanInput">
+                  <option value="true">true</option>
+                  <option value="false">false</option>
+                </select>
               </label>
               <div class="admin-actions">
                 <button class="btn" id="addAchievementBtn" type="button">Add Achievement</button>

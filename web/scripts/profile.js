@@ -30,6 +30,15 @@ const getInitials = (name) => {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 };
 
+const formatAchievementValue = (value) => {
+  const num = Number(value);
+  if (!Number.isFinite(num)) return "0";
+  if (Number.isInteger(num)) return String(num);
+  return num.toFixed(2).replace(/\.?0+$/, "");
+};
+
+const formatBooleanAchievementValue = (value) => (Boolean(value) ? "true" : "false");
+
 const editBtn = $("editProfileBtn");
 const form = $("editForm");
 const cancelBtn = $("cancelEditBtn");
@@ -317,11 +326,20 @@ const renderAchievements = (payload) => {
     title.textContent = item.title || "Achievement";
     const subtitle = document.createElement("p");
     subtitle.className = "subtle";
+    const isBooleanMetric =
+      item.metric === "dual_auth_enabled" ||
+      item.metric === "two_fa_enabled" ||
+      item.metric === "google_signin_enabled" ||
+      item.metric === "avatar_selected";
     subtitle.textContent = item.unlocked
       ? `Unlocked${item.unlockedAt ? ` on ${new Date(item.unlockedAt).toLocaleDateString()}` : ""}`
-      : `${Math.min(Number(item.progress || 0), Number(item.target || 0))} / ${Number(
-          item.target || 0
-        )}`;
+      : isBooleanMetric
+      ? `Current ${formatBooleanAchievementValue(item.progress)} / target ${formatBooleanAchievementValue(
+          item.target
+        )}`
+      : `${formatAchievementValue(
+          Math.min(Number(item.progress || 0), Number(item.target || 0))
+        )} / ${formatAchievementValue(Number(item.target || 0))}`;
     body.appendChild(title);
     body.appendChild(subtitle);
 
@@ -739,4 +757,3 @@ linkedAccountsList?.addEventListener("click", (e) => {
   saveLinkedAccounts(accounts);
   renderLinkedAccounts();
 });
-

@@ -2,8 +2,21 @@ export const ACHIEVEMENT_METRICS = Object.freeze([
   "records_total",
   "records_income",
   "records_expense",
+  "receipts_total",
   "budgets_total",
   "net_worth_total",
+  "account_age_years",
+  "dual_auth_enabled",
+  "two_fa_enabled",
+  "google_signin_enabled",
+  "avatar_selected",
+]);
+
+export const BOOLEAN_ACHIEVEMENT_METRICS = Object.freeze([
+  "dual_auth_enabled",
+  "two_fa_enabled",
+  "google_signin_enabled",
+  "avatar_selected",
 ]);
 
 export const DEFAULT_ACHIEVEMENTS = Object.freeze([

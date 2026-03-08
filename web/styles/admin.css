@@ -75,6 +75,10 @@
   padding: var(--space-5);
 }
 
+#usersPanel.is-collapsed #usersPanelBody {
+  display: none;
+}
+
 .admin-panel-header {
   display: flex;
   justify-content: space-between;
