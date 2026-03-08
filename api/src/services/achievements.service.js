@@ -120,11 +120,9 @@ async function getMetricCounts(userId) {
     [userId]
   );
   const data = rows[0] || {};
-  const hasPasswordLogin = Boolean(data.has_password_login);
   const hasGoogleSignin = Boolean(data.google_signin_enabled);
   return {
     ...data,
-    dual_auth_enabled: hasPasswordLogin && hasGoogleSignin,
     google_signin_enabled: hasGoogleSignin,
     two_fa_enabled: Boolean(data.two_fa_enabled),
     avatar_selected: Boolean(data.avatar_selected),

@@ -105,20 +105,40 @@
   gap: var(--space-3);
 }
 
+.admin-form .settings-item + .settings-item {
+  border-top: 1px solid var(--border);
+  padding-top: var(--space-3);
+}
+
+.settings-item-head > span {
+  display: inline-block;
+  font-weight: 600;
+  margin-bottom: 0.3rem;
+}
+
+.settings-item-head .subtle {
+  margin: 0 0 0.75rem;
+}
+
 .admin-form label {
   display: grid;
   gap: 0.4rem;
   font-weight: 600;
 }
 
-.admin-form input,
-.admin-form select,
-.admin-form textarea {
-  padding: 0.65rem 0.75rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--border);
-  background: var(--card-bg);
-  font: inherit;
+.admin-field-hint {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--muted);
+}
+
+#achievementKeyInput.is-invalid {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+
+#achievementKeyStatus.is-error {
+  color: var(--bad);
 }
 
 .admin-form textarea {
@@ -153,18 +173,60 @@
   background: color-mix(in srgb, var(--card-bg) 95%, #f8fafc);
 }
 
-.admin-achievements-head > span {
-  font-weight: 700;
-}
-
-.admin-achievements-head .subtle {
-  margin: 0.25rem 0 0;
-}
-
 .admin-achievement-builder {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: var(--space-3);
+  grid-template-columns:
+    minmax(132px, 1fr)
+    minmax(132px, 1fr)
+    minmax(170px, 1.2fr)
+    minmax(72px, auto)
+    minmax(112px, auto)
+    minmax(86px, auto)
+    minmax(64px, auto);
+  column-gap: var(--space-3);
+  row-gap: var(--space-3);
+  align-items: end;
+}
+
+.admin-add-achievement-wrap {
+  display: grid;
+  gap: 0.4rem;
+  align-content: end;
+}
+
+.admin-add-achievement-spacer {
+  font-weight: 600;
+  visibility: hidden;
+}
+
+.admin-add-achievement-wrap .btn {
+  width: auto;
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+#achievementIconInput {
+  text-align: center;
+  width: 4.25rem;
+}
+
+#achievementTargetInput,
+#achievementTargetBooleanInput {
+  width: 5.5rem;
+  max-width: 5.5rem;
+}
+
+#achievementMetricInput {
+  width: 9.5rem;
+  max-width: 9.5rem;
+}
+
+#achievementIconWrap,
+#achievementTargetNumberWrap,
+#achievementTargetBooleanWrap,
+.admin-add-achievement-wrap {
+  justify-self: start;
+  width: max-content;
 }
 
 .admin-achievements-list {
@@ -251,11 +313,12 @@
 }
 
 .admin-pager button {
-  padding: 0.5rem 1.2rem;
+  padding: var(--space-2) var(--space-4);
   border-radius: var(--radius);
   background: var(--primary);
   border: 1px solid var(--primary);
   color: #fff;
+  font-size: 0.95rem;
   font-weight: 600;
   transition: filter 0.15s ease, transform 0.05s ease;
 }

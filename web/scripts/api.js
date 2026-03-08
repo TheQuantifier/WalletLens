@@ -18,6 +18,7 @@ const API_BASE =
 const AUTH_TOKEN_KEY = "auth_token";
 const AUTH_TOKEN_TS_KEY = "auth_token_ts";
 const AUTH_TOKEN_TTL_MS = 30 * 60 * 1000;
+const INACTIVITY_ACTIVITY_KEY = "lastActivityAt";
 
 function getAuthToken() {
   const token = sessionStorage.getItem(AUTH_TOKEN_KEY) || "";
@@ -35,6 +36,7 @@ function setAuthToken(token) {
   if (!token) return;
   sessionStorage.setItem(AUTH_TOKEN_KEY, token);
   sessionStorage.setItem(AUTH_TOKEN_TS_KEY, String(Date.now()));
+  localStorage.setItem(INACTIVITY_ACTIVITY_KEY, String(Date.now()));
 }
 
 function clearAuthToken() {

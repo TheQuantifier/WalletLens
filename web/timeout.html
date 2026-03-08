@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+    (function () {
+      const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+      const currentPage = rawPage === "" ? "index.html" : rawPage;
+      const cachedTitle = sessionStorage.getItem(`pageTitle:${currentPage}`);
+      if (cachedTitle) {
+        document.title = cachedTitle;
+      }
+    })();
+  </script>
+
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>&lt;AppName&gt; - Session Timed Out</title>
+
+  <meta name="description" content="Your &lt;AppName&gt; session timed out due to inactivity." />
+  <link rel="icon" type="image/png" href="images/favicon.png" />
+
+  <link rel="stylesheet" href="styles/default.css" />
+  <link rel="stylesheet" href="styles/auth.css" />
+
+  <script>
+    const savedTheme = localStorage.getItem("theme") || "light";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+  </script>
+</head>
+<body class="landing-light">
+  <header class="nf-header" role="banner">
+    <div class="nf-header-inner">
+      <div class="logo-group">
+        <h1 class="logo">
+          <a class="logo-link" href="about.html" style="text-decoration:none; color:inherit;">
+            <img src="images/favicon.png" alt="App icon" class="logo-icon" />
+            <span>&lt;AppName&gt;</span>
+          </a>
+        </h1>
+        <span class="tagline">Track Smarter. Stress Less.</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="main main--login">
+    <section class="nf-hero">
+      <div class="nf-hero-content">
+        <h1 class="nf-title">Session Timed Out</h1>
+        <p class="nf-subtitle">You were signed out after being inactive for too long.</p>
+        <div class="nf-signup" style="max-width:420px;">
+          <a class="nf-btn" href="login.html" style="text-decoration:none; text-align:center;">Log In Again</a>
+          <a class="nf-login" href="about.html" style="text-align:center;">Back to About</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="scripts/default.js" type="module" defer></script>
+</body>
+</html>

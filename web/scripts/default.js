@@ -22,9 +22,18 @@ const APP_NAME_TEST = /<AppName>/;
 const ACHIEVEMENT_SEEN_KEY = "seen_achievement_keys_v1";
 const ACHIEVEMENT_POLL_MS = 20000;
 const ACHIEVEMENT_CHECK_EVENT = "achievements:check";
+const SESSION_TIMEOUT_MINUTES_KEY = "sessionTimeoutMinutes";
+const DEFAULT_SESSION_TIMEOUT_MINUTES = 15;
+const MAX_SESSION_TIMEOUT_MINUTES = 60;
+const INACTIVITY_HEARTBEAT_MS = 15000;
+const INACTIVITY_ACTIVITY_KEY = "lastActivityAt";
+const INACTIVITY_MIN_WRITE_MS = 10000;
+const TIMEOUT_PAGE = "timeout.html";
 let achievementMonitorStarted = false;
 let achievementToastQueue = [];
 let achievementToastShowing = false;
+let inactivityMonitorStarted = false;
+let inactivityTimedOut = false;
 
 /**
  * Pages that do NOT require authentication
@@ -38,6 +47,7 @@ const PUBLIC_PAGES = [
   "about.html",
   "careers.html",
   "help.html",
+  "timeout.html",
   "",
 ];
 
@@ -52,6 +62,12 @@ async function runAuthGuard() {
   const currentPage = rawPage === "" ? "index.html" : rawPage;
 
   if (PUBLIC_PAGES.includes(currentPage)) return;
+
+  const last = Number(localStorage.getItem(INACTIVITY_ACTIVITY_KEY) || "0");
+  if (last && Date.now() - last >= getInactivityTimeoutMs()) {
+    await triggerInactivityTimeout();
+    return;
+  }
 
   try {
     await api.auth.me(); // succeeds if logged in
@@ -94,6 +110,7 @@ document.addEventListener("DOMContentLoaded", () => {
   updateAppName();
   initWalterLens();
   initAchievementCelebrations();
+  initInactivityTimeoutMonitor();
 });
 
 /**
@@ -178,6 +195,74 @@ function isPublicPage() {
   const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
   const currentPage = rawPage === "" ? "index.html" : rawPage;
   return PUBLIC_PAGES.includes(currentPage);
+}
+
+function getSessionTimeoutMinutes() {
+  const raw = Number(localStorage.getItem(SESSION_TIMEOUT_MINUTES_KEY) || "");
+  if (!Number.isFinite(raw) || raw < 1) return DEFAULT_SESSION_TIMEOUT_MINUTES;
+  return Math.min(MAX_SESSION_TIMEOUT_MINUTES, Math.floor(raw));
+}
+
+function getInactivityTimeoutMs() {
+  return getSessionTimeoutMinutes() * 60 * 1000;
+}
+
+function touchActivityStamp() {
+  const now = Date.now();
+  const prev = Number(localStorage.getItem(INACTIVITY_ACTIVITY_KEY) || "0");
+  if (now - prev < INACTIVITY_MIN_WRITE_MS) return;
+  localStorage.setItem(INACTIVITY_ACTIVITY_KEY, String(now));
+}
+
+async function triggerInactivityTimeout() {
+  if (inactivityTimedOut) return;
+  inactivityTimedOut = true;
+  sessionStorage.setItem(
+    "authRedirectMessage",
+    "Your session timed out due to inactivity. Please log in again."
+  );
+  try {
+    await api.auth.logout();
+  } catch {
+    // ignore
+  }
+  window.location.href = TIMEOUT_PAGE;
+}
+
+function checkInactivityDeadline() {
+  if (isPublicPage()) return false;
+  const last = Number(localStorage.getItem(INACTIVITY_ACTIVITY_KEY) || "0");
+  if (!last) return false;
+  if (Date.now() - last < getInactivityTimeoutMs()) return false;
+  triggerInactivityTimeout();
+  return true;
+}
+
+function initInactivityTimeoutMonitor() {
+  if (inactivityMonitorStarted || isPublicPage()) return;
+  inactivityMonitorStarted = true;
+  if (checkInactivityDeadline()) return;
+  localStorage.setItem(INACTIVITY_ACTIVITY_KEY, String(Date.now()));
+
+  const onActivity = () => touchActivityStamp();
+  const activityEvents = ["click", "keydown", "mousemove", "scroll", "touchstart"];
+  activityEvents.forEach((eventName) => {
+    window.addEventListener(eventName, onActivity, { passive: true });
+  });
+  window.addEventListener("focus", onActivity);
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) return;
+    if (!checkInactivityDeadline()) {
+      touchActivityStamp();
+    }
+  });
+
+  window.setInterval(() => {
+    if (checkInactivityDeadline()) return;
+    if (!localStorage.getItem(INACTIVITY_ACTIVITY_KEY)) {
+      localStorage.setItem(INACTIVITY_ACTIVITY_KEY, String(Date.now()));
+    }
+  }, INACTIVITY_HEARTBEAT_MS);
 }
 
 function getSeenAchievementKeys() {
@@ -674,9 +759,16 @@ async function updateAppName() {
   try {
     const data = await api.appSettings.getPublic();
     const nextName = data?.appName || DEFAULT_APP_NAME;
+    const timeoutMinutes = Number(data?.sessionTimeoutMinutes);
     const nameEl = document.getElementById("appName");
     if (nameEl) nameEl.textContent = nextName;
     sessionStorage.setItem("appName", nextName);
+    if (Number.isFinite(timeoutMinutes) && timeoutMinutes >= 1) {
+      localStorage.setItem(
+        SESSION_TIMEOUT_MINUTES_KEY,
+        String(Math.min(MAX_SESSION_TIMEOUT_MINUTES, Math.floor(timeoutMinutes)))
+      );
+    }
     applyAppName(nextName);
   } catch {
     // ignore public settings failure

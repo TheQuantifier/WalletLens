@@ -35,7 +35,9 @@ const els = {
   settingsForm: document.getElementById("settingsForm"),
   appNameInput: document.getElementById("appNameInput"),
   receiptKeepFilesInput: document.getElementById("receiptKeepFilesInput"),
+  sessionTimeoutMinutesInput: document.getElementById("sessionTimeoutMinutesInput"),
   achievementKeyInput: document.getElementById("achievementKeyInput"),
+  achievementKeyStatus: document.getElementById("achievementKeyStatus"),
   achievementTitleInput: document.getElementById("achievementTitleInput"),
   achievementDescriptionInput: document.getElementById("achievementDescriptionInput"),
   achievementIconInput: document.getElementById("achievementIconInput"),
@@ -95,13 +97,11 @@ const ACHIEVEMENT_METRICS = new Set([
   "budgets_total",
   "net_worth_total",
   "account_age_years",
-  "dual_auth_enabled",
   "two_fa_enabled",
   "google_signin_enabled",
   "avatar_selected",
 ]);
 const BOOLEAN_ACHIEVEMENT_METRICS = new Set([
-  "dual_auth_enabled",
   "two_fa_enabled",
   "google_signin_enabled",
   "avatar_selected",
@@ -436,6 +436,29 @@ function normalizeAchievementKey(value) {
     .replace(/[^a-z0-9_]+/g, "_");
 }
 
+function updateAchievementKeyValidation() {
+  const raw = els.achievementKeyInput?.value || "";
+  const key = normalizeAchievementKey(raw);
+  const isTaken = Boolean(key) && state.settingsAchievements.some((item) => item.key === key);
+
+  if (els.achievementKeyInput) {
+    els.achievementKeyInput.classList.toggle("is-invalid", isTaken);
+  }
+  if (els.achievementKeyStatus) {
+    if (isTaken) {
+      els.achievementKeyStatus.textContent = "Key is taken";
+      els.achievementKeyStatus.classList.remove("is-hidden");
+      els.achievementKeyStatus.classList.add("is-error");
+    } else {
+      els.achievementKeyStatus.textContent = "";
+      els.achievementKeyStatus.classList.add("is-hidden");
+      els.achievementKeyStatus.classList.remove("is-error");
+    }
+  }
+
+  return { key, isTaken };
+}
+
 function isBooleanAchievementMetric(metric) {
   return BOOLEAN_ACHIEVEMENT_METRICS.has(String(metric || "").trim());
 }
@@ -478,7 +501,8 @@ function renderSettingsAchievements() {
 }
 
 function addAchievementFromInputs() {
-  const key = normalizeAchievementKey(els.achievementKeyInput?.value);
+  const keyCheck = updateAchievementKeyValidation();
+  const key = keyCheck.key;
   const title = String(els.achievementTitleInput?.value || "").trim();
   const description = String(els.achievementDescriptionInput?.value || "").trim();
   const icon = String(els.achievementIconInput?.value || "🏆").trim() || "🏆";
@@ -496,7 +520,7 @@ function addAchievementFromInputs() {
     return;
   }
 
-  if (state.settingsAchievements.some((item) => item.key === key)) {
+  if (keyCheck.isTaken || state.settingsAchievements.some((item) => item.key === key)) {
     setStatus(els.settingsStatus, `Achievement key "${key}" already exists.`, "error");
     return;
   }
@@ -516,6 +540,14 @@ function addAchievementFromInputs() {
   if (els.achievementIconInput) els.achievementIconInput.value = "";
   if (els.achievementTargetInput) els.achievementTargetInput.value = "1";
   if (els.achievementTargetBooleanInput) els.achievementTargetBooleanInput.value = "true";
+  if (els.achievementKeyStatus) {
+    els.achievementKeyStatus.textContent = "";
+    els.achievementKeyStatus.classList.add("is-hidden");
+    els.achievementKeyStatus.classList.remove("is-error");
+  }
+  if (els.achievementKeyInput) {
+    els.achievementKeyInput.classList.remove("is-invalid");
+  }
   syncAchievementTargetInput();
   renderSettingsAchievements();
   setStatus(els.settingsStatus, "Achievement added. Save settings to apply.", "ok");
@@ -811,10 +843,17 @@ async function loadSettings() {
       const keep = settings?.receipt_keep_files;
       els.receiptKeepFilesInput.checked = typeof keep === "boolean" ? keep : true;
     }
+    if (els.sessionTimeoutMinutesInput) {
+      const timeout = Number(settings?.session_timeout_minutes);
+      els.sessionTimeoutMinutesInput.value = String(
+        Number.isFinite(timeout) && timeout >= 1 && timeout <= 60 ? timeout : 15
+      );
+    }
     state.settingsAchievements = Array.isArray(settings?.achievements_catalog)
       ? settings.achievements_catalog
       : [];
     renderSettingsAchievements();
+    updateAchievementKeyValidation();
   } catch (err) {
     console.error(err);
     setStatus(els.settingsStatus, err.message || "Failed to load settings.", "error");
@@ -828,15 +867,22 @@ async function saveSettings(event) {
     setStatus(els.settingsStatus, "App name is required.", "error");
     return;
   }
+  const timeout = Number(els.sessionTimeoutMinutesInput?.value || 0);
+  if (!Number.isInteger(timeout) || timeout < 1 || timeout > 60) {
+    setStatus(els.settingsStatus, "Session timeout must be an integer between 1 and 60.", "error");
+    return;
+  }
 
   setStatus(els.settingsStatus, "Saving settings...");
   try {
     await api.admin.updateSettings({
       appName,
       receiptKeepFiles: Boolean(els.receiptKeepFilesInput?.checked),
+      sessionTimeoutMinutes: timeout,
       achievementsCatalog: state.settingsAchievements,
     });
     sessionStorage.setItem("appName", appName);
+    localStorage.setItem("sessionTimeoutMinutes", String(timeout));
     window.dispatchEvent(new CustomEvent("appName:updated", { detail: { appName } }));
     setStatus(els.settingsStatus, "Settings updated.", "ok");
   } catch (err) {
@@ -929,6 +975,10 @@ function bindEvents() {
   if (els.addAchievementBtn) {
     els.addAchievementBtn.addEventListener("click", addAchievementFromInputs);
   }
+  if (els.achievementKeyInput) {
+    els.achievementKeyInput.addEventListener("input", updateAchievementKeyValidation);
+    els.achievementKeyInput.addEventListener("blur", updateAchievementKeyValidation);
+  }
   if (els.achievementMetricInput) {
     els.achievementMetricInput.addEventListener("change", syncAchievementTargetInput);
   }
@@ -963,6 +1013,7 @@ function bindEvents() {
     if (action === "remove-achievement") {
       state.settingsAchievements = state.settingsAchievements.filter((item) => item.key !== key);
       renderSettingsAchievements();
+      updateAchievementKeyValidation();
       setStatus(els.settingsStatus, "Achievement removed. Save settings to apply.", "ok");
     }
   });

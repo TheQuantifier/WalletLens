@@ -248,11 +248,11 @@
         </div>
 
         <form id="settingsForm" class="admin-form">
-          <label>
+          <label class="settings-item">
             <span>App Name</span>
             <input id="appNameInput" type="text" placeholder="&lt;AppName&gt;" />
           </label>
-          <label>
+          <label class="settings-item">
             <span>Receipt Storage</span>
             <div class="checkbox-row">
               <input id="receiptKeepFilesInput" type="checkbox" />
@@ -262,15 +262,21 @@
               </span>
             </div>
           </label>
-          <div class="admin-achievements">
-            <div class="admin-achievements-head">
+          <label class="settings-item">
+            <span>Session Timeout (minutes)</span>
+            <input id="sessionTimeoutMinutesInput" type="number" min="1" max="60" step="1" value="15" />
+          </label>
+          <div class="settings-item settings-item--achievements">
+            <div class="settings-item-head">
               <span>Achievements Catalog</span>
               <p class="subtle">Add and remove achievement rules used across all users.</p>
             </div>
+            <div class="admin-achievements">
             <div class="admin-achievement-builder">
-              <label>
+              <label id="achievementKeyWrap">
                 <span>Key</span>
                 <input id="achievementKeyInput" type="text" placeholder="expense_tracker_25" />
+                <small id="achievementKeyStatus" class="admin-field-hint is-hidden" aria-live="polite"></small>
               </label>
               <label>
                 <span>Title</span>
@@ -280,9 +286,9 @@
                 <span>Description</span>
                 <input id="achievementDescriptionInput" type="text" placeholder="Add 25 expense records." />
               </label>
-              <label>
+              <label id="achievementIconWrap">
                 <span>Icon</span>
-                <input id="achievementIconInput" type="text" maxlength="4" placeholder="💸" />
+                <input id="achievementIconInput" type="text" maxlength="2" placeholder="💸" />
               </label>
               <label>
                 <span>Metric</span>
@@ -294,7 +300,6 @@
                   <option value="budgets_total">budgets_total</option>
                   <option value="net_worth_total">net_worth_total</option>
                   <option value="account_age_years">account_age_years</option>
-                  <option value="dual_auth_enabled">dual_auth_enabled</option>
                   <option value="two_fa_enabled">two_fa_enabled</option>
                   <option value="google_signin_enabled">google_signin_enabled</option>
                   <option value="avatar_selected">avatar_selected</option>
@@ -311,11 +316,13 @@
                   <option value="false">false</option>
                 </select>
               </label>
-              <div class="admin-actions">
-                <button class="btn" id="addAchievementBtn" type="button">Add Achievement</button>
+              <div class="admin-add-achievement-wrap">
+                <span class="admin-add-achievement-spacer" aria-hidden="true">Action</span>
+                <button class="btn btn--primary" id="addAchievementBtn" type="button">Add</button>
               </div>
             </div>
             <div id="adminAchievementsList" class="admin-achievements-list"></div>
+            </div>
           </div>
           <div class="admin-actions">
             <button class="btn btn--primary" type="submit">Save Settings</button>

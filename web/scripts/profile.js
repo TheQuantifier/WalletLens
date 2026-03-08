@@ -327,7 +327,6 @@ const renderAchievements = (payload) => {
     const subtitle = document.createElement("p");
     subtitle.className = "subtle";
     const isBooleanMetric =
-      item.metric === "dual_auth_enabled" ||
       item.metric === "two_fa_enabled" ||
       item.metric === "google_signin_enabled" ||
       item.metric === "avatar_selected";

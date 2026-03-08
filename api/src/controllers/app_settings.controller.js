@@ -9,7 +9,11 @@ import { ACHIEVEMENT_METRICS } from "../constants/achievements.js";
 
 export const getPublic = asyncHandler(async (_req, res) => {
   const settings = await getAppSettings();
-  res.json({ appName: settings?.app_name || "<AppName>" });
+  const timeout = Number(settings?.session_timeout_minutes);
+  res.json({
+    appName: settings?.app_name || "<AppName>",
+    sessionTimeoutMinutes: Number.isFinite(timeout) ? timeout : 15,
+  });
 });
 
 export const getAdmin = asyncHandler(async (_req, res) => {
@@ -21,12 +25,13 @@ export const getAdmin = asyncHandler(async (_req, res) => {
 });
 
 export const updateAdmin = asyncHandler(async (req, res) => {
-  const { appName, receiptKeepFiles, achievementsCatalog } = req.body;
+  const { appName, receiptKeepFiles, sessionTimeoutMinutes, achievementsCatalog } = req.body;
   const hasAppName = appName !== undefined;
   const hasReceiptKeepFiles = receiptKeepFiles !== undefined;
+  const hasSessionTimeoutMinutes = sessionTimeoutMinutes !== undefined;
   const hasAchievementsCatalog = achievementsCatalog !== undefined;
 
-  if (!hasAppName && !hasReceiptKeepFiles && !hasAchievementsCatalog) {
+  if (!hasAppName && !hasReceiptKeepFiles && !hasSessionTimeoutMinutes && !hasAchievementsCatalog) {
     return res.status(400).json({ message: "At least one setting is required" });
   }
 
@@ -36,6 +41,13 @@ export const updateAdmin = asyncHandler(async (req, res) => {
 
   if (hasReceiptKeepFiles && typeof receiptKeepFiles !== "boolean") {
     return res.status(400).json({ message: "receiptKeepFiles must be a boolean" });
+  }
+
+  if (hasSessionTimeoutMinutes) {
+    const timeout = Number(sessionTimeoutMinutes);
+    if (!Number.isFinite(timeout) || timeout < 1 || timeout > 60 || !Number.isInteger(timeout)) {
+      return res.status(400).json({ message: "sessionTimeoutMinutes must be an integer between 1 and 60" });
+    }
   }
 
   let normalizedCatalog = null;
@@ -57,6 +69,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
   const updated = await updateAppSettings({
     appName: hasAppName ? String(appName).trim() : null,
     receiptKeepFiles: hasReceiptKeepFiles ? receiptKeepFiles : null,
+    sessionTimeoutMinutes: hasSessionTimeoutMinutes ? Number(sessionTimeoutMinutes) : null,
     achievementsCatalog: hasAchievementsCatalog ? normalizedCatalog : null,
     updatedBy: req.user.id,
   });
@@ -69,6 +82,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     metadata: {
       appName: updated?.app_name,
       receiptKeepFiles: updated?.receipt_keep_files,
+      sessionTimeoutMinutes: updated?.session_timeout_minutes,
       achievementsCatalogCount: Array.isArray(updated?.achievements_catalog)
         ? updated.achievements_catalog.length
         : null,
