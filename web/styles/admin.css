@@ -140,6 +140,22 @@
   min-width: 200px;
 }
 
+#userClearBtn {
+  min-width: 2rem;
+  padding-inline: 0.55rem;
+  color: #c81e1e;
+  border: 1px solid color-mix(in srgb, #c81e1e 35%, var(--border));
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, #fff 92%, #ffebeb);
+  font-weight: 700;
+}
+
+#userClearBtn:hover,
+#userClearBtn:focus-visible {
+  color: #8f1414;
+  border-color: color-mix(in srgb, #8f1414 45%, var(--border));
+}
+
 .admin-form {
   display: grid;
   gap: var(--space-3);

@@ -92,6 +92,7 @@
               list="adminUserOptions"
             />
             <button class="btn btn--primary" id="userSearchBtn" type="button">Find User</button>
+            <button class="btn btn--link" id="userClearBtn" type="button" aria-label="Clear selected user data">X</button>
           </div>
         </div>
         <div id="usersPanelBody">
@@ -136,10 +137,7 @@
           <span id="usersPageInfo" class="subtle">Page 1 of 1</span>
           <button class="btn" id="usersNextPage" type="button" disabled>Next →</button>
         </nav>
-        </div>
-      </section>
-
-      <section id="userDataSections" class="admin-grid is-hidden">
+        <section id="userDataSections" class="admin-grid is-hidden">
         <section class="card admin-panel" id="recordsPanel">
           <div class="admin-panel-header">
             <div>
@@ -246,6 +244,8 @@
             </table>
           </div>
         </section>
+      </section>
+        </div>
       </section>
 
       <section class="card admin-panel" id="settingsPanel">

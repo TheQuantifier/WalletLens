@@ -14,6 +14,7 @@ const els = {
   usersStatus: document.getElementById("usersStatus"),
   userSearch: document.getElementById("userSearch"),
   userSearchBtn: document.getElementById("userSearchBtn"),
+  userClearBtn: document.getElementById("userClearBtn"),
   userOptions: document.getElementById("adminUserOptions"),
   usersPrevPage: document.getElementById("usersPrevPage"),
   usersNextPage: document.getElementById("usersNextPage"),
@@ -1154,6 +1155,14 @@ function tryOpenUserDropdown() {
   }
 }
 
+function clearSelectedUserPanels() {
+  if (els.userSearch) {
+    els.userSearch.value = "";
+  }
+  resetUserScopedData();
+  setStatus(els.usersStatus, "");
+}
+
 function bindEvents() {
   document.querySelectorAll(".admin-sort-btn[data-table][data-key]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -1164,6 +1173,13 @@ function bindEvents() {
   if (els.userSearchBtn) {
     els.userSearchBtn.addEventListener("click", () => {
       loadUsers({ resetPage: true, evaluateSelection: true });
+    });
+  }
+
+  if (els.userClearBtn) {
+    els.userClearBtn.addEventListener("click", () => {
+      clearSelectedUserPanels();
+      loadUsers({ resetPage: true, evaluateSelection: false });
     });
   }
 
