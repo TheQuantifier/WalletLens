@@ -81,7 +81,6 @@ export const updateAdmin = asyncHandler(async (req, res) => {
         appName: hasAppName ? String(appName).trim() : null,
         receiptKeepFiles: hasReceiptKeepFiles ? receiptKeepFiles : null,
         sessionTimeoutMinutes: hasSessionTimeoutMinutes ? Number(sessionTimeoutMinutes) : null,
-        achievementsCatalog: null,
         updatedBy: req.user.id,
       })
     : await getAppSettings();
