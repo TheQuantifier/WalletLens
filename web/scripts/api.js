@@ -76,7 +76,10 @@ async function request(path, options = {}) {
       clearAuthToken();
     }
     const message = data?.message || `Request failed (${res.status})`;
-    throw new Error(message);
+    const error = new Error(message);
+    error.status = res.status;
+    error.payload = data || null;
+    throw error;
   }
 
   if (method !== "GET" && path !== "/achievements") {
@@ -592,6 +595,10 @@ export const settings = {
 // ADMIN MODULE
 // ======================================================================
 export const admin = {
+  getPermissions() {
+    return request("/admin/permissions");
+  },
+
   getStats() {
     return request("/admin/stats");
   },
@@ -707,23 +714,6 @@ export const admin = {
 
   getSystemHealth() {
     return request("/admin/system-health");
-  },
-
-  getDataSafety() {
-    return request("/admin/data-safety");
-  },
-
-  updateDataSafety(payload) {
-    return request("/admin/data-safety", {
-      method: "PUT",
-      body: JSON.stringify(payload || {}),
-    });
-  },
-
-  exportDataSafetySummary() {
-    return request("/admin/data-safety/export", {
-      method: "POST",
-    });
   },
 };
 

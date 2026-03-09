@@ -4,10 +4,12 @@ import {
   markNotificationEmailDelivered,
 } from "../models/notification.model.js";
 import { sendEmail } from "../services/email.service.js";
+import { query } from "../config/db.js";
 
 let started = false;
 let timer = null;
 let isRunning = false;
+const WEEKLY_WORKER_LOCK_ID = 87342191;
 
 function isMonday(date = new Date()) {
   return date.getDay() === 1;
@@ -68,7 +70,15 @@ async function workOnce() {
   if (!isMonday()) return;
 
   isRunning = true;
+  let lockAcquired = false;
   try {
+    const lockResult = await query(
+      "SELECT pg_try_advisory_lock($1) AS locked",
+      [WEEKLY_WORKER_LOCK_ID]
+    );
+    lockAcquired = Boolean(lockResult?.rows?.[0]?.locked);
+    if (!lockAcquired) return;
+
     const summary = await sendWeeklyNotificationEmailsNow();
     if (summary.notificationsDelivered > 0 || summary.usersFailed > 0) {
       console.log(
@@ -77,6 +87,9 @@ async function workOnce() {
       );
     }
   } finally {
+    if (lockAcquired) {
+      await query("SELECT pg_advisory_unlock($1)", [WEEKLY_WORKER_LOCK_ID]).catch(() => {});
+    }
     isRunning = false;
   }
 }

@@ -29,6 +29,7 @@ const env = {
   dbProvider: (process.env.DB_PROVIDER || "postgres").toLowerCase(),
   dbUrl: required("DB_URL"),
   dbSsl: boolFromEnv(process.env.DB_SSL, true),
+  dbSslAllowInvalidCerts: boolFromEnv(process.env.DB_SSL_ALLOW_INVALID_CERTS, false),
 
   // Authentication
   jwtSecret: required("JWT_SECRET"),

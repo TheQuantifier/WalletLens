@@ -553,39 +553,31 @@
         </div>
       </section>
 
-      <section class="card admin-panel is-collapsed" id="dataSafetyPanel">
+      <section class="card admin-panel is-collapsed" id="permissionsPanel">
         <div class="admin-panel-header">
           <div class="admin-panel-title">
-            <button class="admin-caret-toggle" id="toggleDataSafetyPanelCaret" type="button" aria-expanded="false" aria-controls="dataSafetyPanelBody" aria-label="Expand Data Safety section">></button>
+            <button class="admin-caret-toggle" id="togglePermissionsPanelCaret" type="button" aria-expanded="false" aria-controls="permissionsPanelBody" aria-label="Expand Permissions section">></button>
             <div>
-              <h2>Data Safety</h2>
-              <p class="subtle">Set retention policy, track backup state, and export summary snapshots.</p>
+              <h2>Permissions</h2>
+              <p class="subtle">Role access matrix for admin capabilities.</p>
             </div>
           </div>
         </div>
-        <div id="dataSafetyPanelBody">
-          <div class="admin-form">
-            <label class="settings-item">
-              <span>Retention Days</span>
-              <input id="dataRetentionDaysInput" type="number" min="30" max="3650" step="1" value="365" />
-            </label>
-            <label class="settings-item">
-              <span>Backup Status</span>
-              <select id="backupStatusInput">
-                <option value="unknown">unknown</option>
-                <option value="healthy">healthy</option>
-                <option value="warning">warning</option>
-                <option value="failed">failed</option>
-              </select>
-            </label>
-            <div class="admin-actions">
-              <button class="btn btn--primary" id="saveDataSafetyBtn" type="button">Save Data Safety</button>
-              <button class="btn" id="markBackupNowBtn" type="button">Mark Backup Now</button>
-              <button class="btn" id="exportDataSummaryBtn" type="button">Export Summary</button>
-            </div>
-            <p id="dataSafetyStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
-            <pre id="dataSafetyExportOutput" class="admin-export-output"></pre>
+        <div id="permissionsPanelBody">
+          <div class="table-wrap admin-permissions-wrap">
+            <table class="admin-table admin-permissions-table">
+              <thead>
+                <tr id="permissionsHeadRow">
+                  <th>Role</th>
+                </tr>
+              </thead>
+              <tbody id="permissionsTbody">
+                <tr><td class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
           </div>
+          <p id="permissionsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          <p class="subtle admin-permissions-note">Only full admins can view this section.</p>
         </div>
       </section>
     </section>
@@ -668,6 +660,21 @@
         </div>
         <p id="adminRecordStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
       </form>
+    </div>
+  </div>
+
+  <div id="adminPermissionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminPermissionTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminPermissionTitle">Permission Required</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <p id="adminPermissionMessage" class="subtle">
+        You must be admin type or higher to edit.
+      </p>
+      <div class="admin-actions">
+        <button class="btn btn--primary" type="button" data-close-modal>OK</button>
+      </div>
     </div>
   </div>
 

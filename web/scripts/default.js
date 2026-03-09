@@ -842,7 +842,7 @@ async function updateHeaderAuthState() {
     const avatarUrl = user.avatarUrl || user.avatar_url || "";
     applyAccountAvatar(avatarUrl, user.fullName || user.full_name || user.username || "");
     sessionStorage.setItem("cachedUser", JSON.stringify(user));
-    setAdminVisibility(user?.role === "admin");
+    setAdminVisibility(user?.role);
 
   } catch {
     // Not authenticated
@@ -853,13 +853,15 @@ async function updateHeaderAuthState() {
       .forEach((el) => el.classList.remove("hidden"));
 
     applyAccountAvatar("", "");
-    setAdminVisibility(false);
+    setAdminVisibility("user");
   }
 }
 
-function setAdminVisibility(isAdmin) {
+function setAdminVisibility(role) {
+  const normalizedRole = String(role || "").trim().toLowerCase();
+  const isAdminType = ["admin", "support_admin", "analyst"].includes(normalizedRole);
   document.querySelectorAll(".admin-only").forEach((el) => {
-    el.classList.toggle("is-hidden", !isAdmin);
+    el.classList.toggle("is-hidden", !isAdminType);
   });
 }
 

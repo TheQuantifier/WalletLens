@@ -10,7 +10,9 @@ if (!env.dbUrl) {
 
 export const pool = new Pool({
   connectionString: env.dbUrl,
-  ssl: env.dbSsl ? { rejectUnauthorized: false } : false,
+  ssl: env.dbSsl
+    ? { rejectUnauthorized: !env.dbSslAllowInvalidCerts }
+    : false,
 });
 
 /**

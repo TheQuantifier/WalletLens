@@ -73,6 +73,7 @@
 
 .admin-panel {
   padding: var(--space-5);
+  min-width: 0;
 }
 
 #usersPanel.is-collapsed #usersPanelBody {
@@ -103,10 +104,6 @@
   display: none;
 }
 
-#dataSafetyPanel.is-collapsed #dataSafetyPanelBody {
-  display: none;
-}
-
 .admin-panel-header {
   display: flex;
   justify-content: space-between;
@@ -120,6 +117,22 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+}
+
+.admin-readonly-badge {
+  display: inline-flex;
+  align-items: center;
+  margin-top: 0.35rem;
+  padding: 0.15rem 0.45rem;
+  border-radius: 999px;
+  border: 1px solid color-mix(in srgb, #f59e0b 50%, var(--border));
+  background: color-mix(in srgb, #fff8e1 78%, var(--surface));
+  color: #9a6700;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  cursor: help;
 }
 
 .admin-caret-toggle {
@@ -565,6 +578,47 @@
 
 .table-wrap {
   overflow-x: auto;
+}
+
+.admin-permissions-wrap {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.admin-permissions-table {
+  width: max-content;
+  min-width: 980px;
+}
+
+.admin-permissions-table th,
+.admin-permissions-table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+.admin-permissions-table th:first-child,
+.admin-permissions-table td:first-child {
+  text-align: left;
+  white-space: nowrap;
+}
+
+.admin-permission-col {
+  font-size: 0.72rem;
+  line-height: 1.15;
+}
+
+.admin-permission-cell input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  accent-color: var(--primary);
+}
+
+.admin-permissions-note {
+  margin-top: var(--space-2);
 }
 
 .admin-pager {

@@ -14,11 +14,15 @@ import {
 } from "../models/record.model.js";
 import { logActivity } from "../services/activity.service.js";
 import { parseDateOnly } from "./records.controller.js";
-import { getAppSettings, updateAppSettings } from "../models/app_settings.model.js";
+import { getAppSettings } from "../models/app_settings.model.js";
 import {
   listSupportTickets,
   updateSupportTicket,
 } from "../models/support_ticket.model.js";
+import {
+  buildEffectiveRolePermissionsMap,
+  sanitizeRolePermissionOverrides,
+} from "../services/admin_permissions.service.js";
 
 // ==========================================================
 // USERS
@@ -227,6 +231,24 @@ export const getAdminStatsController = asyncHandler(async (_req, res) => {
     `
   );
   res.json({ stats: rows[0] || { total_users: 0, total_records: 0, total_receipts: 0 } });
+});
+
+export const getAdminPermissionsController = asyncHandler(async (req, res) => {
+  const role = String(req.user?.role || "").trim();
+  const settings = await getAppSettings();
+  const overrides = sanitizeRolePermissionOverrides(settings?.admin_role_permissions);
+  const effective = buildEffectiveRolePermissionsMap(overrides);
+  const rolePermissions = effective[role] ? [...effective[role]] : [];
+  res.json({
+    role,
+    permissions: rolePermissions,
+    matrix: role === "admin"
+      ? Object.fromEntries(
+          Object.entries(effective).map(([r, permissionsSet]) => [r, [...permissionsSet]])
+        )
+      : null,
+    overrides,
+  });
 });
 
 export const listReceiptsAdminController = asyncHandler(async (req, res) => {
@@ -446,105 +468,6 @@ export const getSystemHealthAdmin = asyncHandler(async (_req, res) => {
       failedReceiptJobs: Number(failedJobsRows?.[0]?.failed_receipt_jobs || 0),
       queuedOrRunningReceiptJobs: Number(queuedJobsRows?.[0]?.queued_receipt_jobs || 0),
       checkedAt: new Date().toISOString(),
-    },
-  });
-});
-
-// ==========================================================
-// DATA SAFETY
-// ==========================================================
-export const getDataSafetyAdmin = asyncHandler(async (_req, res) => {
-  const settings = await getAppSettings();
-  const { rows } = await query(
-    `
-    SELECT
-      (SELECT COUNT(*)::int FROM users) AS users_count,
-      (SELECT COUNT(*)::int FROM records) AS records_count,
-      (SELECT COUNT(*)::int FROM receipts) AS receipts_count,
-      (SELECT COUNT(*)::int FROM support_tickets) AS support_tickets_count,
-      (SELECT COUNT(*)::int FROM notifications) AS notifications_count
-    `
-  );
-
-  res.json({
-    dataSafety: {
-      retentionDays: Number(settings?.data_retention_days || 365),
-      backupStatus: settings?.backup_status || "unknown",
-      lastBackupAt: settings?.last_backup_at || null,
-      totals: rows[0] || {},
-    },
-  });
-});
-
-export const updateDataSafetyAdmin = asyncHandler(async (req, res) => {
-  const hasRetention = req.body?.retentionDays !== undefined;
-  const hasBackupStatus = req.body?.backupStatus !== undefined;
-  const markBackupNow = Boolean(req.body?.markBackupNow);
-  if (!hasRetention && !hasBackupStatus && !markBackupNow) {
-    return res.status(400).json({ message: "At least one data safety update is required" });
-  }
-
-  let retentionDays = null;
-  if (hasRetention) {
-    retentionDays = Number(req.body.retentionDays);
-    if (!Number.isInteger(retentionDays) || retentionDays < 30 || retentionDays > 3650) {
-      return res.status(400).json({ message: "retentionDays must be an integer between 30 and 3650" });
-    }
-  }
-
-  let backupStatus = null;
-  if (hasBackupStatus) {
-    backupStatus = String(req.body.backupStatus || "").trim().toLowerCase();
-    if (!["unknown", "healthy", "warning", "failed"].includes(backupStatus)) {
-      return res.status(400).json({ message: "Invalid backupStatus value" });
-    }
-  }
-
-  const settings = await updateAppSettings({
-    dataRetentionDays: retentionDays,
-    backupStatus,
-    lastBackupAt: markBackupNow ? new Date().toISOString() : null,
-    updatedBy: req.user.id,
-  });
-
-  await logActivity({
-    userId: req.user.id,
-    action: "admin_data_safety_update",
-    entityType: "app_settings",
-    entityId: settings?.id || null,
-    metadata: {
-      retentionDays: settings?.data_retention_days,
-      backupStatus: settings?.backup_status,
-      lastBackupAt: settings?.last_backup_at,
-    },
-    req,
-  });
-
-  res.json({
-    dataSafety: {
-      retentionDays: Number(settings?.data_retention_days || 365),
-      backupStatus: settings?.backup_status || "unknown",
-      lastBackupAt: settings?.last_backup_at || null,
-    },
-  });
-});
-
-export const runDataExportAdmin = asyncHandler(async (_req, res) => {
-  const { rows } = await query(
-    `
-    SELECT
-      (SELECT COUNT(*)::int FROM users) AS users_count,
-      (SELECT COUNT(*)::int FROM records) AS records_count,
-      (SELECT COUNT(*)::int FROM receipts) AS receipts_count,
-      (SELECT COUNT(*)::int FROM support_tickets) AS support_tickets_count,
-      (SELECT COUNT(*)::int FROM notifications) AS notifications_count,
-      (SELECT COUNT(*)::int FROM activity_log) AS activity_rows
-    `
-  );
-  res.json({
-    export: {
-      generatedAt: new Date().toISOString(),
-      summary: rows[0] || {},
     },
   });
 });

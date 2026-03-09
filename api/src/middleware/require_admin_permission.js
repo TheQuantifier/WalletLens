@@ -1,44 +1,33 @@
-const ROLE_PERMISSIONS = {
-  admin: new Set([
-    "users.read",
-    "users.write",
-    "records.read",
-    "records.write",
-    "settings.read",
-    "settings.write",
-    "notifications.read",
-    "notifications.write",
-    "support.read",
-    "support.write",
-    "audit.read",
-    "health.read",
-    "data_safety.read",
-    "data_safety.write",
-  ]),
-  support_admin: new Set([
-    "users.read",
-    "notifications.read",
-    "notifications.write",
-    "support.read",
-    "support.write",
-    "audit.read",
-    "health.read",
-  ]),
-  analyst: new Set([
-    "users.read",
-    "records.read",
-    "notifications.read",
-    "support.read",
-    "audit.read",
-    "health.read",
-    "data_safety.read",
-  ]),
-};
+import { getAppSettings } from "../models/app_settings.model.js";
+import { buildEffectiveRolePermissionsMap } from "../services/admin_permissions.service.js";
+
+let permissionsCache = null;
+let permissionsCacheExpiresAt = 0;
+const CACHE_TTL_MS = 15000;
+
+async function getEffectivePermissionsMap() {
+  const now = Date.now();
+  if (permissionsCache && now < permissionsCacheExpiresAt) {
+    return permissionsCache;
+  }
+  try {
+    const settings = await getAppSettings();
+    permissionsCache = buildEffectiveRolePermissionsMap(settings?.admin_role_permissions);
+    permissionsCacheExpiresAt = now + CACHE_TTL_MS;
+    return permissionsCache;
+  } catch (err) {
+    console.error("Failed to load admin role permissions, using defaults", err);
+    permissionsCache = buildEffectiveRolePermissionsMap(null);
+    permissionsCacheExpiresAt = now + CACHE_TTL_MS;
+    return permissionsCache;
+  }
+}
 
 export default function requireAdminPermission(permission) {
-  return function requirePermission(req, res, next) {
+  return async function requirePermission(req, res, next) {
     const role = String(req.user?.role || "").trim();
-    const allowed = ROLE_PERMISSIONS[role];
+    const permissionsMap = await getEffectivePermissionsMap();
+    const allowed = permissionsMap[role];
     if (!allowed || !allowed.has(permission)) {
       return res.status(403).json({ message: "Permission denied" });
     }

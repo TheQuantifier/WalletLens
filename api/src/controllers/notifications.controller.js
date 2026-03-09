@@ -11,14 +11,57 @@ import { listUsersWithNotificationEmailEnabled } from "../models/user.model.js";
 import { sendEmail } from "../services/email.service.js";
 import { logActivity } from "../services/activity.service.js";
 
+const ALLOWED_NOTIFICATION_TAGS = new Set([
+  "p",
+  "br",
+  "strong",
+  "b",
+  "em",
+  "i",
+  "u",
+  "ul",
+  "ol",
+  "li",
+  "a",
+]);
+
+function sanitizeHref(rawHref) {
+  const href = String(rawHref || "").trim();
+  if (!href) return "#";
+  if (href.startsWith("#") || href.startsWith("/")) return href;
+  try {
+    const parsed = new URL(href);
+    if (parsed.protocol === "http:" || parsed.protocol === "https:" || parsed.protocol === "mailto:") {
+      return parsed.toString();
+    }
+  } catch {
+    return "#";
+  }
+  return "#";
+}
+
 function sanitizeNotificationHtml(rawHtml) {
-  const raw = String(rawHtml || "");
-  const noScript = raw
+  const input = String(rawHtml || "")
     .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "");
-  const noEventHandlers = noScript.replace(/\son[a-z]+\s*=\s*"[^"]*"/gi, "");
-  const noJsUrls = noEventHandlers.replace(/href\s*=\s*"javascript:[^"]*"/gi, 'href="#"');
-  return noJsUrls.trim();
+    .replace(/<style[\s\S]*?>[\s\S]*?<\/style>/gi, "")
+    .replace(/<!--[\s\S]*?-->/g, "");
+
+  const sanitized = input.replace(/<\/?([a-z0-9]+)(\s[^>]*)?>/gi, (full, tagName, attrs = "") => {
+    const tag = String(tagName || "").toLowerCase();
+    const isClosing = full.startsWith("</");
+    if (!ALLOWED_NOTIFICATION_TAGS.has(tag)) return "";
+    if (isClosing) return `</${tag}>`;
+    if (tag === "br") return "<br>";
+    if (tag !== "a") return `<${tag}>`;
+
+    const hrefMatch = String(attrs).match(
+      /href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i
+    );
+    const href = sanitizeHref(hrefMatch?.[1] || hrefMatch?.[2] || hrefMatch?.[3] || "");
+    return `<a href="${href}" rel="noopener noreferrer" target="_blank">`;
+  });
+
+  return sanitized.trim();
 }
 
 function stripHtmlToText(html) {
@@ -36,6 +79,31 @@ function normalizeNotificationType(rawType) {
     return value;
   }
   return "";
+}
+
+async function sendNotificationBlastAsync({
+  recipients = [],
+  subject,
+  text,
+  batchSize = 25,
+} = {}) {
+  const safeRecipients = Array.isArray(recipients) ? recipients : [];
+  for (let i = 0; i < safeRecipients.length; i += batchSize) {
+    const batch = safeRecipients.slice(i, i + batchSize);
+    const outcomes = await Promise.allSettled(
+      batch.map((user) =>
+        sendEmail({
+          to: user.email,
+          subject,
+          text,
+        })
+      )
+    );
+    const failures = outcomes.filter((o) => o.status === "rejected").length;
+    if (failures > 0) {
+      console.error(`Notification resend batch failed (${failures}/${batch.length})`);
+    }
+  }
 }
 
 export const getMine = asyncHandler(async (req, res) => {
@@ -166,18 +234,19 @@ export const resendAdmin = asyncHandler(async (req, res) => {
     ? "<AppName> Security Notification"
     : "<AppName> Notification";
   const text = String(notification.message_text || "").trim();
+  const body = `${text}\n\nThis message was sent from <AppName>.`;
+  const recipientCount = recipients.length;
 
-  const outcomes = await Promise.allSettled(
-    recipients.map((user) =>
-      sendEmail({
-        to: user.email,
-        subject,
-        text: `${text}\n\nThis message was sent from <AppName>.`,
-      })
-    )
-  );
+  setImmediate(() => {
+    sendNotificationBlastAsync({
+      recipients,
+      subject,
+      text: body,
+      batchSize: 25,
+    }).catch((err) => {
+      console.error("Async notification resend failed:", err);
+    });
+  });
 
-  const sent = outcomes.filter((o) => o.status === "fulfilled").length;
-  const failed = outcomes.length - sent;
-  res.json({ sent, failed });
+  res.status(202).json({ queued: true, recipientCount });
 });

@@ -50,27 +50,26 @@ const els = {
   healthRefreshBtn: document.getElementById("healthRefreshBtn"),
   healthSummary: document.getElementById("healthSummary"),
   healthStatus: document.getElementById("healthStatus"),
-  dataSafetyPanel: document.getElementById("dataSafetyPanel"),
-  dataSafetyPanelBody: document.getElementById("dataSafetyPanelBody"),
-  toggleDataSafetyPanelCaret: document.getElementById("toggleDataSafetyPanelCaret"),
-  dataRetentionDaysInput: document.getElementById("dataRetentionDaysInput"),
-  backupStatusInput: document.getElementById("backupStatusInput"),
-  saveDataSafetyBtn: document.getElementById("saveDataSafetyBtn"),
-  markBackupNowBtn: document.getElementById("markBackupNowBtn"),
-  exportDataSummaryBtn: document.getElementById("exportDataSummaryBtn"),
-  dataSafetyStatus: document.getElementById("dataSafetyStatus"),
-  dataSafetyExportOutput: document.getElementById("dataSafetyExportOutput"),
+  permissionsPanel: document.getElementById("permissionsPanel"),
+  permissionsPanelBody: document.getElementById("permissionsPanelBody"),
+  togglePermissionsPanelCaret: document.getElementById("togglePermissionsPanelCaret"),
+  permissionsHeadRow: document.getElementById("permissionsHeadRow"),
+  permissionsTbody: document.getElementById("permissionsTbody"),
+  permissionsStatus: document.getElementById("permissionsStatus"),
 
   recordsTbody: document.getElementById("recordsTbody"),
+  recordsPanel: document.getElementById("recordsPanel"),
   recordsStatus: document.getElementById("recordsStatus"),
   recordsContext: document.getElementById("recordsContext"),
   recordsType: document.getElementById("recordsType"),
   recordsSearchBtn: document.getElementById("recordsSearchBtn"),
 
   receiptsTbody: document.getElementById("receiptsTbody"),
+  receiptsPanel: document.getElementById("receiptsPanel"),
   receiptsStatus: document.getElementById("receiptsStatus"),
 
   budgetsTbody: document.getElementById("budgetsTbody"),
+  budgetsPanel: document.getElementById("budgetsPanel"),
   budgetsStatus: document.getElementById("budgetsStatus"),
 
   settingsPanel: document.getElementById("settingsPanel"),
@@ -118,9 +117,14 @@ const els = {
   recordAmount: document.getElementById("adminRecordAmount"),
   recordNote: document.getElementById("adminRecordNote"),
   recordStatus: document.getElementById("adminRecordStatus"),
+  permissionModal: document.getElementById("adminPermissionModal"),
+  permissionMessage: document.getElementById("adminPermissionMessage"),
 };
 
 const state = {
+  currentUser: null,
+  currentRole: "user",
+  permissions: new Set(),
   selectedUserId: "",
   selectedUser: null,
   usersQuery: "",
@@ -137,13 +141,63 @@ const state = {
   auditLog: [],
   supportTickets: [],
   systemHealth: null,
-  dataSafety: null,
+  adminRolePermissions: {},
+  savingPermissions: false,
   editingNotificationId: "",
   sorts: {
     users: { key: "", dir: "" },
     records: { key: "", dir: "" },
   },
 };
+
+const ROLE_PERMISSIONS = {
+  admin: new Set([
+    "users.read",
+    "users.write",
+    "records.read",
+    "records.write",
+    "settings.read",
+    "settings.write",
+    "notifications.read",
+    "notifications.write",
+    "support.read",
+    "support.write",
+    "audit.read",
+    "health.read",
+  ]),
+  support_admin: new Set([
+    "users.read",
+    "notifications.read",
+    "notifications.write",
+    "support.read",
+    "support.write",
+    "audit.read",
+    "health.read",
+  ]),
+  analyst: new Set([
+    "users.read",
+    "records.read",
+    "notifications.read",
+    "support.read",
+    "audit.read",
+    "health.read",
+  ]),
+};
+const PERMISSIONS_GRID_ORDER = [
+  "users.read",
+  "users.write",
+  "records.read",
+  "records.write",
+  "settings.read",
+  "settings.write",
+  "notifications.read",
+  "notifications.write",
+  "support.read",
+  "support.write",
+  "audit.read",
+  "health.read",
+];
+const ADMIN_ROLES_FOR_GRID = ["user", "analyst", "support_admin"];
 
 const ACHIEVEMENT_METRICS = new Set([
   "records_total",
@@ -196,6 +250,136 @@ function closeModal(modal) {
   modal.classList.add("hidden");
 }
 
+function openPermissionModal(requiredRole = "admin") {
+  if (els.permissionMessage) {
+    const roleText = String(requiredRole || "admin").trim();
+    els.permissionMessage.textContent = `You must be ${roleText} admin type or higher to edit.`;
+  }
+  openModal(els.permissionModal);
+}
+
+function hasPermission(permission) {
+  return state.permissions.has(permission);
+}
+
+function setElementVisible(el, visible) {
+  if (!el) return;
+  el.classList.toggle("is-hidden", !visible);
+  el.hidden = !visible;
+}
+
+function setControlsDisabled(container, disabled) {
+  if (!container) return;
+  container.querySelectorAll("input, select, textarea, button, [contenteditable='true']").forEach((control) => {
+    if (control instanceof HTMLElement && control.getAttribute("contenteditable") === "true") {
+      control.setAttribute("contenteditable", disabled ? "false" : "true");
+      return;
+    }
+    control.disabled = Boolean(disabled);
+  });
+}
+
+function setReadOnlyBadge(panel, requiredRole, show) {
+  if (!panel) return;
+  const existing = panel.querySelector(".admin-readonly-badge");
+  if (!show) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  const tooltip = `You must be ${requiredRole} role or higher to edit.`;
+  const badge = existing || document.createElement("span");
+  badge.className = "admin-readonly-badge";
+  badge.textContent = "Read only";
+  badge.title = tooltip;
+  badge.setAttribute("aria-label", tooltip);
+
+  const titleAnchor =
+    panel.querySelector(".admin-panel-title > div") ||
+    panel.querySelector(".admin-panel-header > div");
+  if (!titleAnchor) return;
+
+  if (!existing) {
+    titleAnchor.appendChild(badge);
+  }
+}
+
+function applyPermissionVisibility() {
+  const canUsersRead = hasPermission("users.read");
+  const canUsersWrite = hasPermission("users.write");
+  const canRecordsRead = hasPermission("records.read");
+  const canRecordsWrite = hasPermission("records.write");
+  const canSettingsRead = hasPermission("settings.read");
+  const canSettingsWrite = hasPermission("settings.write");
+  const canNotificationsRead = hasPermission("notifications.read");
+  const canNotificationsWrite = hasPermission("notifications.write");
+  const canAuditRead = hasPermission("audit.read");
+  const canSupportRead = hasPermission("support.read");
+  const canSupportWrite = hasPermission("support.write");
+  const canHealthRead = hasPermission("health.read");
+
+  setElementVisible(document.getElementById("statsPanel"), canHealthRead);
+  setElementVisible(els.usersPanel, canUsersRead);
+  setElementVisible(els.settingsPanel, canSettingsRead);
+  setElementVisible(els.achievementsPanel, canSettingsRead);
+  setElementVisible(els.notificationsPanel, canNotificationsRead);
+  setElementVisible(els.auditPanel, canAuditRead);
+  setElementVisible(els.supportPanel, canSupportRead);
+  setElementVisible(els.systemHealthPanel, canHealthRead);
+  setElementVisible(els.permissionsPanel, state.currentRole === "admin");
+  setElementVisible(els.recordsPanel, canRecordsRead);
+  setElementVisible(els.receiptsPanel, canRecordsRead);
+  setElementVisible(els.budgetsPanel, canRecordsRead);
+
+  if (els.userSearchBtn) els.userSearchBtn.disabled = !canUsersRead;
+  if (els.userSearch) els.userSearch.disabled = !canUsersRead;
+  if (els.userClearBtn) els.userClearBtn.disabled = !canUsersRead;
+  if (els.recordsSearchBtn) els.recordsSearchBtn.disabled = !canRecordsRead;
+  if (els.recordsType) els.recordsType.disabled = !canRecordsRead;
+
+  if (!canSettingsWrite) {
+    setControlsDisabled(els.settingsForm, true);
+    if (els.addAchievementBtn) els.addAchievementBtn.disabled = true;
+  }
+
+  if (!canNotificationsWrite) {
+    if (els.publishNotificationBtn) els.publishNotificationBtn.disabled = true;
+    setControlsDisabled(document.querySelector(".admin-notification-toolbar"), true);
+    if (els.notificationEditor) els.notificationEditor.setAttribute("contenteditable", "false");
+  }
+
+  if (!canSupportWrite) {
+    if (els.supportStatusFilter) els.supportStatusFilter.disabled = !canSupportRead;
+  }
+
+  if (!canRecordsRead) {
+    toggleUserDataSections(false);
+  }
+
+  if (!canUsersWrite && els.userRole) {
+    els.userRole.disabled = true;
+  }
+
+  setReadOnlyBadge(els.usersPanel, "admin", canUsersRead && !canUsersWrite);
+  setReadOnlyBadge(els.recordsPanel, "admin", canRecordsRead && !canRecordsWrite);
+  setReadOnlyBadge(els.settingsPanel, "admin", canSettingsRead && !canSettingsWrite);
+  setReadOnlyBadge(els.achievementsPanel, "admin", canSettingsRead && !canSettingsWrite);
+  setReadOnlyBadge(els.notificationsPanel, "support_admin", canNotificationsRead && !canNotificationsWrite);
+  setReadOnlyBadge(els.supportPanel, "support_admin", canSupportRead && !canSupportWrite);
+}
+
+function isPermissionError(err) {
+  const status = Number(err?.status || 0);
+  const message = String(err?.message || "").toLowerCase();
+  return status === 403 || message.includes("permission denied") || message.includes("admin access required");
+}
+
+function handlePermissionError(err, requiredRole = "admin") {
+  if (!isPermissionError(err)) return false;
+  openPermissionModal(requiredRole);
+  return true;
+}
+
 function bindModalClose() {
   document.addEventListener("click", (event) => {
     const closeBtn = event.target.closest("[data-close-modal]");
@@ -216,6 +400,20 @@ async function ensureAdmin() {
     if (!["admin", "support_admin", "analyst"].includes(String(user?.role || ""))) {
       window.location.href = "home.html";
       return false;
+    }
+    state.currentUser = user || null;
+    state.currentRole = String(user?.role || "user").trim();
+    state.permissions = ROLE_PERMISSIONS[state.currentRole] || new Set();
+    try {
+      const perms = await api.admin.getPermissions();
+      if (Array.isArray(perms?.permissions)) {
+        state.permissions = new Set(perms.permissions);
+      }
+      if (perms?.overrides && typeof perms.overrides === "object") {
+        state.adminRolePermissions = sanitizeAdminRolePermissionOverrides(perms.overrides);
+      }
+    } catch (err) {
+      console.warn("Failed to load dynamic permissions; using defaults", err);
     }
     return true;
   } catch {
@@ -362,17 +560,95 @@ function setSystemHealthPanelCollapsed(collapsed) {
   }
 }
 
-function setDataSafetyPanelCollapsed(collapsed) {
-  if (!els.dataSafetyPanel) return;
-  els.dataSafetyPanel.classList.toggle("is-collapsed", collapsed);
-  if (els.dataSafetyPanelBody) els.dataSafetyPanelBody.hidden = collapsed;
-  if (els.toggleDataSafetyPanelCaret) {
-    els.toggleDataSafetyPanelCaret.textContent = collapsed ? ">" : "v";
-    els.toggleDataSafetyPanelCaret.setAttribute("aria-expanded", collapsed ? "false" : "true");
-    els.toggleDataSafetyPanelCaret.setAttribute(
+function setPermissionsPanelCollapsed(collapsed) {
+  if (!els.permissionsPanel) return;
+  els.permissionsPanel.classList.toggle("is-collapsed", collapsed);
+  if (els.permissionsPanelBody) els.permissionsPanelBody.hidden = collapsed;
+  if (els.togglePermissionsPanelCaret) {
+    els.togglePermissionsPanelCaret.textContent = collapsed ? ">" : "v";
+    els.togglePermissionsPanelCaret.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    els.togglePermissionsPanelCaret.setAttribute(
       "aria-label",
-      `${collapsed ? "Expand" : "Collapse"} Data Safety section`
+      `${collapsed ? "Expand" : "Collapse"} Permissions section`
     );
+  }
+}
+
+function formatPermissionHeader(permission) {
+  const [scope, level] = String(permission || "").split(".");
+  return `${scope || ""}<br/>${level || ""}`;
+}
+
+function sanitizeAdminRolePermissionOverrides(input) {
+  if (!input || typeof input !== "object" || Array.isArray(input)) return {};
+  const allowedPermissions = new Set(PERMISSIONS_GRID_ORDER);
+  const next = {};
+  ADMIN_ROLES_FOR_GRID.forEach((role) => {
+    const raw = input[role];
+    if (!Array.isArray(raw)) return;
+    next[role] = [...new Set(
+      raw
+        .map((permission) => String(permission || "").trim().toLowerCase())
+        .filter((permission) => allowedPermissions.has(permission))
+    )];
+  });
+  return next;
+}
+
+function getEffectiveRolePermissionSet(role) {
+  const base = ROLE_PERMISSIONS[role] ? [...ROLE_PERMISSIONS[role]] : [];
+  const override = state.adminRolePermissions?.[role];
+  if (!Array.isArray(override)) return new Set(base);
+  return new Set(override);
+}
+
+function renderPermissionsMatrix() {
+  if (!els.permissionsHeadRow || !els.permissionsTbody) return;
+  const canSeePermissionsPanel = state.currentRole === "admin";
+  if (!canSeePermissionsPanel) {
+    els.permissionsHeadRow.innerHTML = "<th>Role</th>";
+    els.permissionsTbody.innerHTML = '<tr><td class="subtle">You do not have access to this section.</td></tr>';
+    return;
+  }
+
+  const headers = PERMISSIONS_GRID_ORDER
+    .map((permission) => `<th class="admin-permission-col">${formatPermissionHeader(escapeHtml(permission))}</th>`)
+    .join("");
+  els.permissionsHeadRow.innerHTML = `<th>Role</th>${headers}`;
+
+  els.permissionsTbody.innerHTML = ADMIN_ROLES_FOR_GRID
+    .map((role) => {
+      const allowed = getEffectiveRolePermissionSet(role);
+      const cells = PERMISSIONS_GRID_ORDER
+        .map((permission) => {
+          const checked = allowed.has(permission) ? "checked" : "";
+          return `<td class="admin-permission-cell"><input type="checkbox" data-role="${escapeHtml(role)}" data-permission="${escapeHtml(permission)}" ${checked} ${state.savingPermissions ? "disabled" : ""} aria-label="${escapeHtml(role)} ${escapeHtml(permission)}" /></td>`;
+        })
+        .join("");
+      return `<tr><th scope="row">${escapeHtml(role)}</th>${cells}</tr>`;
+    })
+    .join("");
+}
+
+async function persistPermissionsMatrix() {
+  if (state.currentRole !== "admin" || state.savingPermissions) return;
+  state.savingPermissions = true;
+  renderPermissionsMatrix();
+  setStatus(els.permissionsStatus, "Saving permissions...");
+  try {
+    const payload = sanitizeAdminRolePermissionOverrides(state.adminRolePermissions);
+    const { settings } = await api.admin.updateSettings({ adminRolePermissions: payload });
+    state.adminRolePermissions = sanitizeAdminRolePermissionOverrides(
+      settings?.admin_role_permissions || payload
+    );
+    renderPermissionsMatrix();
+    setStatus(els.permissionsStatus, "Permissions updated.", "ok");
+  } catch (err) {
+    console.error(err);
+    setStatus(els.permissionsStatus, err.message || "Failed to save permissions.", "error");
+  } finally {
+    state.savingPermissions = false;
+    renderPermissionsMatrix();
   }
 }
 
@@ -462,9 +738,16 @@ function renderUsersPager() {
 function renderUsers() {
   if (!els.usersTbody) return;
   const rows = sortRows("users", state.users);
+  const canUsersWrite = hasPermission("users.write");
+  const canViewUserData = hasPermission("records.read");
+  const showActionsCol = canViewUserData || canUsersWrite;
+  const usersActionsHeader = document.querySelector("#usersPanel .admin-table thead th.actions-col");
+  if (usersActionsHeader) {
+    usersActionsHeader.hidden = !showActionsCol;
+  }
   if (!rows.length) {
     const message = state.usersQuery ? "No users found." : "No users available.";
-    els.usersTbody.innerHTML = `<tr><td colspan="5" class="subtle">${message}</td></tr>`;
+    els.usersTbody.innerHTML = `<tr><td colspan="${showActionsCol ? 5 : 4}" class="subtle">${message}</td></tr>`;
     renderUsersPager();
     return;
   }
@@ -477,10 +760,14 @@ function renderUsers() {
           <td>${user.email || "—"}</td>
           <td>${user.role || "user"}</td>
           <td>${formatDate(user.created_at || user.createdAt)}</td>
-          <td>
-            <button class="btn btn--link" data-action="view-user" data-id="${user.id}">View Data</button>
-            <button class="btn btn--link" data-action="edit-user" data-id="${user.id}">Edit</button>
-          </td>
+          ${
+            showActionsCol
+              ? `<td>
+            ${canViewUserData ? `<button class="btn btn--link" data-action="view-user" data-id="${user.id}">View Data</button>` : ""}
+            ${canUsersWrite ? `<button class="btn btn--link" data-action="edit-user" data-id="${user.id}">Edit</button>` : ""}
+          </td>`
+              : ""
+          }
         </tr>
       `
     )
@@ -511,6 +798,7 @@ function updateRecordsContext() {
 function renderRecords() {
   if (!els.recordsTbody) return;
   const rows = sortRows("records", state.records);
+  const canRecordsWrite = hasPermission("records.write");
   if (!rows.length) {
     const message = state.selectedUserId
       ? "No records found for this user."
@@ -529,8 +817,12 @@ function renderRecords() {
           <td>${record.category || "—"}</td>
           <td class="num">${Number(record.amount || 0).toFixed(2)}</td>
           <td>
-            <button class="btn btn--link" data-action="edit-record" data-id="${record.id}">Edit</button>
-            <button class="btn btn--link" data-action="delete-record" data-id="${record.id}">Delete</button>
+            ${
+              canRecordsWrite
+                ? `<button class="btn btn--link" data-action="edit-record" data-id="${record.id}">Edit</button>
+            <button class="btn btn--link" data-action="delete-record" data-id="${record.id}">Delete</button>`
+                : "—"
+            }
           </td>
         </tr>
       `
@@ -647,6 +939,7 @@ function syncAchievementTargetInput() {
 
 function renderSettingsAchievements() {
   if (!els.adminAchievementsList) return;
+  const canSettingsWrite = hasPermission("settings.write");
   if (!state.settingsAchievements.length) {
     els.adminAchievementsList.innerHTML =
       '<p class="subtle">No achievements configured. Add one above, then save settings.</p>';
@@ -668,7 +961,9 @@ function renderSettingsAchievements() {
 
   const renderAchievementCard = (item) => `
     <div class="admin-achievement-item">
-      <button
+      ${
+        canSettingsWrite
+          ? `<button
         class="admin-achievement-remove"
         data-action="remove-achievement"
         data-key="${escapeHtml(item.key)}"
@@ -677,7 +972,9 @@ function renderSettingsAchievements() {
         title="Remove achievement"
       >
         X
-      </button>
+      </button>`
+          : ""
+      }
       <div>
         <strong>${escapeHtml(item.icon || "🏆")} ${escapeHtml(item.title)}</strong>
         <p class="meta">${escapeHtml(item.key)} • ${escapeHtml(item.metric)} • target ${escapeHtml(String(item.target))}</p>
@@ -744,6 +1041,7 @@ function extractNotificationTextFromHtml(html) {
 
 function renderNotificationHistory() {
   if (!els.notificationHistoryList) return;
+  const canNotificationsWrite = hasPermission("notifications.write");
   if (!state.notificationsHistory.length) {
     els.notificationHistoryList.innerHTML = '<p class="subtle">No notifications yet.</p>';
     return;
@@ -762,7 +1060,7 @@ function renderNotificationHistory() {
         <article class="admin-notification-item">
           <div class="admin-notification-meta">${createdAt} • ${type} • ${isActive ? "active" : "inactive"} • by ${creator}</div>
           <p>${content}</p>
-          <div class="admin-notification-controls">
+          <div class="admin-notification-controls ${canNotificationsWrite ? "" : "is-hidden"}">
             <button class="btn btn--link" type="button" data-action="edit-notification" data-id="${item.id}">Edit</button>
             <button class="btn btn--link" type="button" data-action="toggle-notification-active" data-id="${item.id}" data-active="${isActive ? "true" : "false"}">
               ${isActive ? "Deactivate" : "Activate"}
@@ -776,6 +1074,7 @@ function renderNotificationHistory() {
 }
 
 async function loadNotificationHistory() {
+  if (!hasPermission("notifications.read")) return;
   if (!els.notificationHistoryList) return;
   try {
     const type = String(els.notificationFilterType?.value || "").trim();
@@ -785,11 +1084,16 @@ async function loadNotificationHistory() {
     renderNotificationHistory();
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
     els.notificationHistoryList.innerHTML = `<p class="subtle">${escapeHtml(err.message || "Failed to load notifications.")}</p>`;
   }
 }
 
 async function publishNotificationFromEditor() {
+  if (!hasPermission("notifications.write")) {
+    openPermissionModal("support_admin");
+    return;
+  }
   const html = String(els.notificationEditor?.innerHTML || "").trim();
   const text = extractNotificationTextFromHtml(html);
   const notificationType = String(els.notificationTypeInput?.value || "general").trim().toLowerCase();
@@ -827,6 +1131,7 @@ async function publishNotificationFromEditor() {
     setStatus(els.notificationAdminStatus, isEdit ? "Notification updated." : "Notification published.", "ok");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.notificationAdminStatus, err.message || "Failed to publish notification.", "error");
   } finally {
     if (els.publishNotificationBtn) {
@@ -863,6 +1168,7 @@ function renderAuditLog() {
 }
 
 async function loadAuditLog() {
+  if (!hasPermission("audit.read")) return;
   if (!els.auditTbody) return;
   try {
     const q = String(els.auditQueryInput?.value || "").trim();
@@ -873,12 +1179,14 @@ async function loadAuditLog() {
     setStatus(els.auditStatus, "");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.auditStatus, err.message || "Failed to load audit log.", "error");
   }
 }
 
 function renderSupportTickets() {
   if (!els.supportTbody) return;
+  const canSupportWrite = hasPermission("support.write");
   if (!state.supportTickets.length) {
     els.supportTbody.innerHTML = `<tr><td colspan="5" class="subtle">No support tickets found.</td></tr>`;
     return;
@@ -895,9 +1203,13 @@ function renderSupportTickets() {
           <td>${subject}</td>
           <td>${status}</td>
           <td>
-            <button class="btn btn--link" type="button" data-action="support-status" data-id="${t.id}" data-status="in_progress">In Progress</button>
+            ${
+              canSupportWrite
+                ? `<button class="btn btn--link" type="button" data-action="support-status" data-id="${t.id}" data-status="in_progress">In Progress</button>
             <button class="btn btn--link" type="button" data-action="support-status" data-id="${t.id}" data-status="resolved">Resolve</button>
-            <button class="btn btn--link" type="button" data-action="support-status" data-id="${t.id}" data-status="closed">Close</button>
+            <button class="btn btn--link" type="button" data-action="support-status" data-id="${t.id}" data-status="closed">Close</button>`
+                : "—"
+            }
           </td>
         </tr>
       `;
@@ -906,6 +1218,7 @@ function renderSupportTickets() {
 }
 
 async function loadSupportTickets() {
+  if (!hasPermission("support.read")) return;
   if (!els.supportTbody) return;
   try {
     const status = String(els.supportStatusFilter?.value || "").trim();
@@ -915,6 +1228,7 @@ async function loadSupportTickets() {
     setStatus(els.supportStatusMsg, "");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.supportStatusMsg, err.message || "Failed to load support tickets.", "error");
   }
 }
@@ -936,6 +1250,7 @@ function renderSystemHealth() {
 }
 
 async function loadSystemHealth() {
+  if (!hasPermission("health.read")) return;
   if (!els.healthSummary) return;
   try {
     const { health } = await api.admin.getSystemHealth();
@@ -944,73 +1259,16 @@ async function loadSystemHealth() {
     setStatus(els.healthStatus, "");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.healthStatus, err.message || "Failed to load system health.", "error");
   }
 }
 
-function renderDataSafety() {
-  const data = state.dataSafety;
-  if (!data) return;
-  if (els.dataRetentionDaysInput) {
-    els.dataRetentionDaysInput.value = String(data.retentionDays || 365);
-  }
-  if (els.backupStatusInput) {
-    els.backupStatusInput.value = String(data.backupStatus || "unknown");
-  }
-}
-
-async function loadDataSafety() {
-  try {
-    const { dataSafety } = await api.admin.getDataSafety();
-    state.dataSafety = dataSafety || null;
-    renderDataSafety();
-    setStatus(els.dataSafetyStatus, "");
-  } catch (err) {
-    console.error(err);
-    setStatus(els.dataSafetyStatus, err.message || "Failed to load data safety.", "error");
-  }
-}
-
-async function saveDataSafety() {
-  try {
-    const retentionDays = Number(els.dataRetentionDaysInput?.value || 365);
-    const backupStatus = String(els.backupStatusInput?.value || "unknown");
-    const { dataSafety } = await api.admin.updateDataSafety({ retentionDays, backupStatus });
-    state.dataSafety = dataSafety || state.dataSafety;
-    renderDataSafety();
-    setStatus(els.dataSafetyStatus, "Data safety settings saved.", "ok");
-  } catch (err) {
-    console.error(err);
-    setStatus(els.dataSafetyStatus, err.message || "Failed to save data safety settings.", "error");
-  }
-}
-
-async function markBackupNow() {
-  try {
-    const { dataSafety } = await api.admin.updateDataSafety({ markBackupNow: true, backupStatus: "healthy" });
-    state.dataSafety = dataSafety || state.dataSafety;
-    renderDataSafety();
-    setStatus(els.dataSafetyStatus, "Backup timestamp updated.", "ok");
-  } catch (err) {
-    console.error(err);
-    setStatus(els.dataSafetyStatus, err.message || "Failed to update backup timestamp.", "error");
-  }
-}
-
-async function exportDataSafetySummary() {
-  try {
-    const { export: payload } = await api.admin.exportDataSafetySummary();
-    if (els.dataSafetyExportOutput) {
-      els.dataSafetyExportOutput.textContent = JSON.stringify(payload || {}, null, 2);
-    }
-    setStatus(els.dataSafetyStatus, "Summary export generated.", "ok");
-  } catch (err) {
-    console.error(err);
-    setStatus(els.dataSafetyStatus, err.message || "Failed to export data summary.", "error");
-  }
-}
-
 async function persistAchievementsCatalog(nextCatalog, successMessage) {
+  if (!hasPermission("settings.write")) {
+    openPermissionModal("admin");
+    return false;
+  }
   const previousCatalog = state.settingsAchievements;
   if (!Array.isArray(nextCatalog) || !nextCatalog.length) {
     setStatus(els.achievementStatus, "At least one achievement is required.", "error");
@@ -1036,6 +1294,7 @@ async function persistAchievementsCatalog(nextCatalog, successMessage) {
     state.settingsAchievements = previousCatalog;
     renderSettingsAchievements();
     updateAchievementKeyValidation();
+    if (handlePermissionError(err, "admin")) return false;
     setStatus(els.achievementStatus, err.message || "Failed to save achievements.", "error");
     return false;
   }
@@ -1112,6 +1371,7 @@ function resolveUserForQuery(users, query) {
 }
 
 async function loadStats() {
+  if (!hasPermission("health.read")) return;
   try {
     const { stats } = await api.admin.getStats();
     setText(els.statsUsers, formatNumber(stats?.total_users));
@@ -1120,17 +1380,20 @@ async function loadStats() {
     setStatus(els.statsStatus, "");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.statsStatus, err.message || "Failed to load overview stats.", "error");
   }
 }
 
 async function loadUserOptions() {
+  if (!hasPermission("users.read")) return;
   try {
     const { users } = await api.admin.listUserOptions();
     state.userOptions = users || [];
     renderUserOptions();
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.usersStatus, err.message || "Failed to load user dropdown options.", "error");
   }
 }
@@ -1150,6 +1413,7 @@ function findUserFromSearchInput(raw) {
 }
 
 async function loadUsers({ resetPage = false, evaluateSelection = true } = {}) {
+  if (!hasPermission("users.read")) return;
   const q = els.userSearch?.value?.trim() || "";
   if (resetPage) {
     state.usersPage = 1;
@@ -1204,6 +1468,7 @@ async function loadUsers({ resetPage = false, evaluateSelection = true } = {}) {
     if (evaluateSelection) {
       resetUserScopedData();
     }
+    if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.usersStatus, err.message || "Failed to load users.", "error");
   }
 }
@@ -1221,6 +1486,10 @@ function openUserModal(user) {
 
 async function saveUser(event) {
   event.preventDefault();
+  if (!hasPermission("users.write")) {
+    openPermissionModal("admin");
+    return;
+  }
   const id = els.userId.value;
   if (!id) return;
 
@@ -1237,11 +1506,13 @@ async function saveUser(event) {
     closeModal(els.userModal);
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "admin")) return;
     setStatus(els.userStatus, err.message || "Failed to update user.", "error");
   }
 }
 
 async function loadRecords() {
+  if (!hasPermission("records.read")) return;
   if (!state.selectedUserId) {
     state.records = [];
     renderRecords();
@@ -1260,11 +1531,13 @@ async function loadRecords() {
     setStatus(els.recordsStatus, "");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "analyst")) return;
     setStatus(els.recordsStatus, err.message || "Failed to load records.", "error");
   }
 }
 
 async function loadReceipts() {
+  if (!hasPermission("records.read")) return;
   if (!state.selectedUserId) {
     state.receipts = [];
     renderReceipts();
@@ -1283,11 +1556,13 @@ async function loadReceipts() {
     setStatus(els.receiptsStatus, "");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "analyst")) return;
     setStatus(els.receiptsStatus, err.message || "Failed to load receipts.", "error");
   }
 }
 
 async function loadBudgetSheets() {
+  if (!hasPermission("records.read")) return;
   if (!state.selectedUserId) {
     state.budgetSheets = [];
     renderBudgetSheets();
@@ -1305,6 +1580,7 @@ async function loadBudgetSheets() {
     setStatus(els.budgetsStatus, "");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "analyst")) return;
     setStatus(els.budgetsStatus, err.message || "Failed to load budgets.", "error");
   }
 }
@@ -1317,6 +1593,10 @@ async function loadUserDataForUser(user) {
 
   state.selectedUserId = user.id;
   state.selectedUser = user;
+  if (!hasPermission("records.read")) {
+    toggleUserDataSections(false);
+    return;
+  }
   toggleUserDataSections(true);
   updateRecordsContext();
   await Promise.all([loadRecords(), loadReceipts(), loadBudgetSheets()]);
@@ -1336,6 +1616,10 @@ function openRecordModal(record) {
 
 async function saveRecord(event) {
   event.preventDefault();
+  if (!hasPermission("records.write")) {
+    openPermissionModal("admin");
+    return;
+  }
   const id = els.recordId.value;
   if (!id) return;
 
@@ -1353,11 +1637,16 @@ async function saveRecord(event) {
     closeModal(els.recordModal);
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "admin")) return;
     setStatus(els.recordStatus, err.message || "Failed to update record.", "error");
   }
 }
 
 async function deleteRecord(id) {
+  if (!hasPermission("records.write")) {
+    openPermissionModal("admin");
+    return;
+  }
   if (!id) return;
   const ok = window.confirm("Delete this record?");
   if (!ok) return;
@@ -1370,11 +1659,13 @@ async function deleteRecord(id) {
     setStatus(els.recordsStatus, "Record deleted.", "ok");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "admin")) return;
     setStatus(els.recordsStatus, err.message || "Failed to delete record.", "error");
   }
 }
 
 async function loadSettings() {
+  if (!hasPermission("settings.read")) return;
   setStatus(els.settingsStatus, "");
   try {
     const { settings } = await api.admin.getSettings();
@@ -1394,16 +1685,23 @@ async function loadSettings() {
     state.settingsAchievements = Array.isArray(settings?.achievements_catalog)
       ? settings.achievements_catalog
       : [];
+    state.adminRolePermissions = sanitizeAdminRolePermissionOverrides(settings?.admin_role_permissions);
     renderSettingsAchievements();
     updateAchievementKeyValidation();
+    renderPermissionsMatrix();
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "admin")) return;
     setStatus(els.settingsStatus, err.message || "Failed to load settings.", "error");
   }
 }
 
 async function saveSettings(event) {
   event.preventDefault();
+  if (!hasPermission("settings.write")) {
+    openPermissionModal("admin");
+    return;
+  }
   const appName = els.appNameInput?.value?.trim();
   if (!appName) {
     setStatus(els.settingsStatus, "App name is required.", "error");
@@ -1429,6 +1727,7 @@ async function saveSettings(event) {
     setStatus(els.settingsStatus, "Settings updated.", "ok");
   } catch (err) {
     console.error(err);
+    if (handlePermissionError(err, "admin")) return;
     setStatus(els.settingsStatus, err.message || "Failed to update settings.", "error");
   }
 }
@@ -1565,10 +1864,10 @@ function bindEvents() {
       setSystemHealthPanelCollapsed(!collapsed);
     });
   }
-  if (els.toggleDataSafetyPanelCaret) {
-    els.toggleDataSafetyPanelCaret.addEventListener("click", () => {
-      const collapsed = els.dataSafetyPanel?.classList.contains("is-collapsed");
-      setDataSafetyPanelCollapsed(!collapsed);
+  if (els.togglePermissionsPanelCaret) {
+    els.togglePermissionsPanelCaret.addEventListener("click", () => {
+      const collapsed = els.permissionsPanel?.classList.contains("is-collapsed");
+      setPermissionsPanelCollapsed(!collapsed);
     });
   }
   if (els.notificationFilterApplyBtn) {
@@ -1597,15 +1896,6 @@ function bindEvents() {
   if (els.healthRefreshBtn) {
     els.healthRefreshBtn.addEventListener("click", loadSystemHealth);
   }
-  if (els.saveDataSafetyBtn) {
-    els.saveDataSafetyBtn.addEventListener("click", saveDataSafety);
-  }
-  if (els.markBackupNowBtn) {
-    els.markBackupNowBtn.addEventListener("click", markBackupNow);
-  }
-  if (els.exportDataSummaryBtn) {
-    els.exportDataSummaryBtn.addEventListener("click", exportDataSafetySummary);
-  }
   if (els.addAchievementBtn) {
     els.addAchievementBtn.addEventListener("click", addAchievementFromInputs);
   }
@@ -1633,6 +1923,27 @@ function bindEvents() {
     });
   });
 
+  document.addEventListener("change", (event) => {
+    const checkbox = event.target.closest("input[type='checkbox'][data-role][data-permission]");
+    if (!checkbox || state.currentRole !== "admin") return;
+    const role = String(checkbox.dataset.role || "").trim();
+    const permission = String(checkbox.dataset.permission || "").trim();
+    if (!ADMIN_ROLES_FOR_GRID.includes(role)) return;
+    if (!PERMISSIONS_GRID_ORDER.includes(permission)) return;
+
+    const current = getEffectiveRolePermissionSet(role);
+    if (checkbox.checked) {
+      current.add(permission);
+    } else {
+      current.delete(permission);
+    }
+    state.adminRolePermissions = {
+      ...state.adminRolePermissions,
+      [role]: [...current].filter((item) => PERMISSIONS_GRID_ORDER.includes(item)),
+    };
+    persistPermissionsMatrix();
+  });
+
   document.addEventListener("click", (event) => {
     const btn = event.target.closest("button[data-action]");
     if (!btn) return;
@@ -1642,6 +1953,10 @@ function bindEvents() {
     const key = btn.dataset.key;
 
     if (action === "edit-user") {
+      if (!hasPermission("users.write")) {
+        openPermissionModal("admin");
+        return;
+      }
       const user = state.users.find((u) => u.id === id);
       openUserModal(user);
     }
@@ -1652,19 +1967,35 @@ function bindEvents() {
     }
 
     if (action === "edit-record") {
+      if (!hasPermission("records.write")) {
+        openPermissionModal("admin");
+        return;
+      }
       const record = state.records.find((r) => r.id === id);
       openRecordModal(record);
     }
 
     if (action === "delete-record") {
+      if (!hasPermission("records.write")) {
+        openPermissionModal("admin");
+        return;
+      }
       deleteRecord(id);
     }
 
     if (action === "remove-achievement") {
+      if (!hasPermission("settings.write")) {
+        openPermissionModal("admin");
+        return;
+      }
       const nextCatalog = state.settingsAchievements.filter((item) => item.key !== key);
       persistAchievementsCatalog(nextCatalog, "Achievement removed.");
     }
     if (action === "edit-notification") {
+      if (!hasPermission("notifications.write")) {
+        openPermissionModal("support_admin");
+        return;
+      }
       const item = state.notificationsHistory.find((n) => n.id === id);
       if (!item || !els.notificationEditor) return;
       els.notificationEditor.innerHTML = String(item.message_html || item.message_text || "");
@@ -1676,25 +2007,51 @@ function bindEvents() {
       setNotificationsPanelCollapsed(false);
     }
     if (action === "toggle-notification-active") {
+      if (!hasPermission("notifications.write")) {
+        openPermissionModal("support_admin");
+        return;
+      }
       const isActive = String(btn.dataset.active || "") === "true";
       api.admin
         .updateNotification(id, { isActive: !isActive })
         .then(() => loadNotificationHistory())
-        .catch((err) => setStatus(els.notificationAdminStatus, err.message || "Failed to update notification", "error"));
+        .catch((err) => {
+          if (handlePermissionError(err, "support_admin")) return;
+          setStatus(els.notificationAdminStatus, err.message || "Failed to update notification", "error");
+        });
     }
     if (action === "resend-notification") {
+      if (!hasPermission("notifications.write")) {
+        openPermissionModal("support_admin");
+        return;
+      }
       api.admin
         .resendNotification(id)
-        .then((result) =>
+        .then((result) => {
+          if (result?.queued) {
+            setStatus(
+              els.notificationAdminStatus,
+              `Resend queued for ${result?.recipientCount ?? 0} recipient(s).`,
+              "ok"
+            );
+            return;
+          }
           setStatus(
             els.notificationAdminStatus,
             `Resend complete. Sent: ${result?.sent ?? 0}, Failed: ${result?.failed ?? 0}`,
             "ok"
-          )
-        )
-        .catch((err) => setStatus(els.notificationAdminStatus, err.message || "Resend failed", "error"));
+          );
+        })
+        .catch((err) => {
+          if (handlePermissionError(err, "support_admin")) return;
+          setStatus(els.notificationAdminStatus, err.message || "Resend failed", "error");
+        });
     }
     if (action === "support-status") {
+      if (!hasPermission("support.write")) {
+        openPermissionModal("support_admin");
+        return;
+      }
       const status = String(btn.dataset.status || "").trim();
       api.admin
         .updateSupportTicket(id, { status })
@@ -1702,7 +2059,10 @@ function bindEvents() {
           setStatus(els.supportStatusMsg, "Ticket updated.", "ok");
           loadSupportTickets();
         })
-        .catch((err) => setStatus(els.supportStatusMsg, err.message || "Failed to update ticket", "error"));
+        .catch((err) => {
+          if (handlePermissionError(err, "support_admin")) return;
+          setStatus(els.supportStatusMsg, err.message || "Failed to update ticket", "error");
+        });
     }
   });
 }
@@ -1710,6 +2070,7 @@ function bindEvents() {
 async function init() {
   const ok = await ensureAdmin();
   if (!ok) return;
+  applyPermissionVisibility();
   bindModalClose();
   bindEvents();
   updateSortArrows();
@@ -1728,7 +2089,7 @@ async function init() {
   setStatus(els.auditStatus, "");
   setStatus(els.supportStatusMsg, "");
   setStatus(els.healthStatus, "");
-  setStatus(els.dataSafetyStatus, "");
+  setStatus(els.permissionsStatus, "");
   updateRecordsContext();
   setUsersPanelCollapsed(true);
   setSettingsPanelCollapsed(true);
@@ -1737,20 +2098,18 @@ async function init() {
   setAuditPanelCollapsed(true);
   setSupportPanelCollapsed(true);
   setSystemHealthPanelCollapsed(true);
-  setDataSafetyPanelCollapsed(true);
+  setPermissionsPanelCollapsed(true);
   syncAchievementTargetInput();
+  renderPermissionsMatrix();
 
-  await Promise.all([
-    loadStats(),
-    loadUserOptions(),
-    loadSettings(),
-    loadNotificationHistory(),
-    loadAuditLog(),
-    loadSupportTickets(),
-    loadSystemHealth(),
-    loadDataSafety(),
-    loadUsers({ resetPage: true, evaluateSelection: false }),
-  ]);
+  const initialLoads = [];
+  if (hasPermission("health.read")) initialLoads.push(loadStats(), loadSystemHealth());
+  if (hasPermission("users.read")) initialLoads.push(loadUserOptions(), loadUsers({ resetPage: true, evaluateSelection: false }));
+  if (hasPermission("settings.read")) initialLoads.push(loadSettings());
+  if (hasPermission("notifications.read")) initialLoads.push(loadNotificationHistory());
+  if (hasPermission("audit.read")) initialLoads.push(loadAuditLog());
+  if (hasPermission("support.read")) initialLoads.push(loadSupportTickets());
+  await Promise.all(initialLoads);
 }
 
 init();

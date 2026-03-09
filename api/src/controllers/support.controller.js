@@ -96,15 +96,6 @@ export const contactSupport = asyncHandler(async (req, res) => {
     });
   }
 
-  const ticket = await createSupportTicket({
-    source: "authenticated",
-    userId: req.user?.id || null,
-    name,
-    email,
-    subject,
-    message,
-  });
-
   const metaLines = [
     name ? `Name: ${name}` : null,
     email ? `Email: ${email}` : null,
@@ -137,6 +128,15 @@ export const contactSupport = asyncHandler(async (req, res) => {
     from,
   });
 
+  const ticket = await createSupportTicket({
+    source: "authenticated",
+    userId: req.user?.id || null,
+    name,
+    email,
+    subject,
+    message,
+  });
+
   await logActivity({
     userId: req.user.id,
     action: "support_contact_authenticated",
@@ -163,15 +163,6 @@ export const contactSupportPublic = asyncHandler(async (req, res) => {
   if (!captcha.ok) {
     return res.status(400).json({ message: captcha.message });
   }
-
-  const ticket = await createSupportTicket({
-    source: "public",
-    userId: null,
-    name,
-    email,
-    subject,
-    message,
-  });
 
   const metaLines = [
     `Name: ${name}`,
@@ -201,6 +192,15 @@ export const contactSupportPublic = asyncHandler(async (req, res) => {
     text: body,
     replyTo: email,
     from,
+  });
+
+  const ticket = await createSupportTicket({
+    source: "public",
+    userId: null,
+    name,
+    email,
+    subject,
+    message,
   });
 
   res.json({ ok: true, ticketId: ticket?.id || null });

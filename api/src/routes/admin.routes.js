@@ -10,6 +10,7 @@ import {
   getUserAdmin,
   updateUserAdmin,
   getAdminStatsController,
+  getAdminPermissionsController,
   listRecordsAdminController,
   listReceiptsAdminController,
   listBudgetSheetsAdminController,
@@ -20,9 +21,6 @@ import {
   listSupportTicketsAdmin,
   updateSupportTicketAdmin,
   getSystemHealthAdmin,
-  getDataSafetyAdmin,
-  updateDataSafetyAdmin,
-  runDataExportAdmin,
 } from "../controllers/admin.controller.js";
 import {
   getAdmin as getAppSettingsAdmin,
@@ -38,6 +36,8 @@ import {
 const router = express.Router();
 
 router.use(auth, requireAdmin);
+
+router.get("/permissions", getAdminPermissionsController);
 
 // Users
 router.get("/users", requireAdminPermission("users.read"), listUsersAdmin);
@@ -79,10 +79,5 @@ router.put("/support-tickets/:id", requireAdminPermission("support.write"), upda
 
 // System health
 router.get("/system-health", requireAdminPermission("health.read"), getSystemHealthAdmin);
-
-// Data safety
-router.get("/data-safety", requireAdminPermission("data_safety.read"), getDataSafetyAdmin);
-router.put("/data-safety", requireAdminPermission("data_safety.write"), updateDataSafetyAdmin);
-router.post("/data-safety/export", requireAdminPermission("data_safety.read"), runDataExportAdmin);
 
 export default router;
