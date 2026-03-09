@@ -67,13 +67,22 @@
 
       <section class="card admin-panel is-collapsed" id="usersPanel">
         <div class="admin-panel-header">
-          <div>
-            <h2>Users</h2>
-            <p class="subtle">Enter a username, name, or email to find a user and view related data.</p>
+          <div class="admin-panel-title">
+            <button
+              class="admin-caret-toggle"
+              id="toggleUsersPanelCaret"
+              type="button"
+              aria-expanded="false"
+              aria-controls="usersPanelBody"
+              aria-label="Expand Users section"
+            >
+              >
+            </button>
+            <div>
+              <h2>Users</h2>
+              <p class="subtle">Enter a username, name, or email to find a user and view related data.</p>
+            </div>
           </div>
-          <button class="btn" id="toggleUsersPanelBtn" type="button" aria-expanded="false" aria-controls="usersPanelBody">
-            Expand
-          </button>
           <div class="admin-actions">
             <input
               id="userSearch"
@@ -241,37 +250,72 @@
 
       <section class="card admin-panel" id="settingsPanel">
         <div class="admin-panel-header">
-          <div>
-            <h2>App Settings</h2>
-            <p class="subtle">Update global configuration like app name.</p>
+          <div class="admin-panel-title">
+            <button
+              class="admin-caret-toggle"
+              id="toggleSettingsPanelCaret"
+              type="button"
+              aria-expanded="true"
+              aria-controls="settingsPanelBody"
+              aria-label="Collapse App Settings section"
+            >
+              v
+            </button>
+            <div>
+              <h2>App Settings</h2>
+              <p class="subtle">Update global configuration like app name.</p>
+            </div>
           </div>
         </div>
-
-        <form id="settingsForm" class="admin-form">
-          <label class="settings-item">
-            <span>App Name</span>
-            <input id="appNameInput" type="text" placeholder="&lt;AppName&gt;" />
-          </label>
-          <label class="settings-item">
-            <span>Receipt Storage</span>
-            <div class="checkbox-row">
-              <input id="receiptKeepFilesInput" type="checkbox" />
-              <span>
-                Keep receipt files in storage.
-                <span class="subtle">Disabling will block new uploads and delete files after parsing.</span>
-              </span>
+        <div id="settingsPanelBody">
+          <form id="settingsForm" class="admin-form">
+            <label class="settings-item">
+              <span>App Name</span>
+              <input id="appNameInput" type="text" placeholder="&lt;AppName&gt;" />
+            </label>
+            <label class="settings-item">
+              <span>Receipt Storage</span>
+              <div class="checkbox-row">
+                <input id="receiptKeepFilesInput" type="checkbox" />
+                <span>
+                  Keep receipt files in storage.
+                  <span class="subtle">Disabling will block new uploads and delete files after parsing.</span>
+                </span>
+              </div>
+            </label>
+            <label class="settings-item">
+              <span>Session Timeout (minutes)</span>
+              <input id="sessionTimeoutMinutesInput" type="number" min="1" max="60" step="1" value="15" />
+            </label>
+            <div class="admin-actions">
+              <button class="btn btn--primary" type="submit">Save Settings</button>
             </div>
-          </label>
-          <label class="settings-item">
-            <span>Session Timeout (minutes)</span>
-            <input id="sessionTimeoutMinutesInput" type="number" min="1" max="60" step="1" value="15" />
-          </label>
-          <div class="settings-item settings-item--achievements">
-            <div class="settings-item-head">
-              <span>Achievements Catalog</span>
+            <p id="settingsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <section class="card admin-panel" id="achievementsPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button
+              class="admin-caret-toggle"
+              id="toggleAchievementsPanelCaret"
+              type="button"
+              aria-expanded="true"
+              aria-controls="achievementsPanelBody"
+              aria-label="Collapse Achievements section"
+            >
+              v
+            </button>
+            <div>
+              <h2>Achievements Catalog</h2>
               <p class="subtle">Add and remove achievement rules used across all users.</p>
             </div>
-            <div class="admin-achievements">
+          </div>
+        </div>
+        <div id="achievementsPanelBody">
+          <div class="admin-achievements">
             <div class="admin-achievement-builder">
               <label id="achievementKeyWrap">
                 <span>Key</span>
@@ -313,7 +357,6 @@
                 <span>Target</span>
                 <select id="achievementTargetBooleanInput">
                   <option value="true">true</option>
-                  <option value="false">false</option>
                 </select>
               </label>
               <div class="admin-add-achievement-wrap">
@@ -321,14 +364,10 @@
                 <button class="btn btn--primary" id="addAchievementBtn" type="button">Add</button>
               </div>
             </div>
-            <div id="adminAchievementsList" class="admin-achievements-list"></div>
-            </div>
           </div>
-          <div class="admin-actions">
-            <button class="btn btn--primary" type="submit">Save Settings</button>
-          </div>
-          <p id="settingsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
-        </form>
+          <div id="adminAchievementsList" class="admin-achievements-list"></div>
+          <p id="achievementStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+        </div>
       </section>
     </section>
   </main>

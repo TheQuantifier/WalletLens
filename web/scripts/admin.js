@@ -10,7 +10,7 @@ const els = {
   usersTbody: document.getElementById("usersTbody"),
   usersPanel: document.getElementById("usersPanel"),
   usersPanelBody: document.getElementById("usersPanelBody"),
-  toggleUsersPanelBtn: document.getElementById("toggleUsersPanelBtn"),
+  toggleUsersPanelCaret: document.getElementById("toggleUsersPanelCaret"),
   usersStatus: document.getElementById("usersStatus"),
   userSearch: document.getElementById("userSearch"),
   userSearchBtn: document.getElementById("userSearchBtn"),
@@ -19,6 +19,9 @@ const els = {
   usersNextPage: document.getElementById("usersNextPage"),
   usersPageInfo: document.getElementById("usersPageInfo"),
   userDataSections: document.getElementById("userDataSections"),
+  achievementsPanel: document.getElementById("achievementsPanel"),
+  achievementsPanelBody: document.getElementById("achievementsPanelBody"),
+  toggleAchievementsPanelCaret: document.getElementById("toggleAchievementsPanelCaret"),
 
   recordsTbody: document.getElementById("recordsTbody"),
   recordsStatus: document.getElementById("recordsStatus"),
@@ -32,6 +35,9 @@ const els = {
   budgetsTbody: document.getElementById("budgetsTbody"),
   budgetsStatus: document.getElementById("budgetsStatus"),
 
+  settingsPanel: document.getElementById("settingsPanel"),
+  settingsPanelBody: document.getElementById("settingsPanelBody"),
+  toggleSettingsPanelCaret: document.getElementById("toggleSettingsPanelCaret"),
   settingsForm: document.getElementById("settingsForm"),
   appNameInput: document.getElementById("appNameInput"),
   receiptKeepFilesInput: document.getElementById("receiptKeepFilesInput"),
@@ -48,6 +54,7 @@ const els = {
   achievementTargetBooleanWrap: document.getElementById("achievementTargetBooleanWrap"),
   addAchievementBtn: document.getElementById("addAchievementBtn"),
   adminAchievementsList: document.getElementById("adminAchievementsList"),
+  achievementStatus: document.getElementById("achievementStatus"),
   settingsStatus: document.getElementById("settingsStatus"),
 
   userModal: document.getElementById("adminUserModal"),
@@ -199,9 +206,45 @@ function setUsersPanelCollapsed(collapsed) {
   if (els.usersPanelBody) {
     els.usersPanelBody.hidden = collapsed;
   }
-  if (els.toggleUsersPanelBtn) {
-    els.toggleUsersPanelBtn.textContent = collapsed ? "Expand" : "Collapse";
-    els.toggleUsersPanelBtn.setAttribute("aria-expanded", collapsed ? "false" : "true");
+  if (els.toggleUsersPanelCaret) {
+    els.toggleUsersPanelCaret.textContent = collapsed ? ">" : "v";
+    els.toggleUsersPanelCaret.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    els.toggleUsersPanelCaret.setAttribute(
+      "aria-label",
+      `${collapsed ? "Expand" : "Collapse"} Users section`
+    );
+  }
+}
+
+function setAchievementsPanelCollapsed(collapsed) {
+  if (!els.achievementsPanel) return;
+  els.achievementsPanel.classList.toggle("is-collapsed", collapsed);
+  if (els.achievementsPanelBody) {
+    els.achievementsPanelBody.hidden = collapsed;
+  }
+  if (els.toggleAchievementsPanelCaret) {
+    els.toggleAchievementsPanelCaret.textContent = collapsed ? ">" : "v";
+    els.toggleAchievementsPanelCaret.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    els.toggleAchievementsPanelCaret.setAttribute(
+      "aria-label",
+      `${collapsed ? "Expand" : "Collapse"} Achievements section`
+    );
+  }
+}
+
+function setSettingsPanelCollapsed(collapsed) {
+  if (!els.settingsPanel) return;
+  els.settingsPanel.classList.toggle("is-collapsed", collapsed);
+  if (els.settingsPanelBody) {
+    els.settingsPanelBody.hidden = collapsed;
+  }
+  if (els.toggleSettingsPanelCaret) {
+    els.toggleSettingsPanelCaret.textContent = collapsed ? ">" : "v";
+    els.toggleSettingsPanelCaret.setAttribute("aria-expanded", collapsed ? "false" : "true");
+    els.toggleSettingsPanelCaret.setAttribute(
+      "aria-label",
+      `${collapsed ? "Expand" : "Collapse"} App Settings section`
+    );
   }
 }
 
@@ -482,25 +525,121 @@ function renderSettingsAchievements() {
     return;
   }
 
-  els.adminAchievementsList.innerHTML = state.settingsAchievements
-    .map(
-      (item) => `
-        <div class="admin-achievement-item">
-          <div>
-            <strong>${escapeHtml(item.icon || "🏆")} ${escapeHtml(item.title)}</strong>
-            <p class="meta">${escapeHtml(item.key)} • ${escapeHtml(item.metric)} • target ${escapeHtml(String(item.target))}</p>
-            <p class="meta">${escapeHtml(item.description)}</p>
-          </div>
-          <div class="admin-actions">
-            <button class="btn btn--link" data-action="remove-achievement" data-key="${escapeHtml(item.key)}" type="button">Remove</button>
-          </div>
+  const groupedByMetric = new Map();
+  for (const item of state.settingsAchievements) {
+    const metric = String(item.metric || "").trim() || "unknown_metric";
+    if (!groupedByMetric.has(metric)) groupedByMetric.set(metric, []);
+    groupedByMetric.get(metric).push(item);
+  }
+
+  const targetRank = (target) => {
+    if (typeof target === "number") return target;
+    if (typeof target === "boolean") return target ? 1 : 0;
+    return Number.NaN;
+  };
+
+  const renderAchievementCard = (item) => `
+    <div class="admin-achievement-item">
+      <button
+        class="admin-achievement-remove"
+        data-action="remove-achievement"
+        data-key="${escapeHtml(item.key)}"
+        type="button"
+        aria-label="Remove achievement ${escapeHtml(item.title || item.key)}"
+        title="Remove achievement"
+      >
+        X
+      </button>
+      <div>
+        <strong>${escapeHtml(item.icon || "🏆")} ${escapeHtml(item.title)}</strong>
+        <p class="meta">${escapeHtml(item.key)} • ${escapeHtml(item.metric)} • target ${escapeHtml(String(item.target))}</p>
+        <p class="meta">${escapeHtml(item.description)}</p>
+      </div>
+    </div>
+  `;
+
+  const metricGroups = [...groupedByMetric.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([metric, items]) => {
+      const isBooleanMetric = isBooleanAchievementMetric(metric);
+      const visibleItems = isBooleanMetric
+        ? items.filter((item) => item.target === true)
+        : items;
+      const sortedItems = [...visibleItems].sort((a, b) => {
+        const aRank = targetRank(a.target);
+        const bRank = targetRank(b.target);
+        if (Number.isFinite(aRank) && Number.isFinite(bRank) && aRank !== bRank) {
+          return aRank - bRank;
+        }
+        return String(a.target).localeCompare(String(b.target));
+      });
+      if (!sortedItems.length) return null;
+
+      const cardsHtml = `
+        <div class="admin-achievement-metric-grid">
+          ${sortedItems.map(renderAchievementCard).join("")}
         </div>
-      `
-    )
+      `;
+
+      return {
+        isBooleanMetric,
+        html: `
+        <section class="admin-achievement-metric-group ${isBooleanMetric ? "admin-achievement-metric-group--boolean" : ""}">
+          <h3 class="admin-achievement-metric-title">${escapeHtml(metric)}</h3>
+          ${cardsHtml}
+        </section>
+      `,
+      };
+    })
+    .filter(Boolean);
+
+  const nonBooleanGroupsHtml = metricGroups
+    .filter((group) => !group.isBooleanMetric)
+    .map((group) => group.html)
     .join("");
+  const booleanGroupsHtml = metricGroups
+    .filter((group) => group.isBooleanMetric)
+    .map((group) => group.html)
+    .join("");
+
+  els.adminAchievementsList.innerHTML = `
+    ${nonBooleanGroupsHtml}
+    ${booleanGroupsHtml ? `<div class="admin-achievement-boolean-metrics">${booleanGroupsHtml}</div>` : ""}
+  `;
 }
 
-function addAchievementFromInputs() {
+async function persistAchievementsCatalog(nextCatalog, successMessage) {
+  const previousCatalog = state.settingsAchievements;
+  if (!Array.isArray(nextCatalog) || !nextCatalog.length) {
+    setStatus(els.achievementStatus, "At least one achievement is required.", "error");
+    return false;
+  }
+
+  state.settingsAchievements = nextCatalog;
+  renderSettingsAchievements();
+  updateAchievementKeyValidation();
+  setStatus(els.achievementStatus, "Saving achievements...");
+
+  try {
+    const { settings } = await api.admin.updateSettings({ achievementsCatalog: nextCatalog });
+    state.settingsAchievements = Array.isArray(settings?.achievements_catalog)
+      ? settings.achievements_catalog
+      : nextCatalog;
+    renderSettingsAchievements();
+    updateAchievementKeyValidation();
+    setStatus(els.achievementStatus, successMessage, "ok");
+    return true;
+  } catch (err) {
+    console.error(err);
+    state.settingsAchievements = previousCatalog;
+    renderSettingsAchievements();
+    updateAchievementKeyValidation();
+    setStatus(els.achievementStatus, err.message || "Failed to save achievements.", "error");
+    return false;
+  }
+}
+
+async function addAchievementFromInputs() {
   const keyCheck = updateAchievementKeyValidation();
   const key = keyCheck.key;
   const title = String(els.achievementTitleInput?.value || "").trim();
@@ -509,30 +648,33 @@ function addAchievementFromInputs() {
   const metric = String(els.achievementMetricInput?.value || "").trim();
   const isBoolean = isBooleanAchievementMetric(metric);
   const target = isBoolean
-    ? String(els.achievementTargetBooleanInput?.value || "true") === "true"
+    ? true
     : Number(els.achievementTargetInput?.value || 0);
 
   const hasValidTarget = isBoolean
     ? typeof target === "boolean"
     : Number.isFinite(target) && target > 0;
   if (!key || !title || !description || !ACHIEVEMENT_METRICS.has(metric) || !hasValidTarget) {
-    setStatus(els.settingsStatus, "Fill all achievement fields with valid values.", "error");
+    setStatus(els.achievementStatus, "Fill all achievement fields with valid values.", "error");
     return;
   }
 
   if (keyCheck.isTaken || state.settingsAchievements.some((item) => item.key === key)) {
-    setStatus(els.settingsStatus, `Achievement key "${key}" already exists.`, "error");
+    setStatus(els.achievementStatus, `Achievement key "${key}" already exists.`, "error");
     return;
   }
 
-  state.settingsAchievements.push({
+  const nextCatalog = [...state.settingsAchievements, {
     key,
     title,
     description,
     icon,
     metric,
     target,
-  });
+  }];
+
+  const saved = await persistAchievementsCatalog(nextCatalog, "Achievement added.");
+  if (!saved) return;
 
   if (els.achievementKeyInput) els.achievementKeyInput.value = "";
   if (els.achievementTitleInput) els.achievementTitleInput.value = "";
@@ -549,8 +691,6 @@ function addAchievementFromInputs() {
     els.achievementKeyInput.classList.remove("is-invalid");
   }
   syncAchievementTargetInput();
-  renderSettingsAchievements();
-  setStatus(els.settingsStatus, "Achievement added. Save settings to apply.", "ok");
 }
 
 function resolveUserForQuery(users, query) {
@@ -966,10 +1106,22 @@ function bindEvents() {
   if (els.settingsForm) {
     els.settingsForm.addEventListener("submit", saveSettings);
   }
-  if (els.toggleUsersPanelBtn) {
-    els.toggleUsersPanelBtn.addEventListener("click", () => {
+  if (els.toggleUsersPanelCaret) {
+    els.toggleUsersPanelCaret.addEventListener("click", () => {
       const collapsed = els.usersPanel?.classList.contains("is-collapsed");
       setUsersPanelCollapsed(!collapsed);
+    });
+  }
+  if (els.toggleAchievementsPanelCaret) {
+    els.toggleAchievementsPanelCaret.addEventListener("click", () => {
+      const collapsed = els.achievementsPanel?.classList.contains("is-collapsed");
+      setAchievementsPanelCollapsed(!collapsed);
+    });
+  }
+  if (els.toggleSettingsPanelCaret) {
+    els.toggleSettingsPanelCaret.addEventListener("click", () => {
+      const collapsed = els.settingsPanel?.classList.contains("is-collapsed");
+      setSettingsPanelCollapsed(!collapsed);
     });
   }
   if (els.addAchievementBtn) {
@@ -1011,10 +1163,8 @@ function bindEvents() {
     }
 
     if (action === "remove-achievement") {
-      state.settingsAchievements = state.settingsAchievements.filter((item) => item.key !== key);
-      renderSettingsAchievements();
-      updateAchievementKeyValidation();
-      setStatus(els.settingsStatus, "Achievement removed. Save settings to apply.", "ok");
+      const nextCatalog = state.settingsAchievements.filter((item) => item.key !== key);
+      persistAchievementsCatalog(nextCatalog, "Achievement removed.");
     }
   });
 }
@@ -1035,8 +1185,11 @@ async function init() {
   setStatus(els.recordsStatus, "");
   setStatus(els.receiptsStatus, "");
   setStatus(els.budgetsStatus, "");
+  setStatus(els.achievementStatus, "");
   updateRecordsContext();
   setUsersPanelCollapsed(true);
+  setSettingsPanelCollapsed(true);
+  setAchievementsPanelCollapsed(true);
   syncAchievementTargetInput();
 
   await Promise.all([
