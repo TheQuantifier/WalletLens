@@ -1,6 +1,10 @@
 // src/controllers/app_settings.controller.js
 import asyncHandler from "../middleware/async.js";
 import { getAppSettings, updateAppSettings } from "../models/app_settings.model.js";
+import {
+  listAchievementsCatalog,
+  replaceAchievementsCatalog,
+} from "../models/achievements_catalog.model.js";
 import { logActivity } from "../services/activity.service.js";
 import {
   sanitizeAchievementsCatalog,
@@ -19,7 +23,8 @@ export const getPublic = asyncHandler(async (_req, res) => {
 export const getAdmin = asyncHandler(async (_req, res) => {
   const settings = await getAppSettings();
   if (settings) {
-    settings.achievements_catalog = sanitizeAchievementsCatalog(settings.achievements_catalog);
+    const catalogRows = await listAchievementsCatalog();
+    settings.achievements_catalog = sanitizeAchievementsCatalog(catalogRows);
   }
   res.json({ settings });
 });
@@ -66,13 +71,26 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     }
   }
 
-  const updated = await updateAppSettings({
-    appName: hasAppName ? String(appName).trim() : null,
-    receiptKeepFiles: hasReceiptKeepFiles ? receiptKeepFiles : null,
-    sessionTimeoutMinutes: hasSessionTimeoutMinutes ? Number(sessionTimeoutMinutes) : null,
-    achievementsCatalog: hasAchievementsCatalog ? normalizedCatalog : null,
-    updatedBy: req.user.id,
-  });
+  if (hasAchievementsCatalog) {
+    await replaceAchievementsCatalog(normalizedCatalog, req.user.id);
+  }
+
+  const needsAppSettingsUpdate = hasAppName || hasReceiptKeepFiles || hasSessionTimeoutMinutes;
+  const updated = needsAppSettingsUpdate
+    ? await updateAppSettings({
+        appName: hasAppName ? String(appName).trim() : null,
+        receiptKeepFiles: hasReceiptKeepFiles ? receiptKeepFiles : null,
+        sessionTimeoutMinutes: hasSessionTimeoutMinutes ? Number(sessionTimeoutMinutes) : null,
+        achievementsCatalog: null,
+        updatedBy: req.user.id,
+      })
+    : await getAppSettings();
+
+  const catalogRows = await listAchievementsCatalog();
+  const achievementsCatalogSanitized = sanitizeAchievementsCatalog(catalogRows);
+  if (updated) {
+    updated.achievements_catalog = achievementsCatalogSanitized;
+  }
 
   await logActivity({
     userId: req.user.id,
@@ -83,8 +101,8 @@ export const updateAdmin = asyncHandler(async (req, res) => {
       appName: updated?.app_name,
       receiptKeepFiles: updated?.receipt_keep_files,
       sessionTimeoutMinutes: updated?.session_timeout_minutes,
-      achievementsCatalogCount: Array.isArray(updated?.achievements_catalog)
-        ? updated.achievements_catalog.length
+      achievementsCatalogCount: Array.isArray(achievementsCatalogSanitized)
+        ? achievementsCatalogSanitized.length
         : null,
       achievementMetrics: ACHIEVEMENT_METRICS,
     },

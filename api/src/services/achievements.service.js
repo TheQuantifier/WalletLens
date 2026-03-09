@@ -4,7 +4,7 @@ import {
   ACHIEVEMENT_METRICS,
   BOOLEAN_ACHIEVEMENT_METRICS,
 } from "../constants/achievements.js";
-import { getAppSettings } from "../models/app_settings.model.js";
+import { listAchievementsCatalog } from "../models/achievements_catalog.model.js";
 import {
   listUnlockedAchievementsForUser,
   unlockAchievementsForUser,
@@ -130,8 +130,8 @@ async function getMetricCounts(userId) {
 }
 
 export async function getAchievementCatalog() {
-  const settings = await getAppSettings();
-  return sanitizeAchievementsCatalog(settings?.achievements_catalog);
+  const catalogRows = await listAchievementsCatalog();
+  return sanitizeAchievementsCatalog(catalogRows);
 }
 
 export async function evaluateAchievementsForUser(userId) {
