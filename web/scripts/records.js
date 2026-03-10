@@ -1,6 +1,6 @@
 // scripts/records.js
 import { api } from "./api.js";
-import { applyRulesToRecord, loadRules } from "./rules-engine.js";
+import { applyRulesToRecord } from "./rules-engine.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   // ===============================
@@ -56,6 +56,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // NEW: cache so we don’t hit API on each keystroke
   let allRecordsCache = [];
+  let automationRules = [];
 
   const debounce = (fn, delay = 200) => {
     let t;
@@ -246,6 +247,15 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     } catch {
       userCustomCategories = { expense: [], income: [] };
+    }
+  };
+
+  const loadAutomationRules = async () => {
+    try {
+      const list = await api.rules.getAll();
+      automationRules = Array.isArray(list) ? list : [];
+    } catch {
+      automationRules = [];
     }
   };
 
@@ -938,11 +948,10 @@ document.addEventListener("DOMContentLoaded", () => {
       note: document.getElementById(`${type}Notes`).value
     };
 
-    const rules = loadRules();
     const applyRules = type === "income" ? applyRulesIncome?.checked : applyRulesExpense?.checked;
-    if (applyRules && rules.length) {
+    if (applyRules && automationRules.length) {
       const origin = modal.dataset.linkedReceiptId ? "receipt" : "manual";
-      payload = applyRulesToRecord(payload, rules, { origin });
+      payload = applyRulesToRecord(payload, automationRules, { origin });
       document.getElementById(`${type}Category`).value = payload.category || "";
       document.getElementById(`${type}Notes`).value = payload.note || "";
     }
@@ -971,7 +980,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       if (editId) await api.records.update(editId, payload);
-      else await api.records.create(payload);
+      else await api.records.create({ ...payload, applyRules: false });
 
       hideModal(modal);
       form.reset();
@@ -1217,6 +1226,7 @@ document.addEventListener("DOMContentLoaded", () => {
   (async () => {
     updateSortArrows();
     await loadUserCustomCategories();
+    await loadAutomationRules();
     populateBudgetCategorySelects();
     await loadFxRates();
     loadRecords();

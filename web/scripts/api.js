@@ -259,10 +259,10 @@ export const records = {
     return request(`/records/${id}`);
   },
 
-  create({ type, amount, category, date, note }) {
+  create({ type, amount, category, date, note, applyRules } = {}) {
     return request("/records", {
       method: "POST",
-      body: JSON.stringify({ type, amount, category, date, note }),
+      body: JSON.stringify({ type, amount, category, date, note, applyRules }),
     });
   },
 
@@ -282,6 +282,37 @@ export const records = {
     const query =
       deleteReceipt === undefined ? "" : `?deleteReceipt=${deleteReceipt}`;
     return request(`/records/${id}${query}`, { method: "DELETE" });
+  },
+};
+
+// ======================================================================
+// RULES MODULE
+// ======================================================================
+export const rules = {
+  getAll() {
+    return request("/rules");
+  },
+
+  create(payload) {
+    return request("/rules", {
+      method: "POST",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  update(id, payload) {
+    return request(`/rules/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(payload || {}),
+    });
+  },
+
+  remove(id) {
+    return request(`/rules/${id}`, { method: "DELETE" });
+  },
+
+  applyAll() {
+    return request("/rules/apply", { method: "POST" });
   },
 };
 
@@ -814,6 +845,7 @@ export function getReceiptSummary(receipt) {
 export const api = {
   auth,
   records,
+  rules,
   receipts,
   walterlens,
   netWorth,

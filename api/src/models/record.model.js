@@ -66,6 +66,20 @@ export async function listRecords(userId, { type, limit = 200, offset = 0 } = {}
   return rows;
 }
 
+export async function listAllRecordsForUser(userId) {
+  const { rows } = await query(
+    `
+    SELECT *
+    FROM records
+    WHERE user_id = $1
+    ORDER BY date DESC, created_at DESC
+    `,
+    [userId]
+  );
+
+  return rows;
+}
+
 export async function getRecordById(userId, id) {
   const { rows } = await query(
     `

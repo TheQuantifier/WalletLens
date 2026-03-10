@@ -15,6 +15,7 @@ import { logActivity } from "../services/activity.service.js";
 import { evaluateAchievementsForUser } from "../services/achievements.service.js";
 import { findUserById } from "../models/user.model.js";
 import { EXPENSE_CATEGORIES, INCOME_CATEGORIES } from "../constants/categories.js";
+import { applyStoredRulesToRecordInput } from "../services/rules.service.js";
 
 // ==========================================================
 // Helper: Parse YYYY-MM-DD into a stable UTC-noon Date
@@ -101,7 +102,7 @@ export const getCategories = asyncHandler(async (req, res) => {
 // POST /api/records
 // ==========================================================
 export const create = asyncHandler(async (req, res) => {
-  const { type, amount, category, date, note } = req.body;
+  const { type, amount, category, date, note, applyRules = true } = req.body;
 
   if (!type || amount === undefined || amount === null || !category) {
     return res
@@ -125,14 +126,28 @@ export const create = asyncHandler(async (req, res) => {
 
   const parsedDate = date ? parseDateOnly(date) : new Date();
 
-  const record = await createRecord(req.user.id, {
+  let recordInput = {
     type,
     amount: numAmount,
     category: String(category).trim(),
     date: parsedDate,
     note: note !== undefined ? String(note) : "",
     linkedReceiptId: null,
-  });
+  };
+
+  if (applyRules !== false) {
+    const applied = await applyStoredRulesToRecordInput(req.user.id, recordInput, {
+      origin: "manual",
+    });
+    recordInput = {
+      ...recordInput,
+      type: applied.record.type,
+      category: applied.record.category,
+      note: applied.record.note,
+    };
+  }
+
+  const record = await createRecord(req.user.id, recordInput);
 
   await logActivity({
     userId: req.user.id,

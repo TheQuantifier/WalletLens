@@ -1,5 +1,5 @@
 import { api } from "./api.js";
-import { applyRulesToRecord, loadRules, saveRules, summarizeRule } from "./rules-engine.js";
+import { loadRules, saveRules, summarizeRule } from "./rules-engine.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   const ONBOARDING_KEY = "rules_onboarding_seen_v1";
@@ -33,38 +33,7 @@ document.addEventListener("DOMContentLoaded", () => {
     actionTag: document.getElementById("actionTag"),
   };
 
-  const EXPENSE_CATEGORIES = [
-    "Housing",
-    "Utilities",
-    "Groceries",
-    "Transportation",
-    "Dining",
-    "Health",
-    "Entertainment",
-    "Shopping",
-    "Membership",
-    "Miscellaneous",
-    "Education",
-    "Giving",
-    "Savings",
-    "Other",
-  ];
-
-  const INCOME_CATEGORIES = [
-    "Salary / Wages",
-    "Bonus / Commission",
-    "Business Income",
-    "Freelance / Contract",
-    "Rental Income",
-    "Interest / Dividends",
-    "Capital Gains",
-    "Refunds / Reimbursements",
-    "Gifts Received",
-    "Government Benefits",
-    "Other",
-  ];
-
-  const uniq = (arr) => Array.from(new Set(arr.filter(Boolean)));
+  let rules = [];
 
   const showStatus = (msg, kind = "ok") => {
     if (!rulesStatus) return;
@@ -78,6 +47,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!rulesStatus) return;
     rulesStatus.classList.add("is-hidden");
     rulesStatus.textContent = "";
+    rulesStatus.classList.remove("is-ok", "is-error");
   };
 
   const showModal = () => ruleModal?.classList.remove("hidden");
@@ -85,48 +55,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const showOnboarding = () => rulesOnboardingModal?.classList.remove("hidden");
   const hideOnboarding = () => rulesOnboardingModal?.classList.add("hidden");
 
-  const populateCategoryOptions = async () => {
-    let customExpense = [];
-    let customIncome = [];
-    try {
-      const { user } = await api.auth.me();
-      customExpense = user?.customExpenseCategories || user?.custom_expense_categories || [];
-      customIncome = user?.customIncomeCategories || user?.custom_income_categories || [];
-    } catch {
-      customExpense = [];
-      customIncome = [];
-    }
-
-    const combined = uniq([
-      ...EXPENSE_CATEGORIES,
-      ...INCOME_CATEGORIES,
-      ...customExpense,
-      ...customIncome,
-    ]);
-
-    const fill = (select, includeAny) => {
-      if (!select) return;
-      const baseOptions = includeAny ? [""] : [""];
-      select.innerHTML = "";
-      baseOptions.forEach((val) => {
-        const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = includeAny ? (val === "" ? "Any" : val) : val === "" ? "No change" : val;
-        select.appendChild(opt);
-      });
-      combined.forEach((c) => {
-        const opt = document.createElement("option");
-        opt.value = c;
-        opt.textContent = c;
-        select.appendChild(opt);
-      });
-    };
-
-    fill(els.category, true);
-    fill(els.actionCategory, false);
-  };
-
-  const buildRuleFromForm = () => {
+  const getRulePayload = () => {
     const conditions = [];
     if (els.type?.value && els.type.value !== "any") {
       conditions.push({ field: "type", op: "equals", value: els.type.value });
@@ -155,11 +84,29 @@ document.addEventListener("DOMContentLoaded", () => {
       actions.push({ type: "appendNote", value: els.actionTag.value });
     }
 
-    return { conditions, actions };
+    return {
+      name: els.name?.value?.trim() || "",
+      enabled: !!els.enabled?.checked,
+      priority: Number(els.priority?.value || 100),
+      applyMode: els.applyMode?.value || "first",
+      conditions,
+      actions,
+    };
+  };
+
+  const setSaving = (saving) => {
+    if (!ruleSaveBtn) return;
+    ruleSaveBtn.disabled = saving;
+    ruleSaveBtn.textContent = saving ? "Saving..." : "Save Rule";
+  };
+
+  const setApplying = (saving) => {
+    if (!btnApplyRules) return;
+    btnApplyRules.disabled = saving;
+    btnApplyRules.textContent = saving ? "Applying..." : "Apply To Existing";
   };
 
   const renderRules = () => {
-    const rules = loadRules();
     if (!rulesList) return;
 
     rulesList.innerHTML = "";
@@ -167,20 +114,21 @@ document.addEventListener("DOMContentLoaded", () => {
       rulesEmpty?.classList.remove("is-hidden");
       return;
     }
+
     rulesEmpty?.classList.add("is-hidden");
 
     rules.forEach((rule) => {
       const card = document.createElement("div");
       card.className = "rule-card";
 
+      const pill = document.createElement("span");
+      pill.className = "rule-pill";
+      pill.textContent = rule.enabled === false ? "Disabled" : "Enabled";
+
       const header = document.createElement("div");
       const title = document.createElement("h3");
       title.textContent = rule.name || "Untitled Rule";
       header.appendChild(title);
-
-      const pill = document.createElement("span");
-      pill.className = "rule-pill";
-      pill.textContent = rule.enabled === false ? "Disabled" : "Enabled";
 
       const meta = document.createElement("div");
       meta.className = "rule-meta";
@@ -191,12 +139,15 @@ document.addEventListener("DOMContentLoaded", () => {
       const toggleInput = document.createElement("input");
       toggleInput.type = "checkbox";
       toggleInput.checked = rule.enabled !== false;
-      toggleInput.addEventListener("change", () => {
-        const next = loadRules().map((r) =>
-          r.id === rule.id ? { ...r, enabled: toggleInput.checked } : r
-        );
-        saveRules(next);
-        renderRules();
+      toggleInput.addEventListener("change", async () => {
+        try {
+          const updated = await api.rules.update(rule.id, { enabled: toggleInput.checked });
+          rules = rules.map((item) => (item.id === rule.id ? updated : item));
+          renderRules();
+        } catch (err) {
+          toggleInput.checked = rule.enabled !== false;
+          showStatus(`Failed to update rule: ${err?.message || "Unknown error"}`, "error");
+        }
       });
       toggle.appendChild(toggleInput);
       toggle.appendChild(document.createTextNode("Enabled"));
@@ -214,12 +165,16 @@ document.addEventListener("DOMContentLoaded", () => {
       delBtn.className = "btn";
       delBtn.type = "button";
       delBtn.textContent = "Delete";
-      delBtn.addEventListener("click", () => {
+      delBtn.addEventListener("click", async () => {
         if (!confirm("Delete this rule?")) return;
-        const next = loadRules().filter((r) => r.id !== rule.id);
-        saveRules(next);
-        renderRules();
-        showStatus("Rule deleted.");
+        try {
+          await api.rules.remove(rule.id);
+          rules = rules.filter((item) => item.id !== rule.id);
+          renderRules();
+          showStatus("Rule deleted.");
+        } catch (err) {
+          showStatus(`Failed to delete rule: ${err?.message || "Unknown error"}`, "error");
+        }
       });
 
       actions.appendChild(editBtn);
@@ -244,36 +199,45 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const openCreate = () => {
     resetForm();
-    ruleModalTitle.textContent = "Create Rule";
-    showModal();
+    if (ruleModalTitle) ruleModalTitle.textContent = "Create Rule";
     clearStatus();
+    showModal();
   };
 
   const openEdit = (rule) => {
     resetForm();
-    ruleModalTitle.textContent = "Edit Rule";
+    if (ruleModalTitle) ruleModalTitle.textContent = "Edit Rule";
     ruleForm?.setAttribute("data-edit-id", rule.id || "");
     if (els.name) els.name.value = rule.name || "";
     if (els.priority) els.priority.value = String(rule.priority || 100);
     if (els.applyMode) els.applyMode.value = rule.applyMode || "first";
     if (els.enabled) els.enabled.checked = rule.enabled !== false;
 
-    (rule.conditions || []).forEach((c) => {
-      if (c.field === "type") els.type.value = c.value || "any";
-      if (c.field === "category") els.category.value = c.value || "";
-      if (c.field === "note") els.noteContains.value = c.value || "";
-      if (c.field === "origin") els.origin.value = c.value || "any";
-      if (c.field === "amount") {
-        if (c.value?.min) els.amountMin.value = c.value.min;
-        if (c.value?.max) els.amountMax.value = c.value.max;
+    (rule.conditions || []).forEach((condition) => {
+      if (condition.field === "type" && els.type) els.type.value = condition.value || "any";
+      if (condition.field === "category" && els.category) els.category.value = condition.value || "";
+      if (condition.field === "note" && els.noteContains) els.noteContains.value = condition.value || "";
+      if (condition.field === "origin" && els.origin) els.origin.value = condition.value || "any";
+      if (condition.field === "amount") {
+        if (condition.value?.min !== undefined && els.amountMin) {
+          els.amountMin.value = condition.value.min;
+        }
+        if (condition.value?.max !== undefined && els.amountMax) {
+          els.amountMax.value = condition.value.max;
+        }
       }
     });
 
-    (rule.actions || []).forEach((a) => {
-      if (a.type === "setCategory") els.actionCategory.value = a.value || "";
-      if (a.type === "appendNote") els.actionTag.value = a.value || "";
+    (rule.actions || []).forEach((action) => {
+      if (action.type === "setCategory" && els.actionCategory) {
+        els.actionCategory.value = action.value || "";
+      }
+      if (action.type === "appendNote" && els.actionTag) {
+        els.actionTag.value = action.value || "";
+      }
     });
 
+    clearStatus();
     showModal();
   };
 
@@ -300,47 +264,114 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   };
 
-  ruleForm?.addEventListener("submit", (e) => {
-    e.preventDefault();
+  const populateCategoryOptions = async () => {
+    let categories = [];
+    try {
+      const data = await api.records.categories();
+      categories = Array.from(new Set([...(data?.expense || []), ...(data?.income || [])]));
+    } catch {
+      categories = [];
+    }
+
+    const fill = (select, emptyLabel) => {
+      if (!select) return;
+      select.innerHTML = "";
+
+      const emptyOption = document.createElement("option");
+      emptyOption.value = "";
+      emptyOption.textContent = emptyLabel;
+      select.appendChild(emptyOption);
+
+      categories.forEach((category) => {
+        const option = document.createElement("option");
+        option.value = category;
+        option.textContent = category;
+        select.appendChild(option);
+      });
+    };
+
+    fill(els.category, "Any");
+    fill(els.actionCategory, "No change");
+  };
+
+  const migrateLegacyRules = async () => {
+    const legacyRules = loadRules();
+    if (!legacyRules.length || rules.length) return;
+
+    let migrated = 0;
+    for (const legacyRule of legacyRules) {
+      try {
+        const created = await api.rules.create({
+          name: legacyRule.name,
+          enabled: legacyRule.enabled !== false,
+          priority: Number(legacyRule.priority || 100),
+          applyMode: legacyRule.applyMode || "first",
+          conditions: Array.isArray(legacyRule.conditions) ? legacyRule.conditions : [],
+          actions: Array.isArray(legacyRule.actions) ? legacyRule.actions : [],
+        });
+        rules.push(created);
+        migrated += 1;
+      } catch (err) {
+        showStatus(`Legacy rule migration failed: ${err?.message || "Unknown error"}`, "error");
+        return;
+      }
+    }
+
+    saveRules([]);
+    if (migrated) {
+      showStatus(`Migrated ${migrated} legacy rule${migrated === 1 ? "" : "s"} to your account.`);
+    }
+  };
+
+  const loadRemoteRules = async () => {
+    rules = await api.rules.getAll();
+    await migrateLegacyRules();
+    rules = await api.rules.getAll();
+    renderRules();
+  };
+
+  ruleForm?.addEventListener("submit", async (event) => {
+    event.preventDefault();
     clearStatus();
 
-    const name = els.name?.value?.trim();
-    if (!name) {
+    const payload = getRulePayload();
+    if (!payload.name) {
       showStatus("Please enter a rule name.", "error");
       return;
     }
-
-    const { conditions, actions } = buildRuleFromForm();
-    if (!conditions.length) {
+    if (!payload.conditions.length) {
       showStatus("Add at least one condition.", "error");
       return;
     }
-    if (!actions.length) {
+    if (!payload.actions.length) {
       showStatus("Add at least one action.", "error");
       return;
     }
 
-    const rules = loadRules();
     const editId = ruleForm?.getAttribute("data-edit-id");
-    const rule = {
-      id: editId || `rule_${Date.now()}`,
-      name,
-      enabled: !!els.enabled?.checked,
-      priority: Number(els.priority?.value || 100),
-      applyMode: els.applyMode?.value || "first",
-      conditions,
-      actions,
-      updatedAt: new Date().toISOString(),
-    };
 
-    const next = editId
-      ? rules.map((r) => (r.id === editId ? { ...r, ...rule } : r))
-      : [...rules, rule];
+    try {
+      setSaving(true);
+      const savedRule = editId
+        ? await api.rules.update(editId, payload)
+        : await api.rules.create(payload);
 
-    saveRules(next);
-    hideModal();
-    renderRules();
-    showStatus(editId ? "Rule updated." : "Rule created.");
+      rules = editId
+        ? rules.map((rule) => (rule.id === editId ? savedRule : rule))
+        : [...rules, savedRule].sort((a, b) => {
+            const priorityDiff = Number(b?.priority || 0) - Number(a?.priority || 0);
+            if (priorityDiff !== 0) return priorityDiff;
+            return String(a?.createdAt || "").localeCompare(String(b?.createdAt || ""));
+          });
+
+      hideModal();
+      renderRules();
+      showStatus(editId ? "Rule updated." : "Rule created.");
+    } catch (err) {
+      showStatus(`Failed to save rule: ${err?.message || "Unknown error"}`, "error");
+    } finally {
+      setSaving(false);
+    }
   });
 
   ruleCancelBtn?.addEventListener("click", () => hideModal());
@@ -350,10 +381,8 @@ document.addEventListener("DOMContentLoaded", () => {
     localStorage.setItem(ONBOARDING_KEY, "true");
     hideOnboarding();
   });
-
   btnApplyRules?.addEventListener("click", async () => {
     clearStatus();
-    const rules = loadRules();
     if (!rules.length) {
       showStatus("No rules to apply.", "error");
       return;
@@ -363,39 +392,27 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      btnApplyRules.disabled = true;
-      btnApplyRules.textContent = "Applying…";
-
-      const list = await api.records.getAll();
-      const records = Array.isArray(list) ? list : (list?.records || list?.data || []);
-
-      let updated = 0;
-      for (const record of records) {
-        const updatedRecord = applyRulesToRecord(record, rules);
-        const patch = {};
-        if ((record.category || "") !== (updatedRecord.category || "")) patch.category = updatedRecord.category;
-        if ((record.note || "") !== (updatedRecord.note || "")) patch.note = updatedRecord.note;
-        if ((record.type || "") !== (updatedRecord.type || "")) patch.type = updatedRecord.type;
-        if (Object.keys(patch).length) {
-          await api.records.update(record.id || record._id, patch);
-          updated += 1;
-        }
-      }
-
-      showStatus(`Applied rules to ${updated} record${updated === 1 ? "" : "s"}.`);
+      setApplying(true);
+      const result = await api.rules.applyAll();
+      const updatedCount = Number(result?.updatedCount || 0);
+      showStatus(`Applied rules to ${updatedCount} record${updatedCount === 1 ? "" : "s"}.`);
     } catch (err) {
       showStatus(`Failed to apply rules: ${err?.message || "Unknown error"}`, "error");
     } finally {
-      btnApplyRules.disabled = false;
-      btnApplyRules.textContent = "Apply To Existing";
+      setApplying(false);
     }
   });
 
-  populateCategoryOptions().then(() => {
-    renderRules();
-    prefillFromQuery();
-    if (!localStorage.getItem(ONBOARDING_KEY)) {
-      showOnboarding();
+  (async () => {
+    try {
+      await populateCategoryOptions();
+      await loadRemoteRules();
+      prefillFromQuery();
+      if (!localStorage.getItem(ONBOARDING_KEY)) {
+        showOnboarding();
+      }
+    } catch (err) {
+      showStatus(`Failed to load rules: ${err?.message || "Unknown error"}`, "error");
     }
-  });
+  })();
 });
