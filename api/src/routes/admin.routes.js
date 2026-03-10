@@ -9,6 +9,7 @@ import {
   listUserOptionsAdmin,
   getUserAdmin,
   updateUserAdmin,
+  forceLogoutAllUsersAdmin,
   getAdminStatsController,
   getAdminPermissionsController,
   listRecordsAdminController,
@@ -53,6 +54,11 @@ router.get("/users", requireAdminPermission("users.read"), listUsersAdmin);
 router.get("/users/options", requireAdminPermission("users.read"), listUserOptionsAdmin);
 router.get("/users/:id", requireAdminPermission("users.read"), getUserAdmin);
 router.put("/users/:id", requireAdminPermission("users.write"), updateUserAdmin);
+router.post(
+  "/sessions/force-logout-all",
+  requireAdminPermission("settings.write"),
+  forceLogoutAllUsersAdmin
+);
 
 // Stats
 router.get("/stats", requireAdminPermission("health.read"), getAdminStatsController);

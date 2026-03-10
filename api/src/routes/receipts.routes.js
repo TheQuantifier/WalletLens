@@ -8,7 +8,8 @@ import auth from "../middleware/auth.js";
 const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 50 * 1024 * 1024 },
+  // Hard upper bound; app_settings max_upload_size_mb applies the active runtime limit.
+  limits: { fileSize: 250 * 1024 * 1024 },
 });
 
 /*

@@ -269,6 +269,7 @@
         </div>
         <div id="settingsPanelBody">
           <form id="settingsForm" class="admin-form">
+            <h3 class="admin-settings-subtitle">General</h3>
             <label class="settings-item">
               <span>App Name</span>
               <input id="appNameInput" type="text" placeholder="&lt;AppName&gt;" />
@@ -287,8 +288,109 @@
               <span>Session Timeout (minutes)</span>
               <input id="sessionTimeoutMinutesInput" type="number" min="1" max="60" step="1" value="15" />
             </label>
+            <label class="settings-item">
+              <span>Max Concurrent Sessions Per User</span>
+              <input
+                id="maxConcurrentSessionsInput"
+                type="number"
+                min="0"
+                max="1000"
+                step="1"
+                value="0"
+              />
+              <span class="subtle">Use 0 for infinite sessions.</span>
+            </label>
+            <label class="settings-item">
+              <span>Require 2FA For Admin Roles</span>
+              <div class="checkbox-row">
+                <input id="require2faForAdminRolesInput" type="checkbox" />
+                <span><span class="subtle">When enabled, admin/support/analyst roles must have 2FA enabled to log in.</span></span>
+              </div>
+            </label>
+
+            <h3 class="admin-settings-subtitle">Notifications</h3>
+            <div class="admin-settings-inline-grid">
+              <label class="settings-item">
+                <span>Weekly Digest Day</span>
+                <select id="weeklyDigestDayInput">
+                  <option value="0">Sunday</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                </select>
+              </label>
+              <label class="settings-item">
+                <span>Weekly Digest Time (24h)</span>
+                <input id="weeklyDigestTimeInput" type="time" value="09:00" />
+              </label>
+              <label class="settings-item">
+                <span>Weekly Digest Timezone</span>
+                <select id="weeklyDigestTimezoneInput"></select>
+              </label>
+            </div>
+            <label class="settings-item">
+              <span>Pause Non-Security Emails</span>
+              <div class="checkbox-row">
+                <input id="pauseNonSecurityEmailsInput" type="checkbox" />
+                <span><span class="subtle">Security emails can still be sent.</span></span>
+              </div>
+            </label>
+            <label class="settings-item">
+              <span>Pause All Notifications</span>
+              <div class="checkbox-row">
+                <input id="pauseAllNotificationsInput" type="checkbox" />
+                <span><span class="subtle">Disables notification delivery and in-app notification feed.</span></span>
+              </div>
+            </label>
+
+            <h3 class="admin-settings-subtitle">Uploads and OCR</h3>
+            <label class="settings-item">
+              <span>Max Upload Size (MB)</span>
+              <input id="maxUploadSizeMbInput" type="number" min="1" max="250" step="1" value="50" />
+            </label>
+            <label class="settings-item">
+              <span>OCR Timeout (seconds)</span>
+              <input id="ocrTimeoutSecondsInput" type="number" min="5" max="300" step="1" value="25" />
+            </label>
+            <label class="settings-item">
+              <span>OCR Retry Limit</span>
+              <input id="ocrRetryLimitInput" type="number" min="0" max="5" step="1" value="1" />
+            </label>
+
+            <h3 class="admin-settings-subtitle">Data and Privacy</h3>
+            <label class="settings-item">
+              <span>Default Data Export Format</span>
+              <div class="checkbox-row">
+                <input id="defaultDataExportFormatInput" type="checkbox" />
+                <span><span class="subtle">Use JSON export by default (unchecked = CSV).</span></span>
+              </div>
+            </label>
+
+            <h3 class="admin-settings-subtitle">System Operations</h3>
+            <div class="admin-settings-inline-grid admin-settings-inline-grid--maintenance">
+              <label class="settings-item">
+                <span>Maintenance Mode</span>
+                <div class="checkbox-row">
+                  <input id="maintenanceModeEnabledInput" type="checkbox" />
+                  <span><span class="subtle">Please be aware: Maintenance is underway.</span></span>
+                </div>
+              </label>
+              <label class="settings-item">
+                <span>Maintenance Banner Text</span>
+                <input id="maintenanceModeBannerTextInput" type="text" placeholder="Please be aware: Maintenance is underway." />
+              </label>
+            </div>
+
             <div class="admin-actions">
               <button class="btn btn--primary" type="submit">Save Settings</button>
+            </div>
+            <div class="admin-actions">
+              <button class="btn btn--danger" id="forceLogoutAllSessionsBtn" type="button">
+                Force Logout All Users
+              </button>
             </div>
             <p id="settingsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
           </form>

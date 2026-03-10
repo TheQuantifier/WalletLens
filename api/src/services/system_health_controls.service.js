@@ -13,6 +13,7 @@ export const SYSTEM_HEALTH_SERVICE_IDS = new Set([
   "smtp_connection",
   "object_storage_connection",
   "ai_provider",
+  "walterlens_service",
   "parser_service",
   "ocr_worker",
   "turnstile",

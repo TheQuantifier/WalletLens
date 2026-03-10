@@ -87,6 +87,20 @@ const els = {
   appNameInput: document.getElementById("appNameInput"),
   receiptKeepFilesInput: document.getElementById("receiptKeepFilesInput"),
   sessionTimeoutMinutesInput: document.getElementById("sessionTimeoutMinutesInput"),
+  maxConcurrentSessionsInput: document.getElementById("maxConcurrentSessionsInput"),
+  require2faForAdminRolesInput: document.getElementById("require2faForAdminRolesInput"),
+  weeklyDigestDayInput: document.getElementById("weeklyDigestDayInput"),
+  weeklyDigestTimeInput: document.getElementById("weeklyDigestTimeInput"),
+  weeklyDigestTimezoneInput: document.getElementById("weeklyDigestTimezoneInput"),
+  pauseNonSecurityEmailsInput: document.getElementById("pauseNonSecurityEmailsInput"),
+  pauseAllNotificationsInput: document.getElementById("pauseAllNotificationsInput"),
+  maxUploadSizeMbInput: document.getElementById("maxUploadSizeMbInput"),
+  ocrTimeoutSecondsInput: document.getElementById("ocrTimeoutSecondsInput"),
+  ocrRetryLimitInput: document.getElementById("ocrRetryLimitInput"),
+  defaultDataExportFormatInput: document.getElementById("defaultDataExportFormatInput"),
+  maintenanceModeEnabledInput: document.getElementById("maintenanceModeEnabledInput"),
+  maintenanceModeBannerTextInput: document.getElementById("maintenanceModeBannerTextInput"),
+  forceLogoutAllSessionsBtn: document.getElementById("forceLogoutAllSessionsBtn"),
   achievementKeyInput: document.getElementById("achievementKeyInput"),
   achievementKeyStatus: document.getElementById("achievementKeyStatus"),
   achievementTitleInput: document.getElementById("achievementTitleInput"),
@@ -450,6 +464,41 @@ function formatDateTime(value) {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return "—";
   return dt.toLocaleString();
+}
+
+function getSupportedIanaTimezones() {
+  try {
+    const values = Intl.supportedValuesOf?.("timeZone");
+    if (Array.isArray(values) && values.length) {
+      return [...values].sort((a, b) => a.localeCompare(b));
+    }
+  } catch {
+    // no-op
+  }
+  return [
+    "America/Chicago",
+    "America/New_York",
+    "America/Denver",
+    "America/Los_Angeles",
+    "UTC",
+  ];
+}
+
+function populateWeeklyDigestTimezoneOptions(selectedValue = "America/Chicago") {
+  const select = els.weeklyDigestTimezoneInput;
+  if (!select) return;
+
+  const timezones = getSupportedIanaTimezones();
+  const selected = String(selectedValue || "").trim() || "America/Chicago";
+  if (!timezones.includes(selected)) {
+    timezones.push(selected);
+    timezones.sort((a, b) => a.localeCompare(b));
+  }
+
+  select.innerHTML = timezones
+    .map((tz) => `<option value="${escapeHtml(tz)}">${escapeHtml(tz)}</option>`)
+    .join("");
+  select.value = selected;
 }
 
 function normalizeText(value) {
@@ -1271,15 +1320,20 @@ function renderSystemHealth() {
         "brevo_api",
         "ratesdb_api",
         "google_oauth_api",
-        "turnstile",
         "ai_provider",
       ],
     },
     {
       id: "code_services",
-      label: "Code Services (Python/Workers)",
-      detail: "Internal worker/runtime services.",
-      serviceIds: ["parser_service", "ocr_worker", "weekly_notification_worker"],
+      label: "Service Connections",
+      detail: "Internal runtime services used by the app.",
+      serviceIds: [
+        "parser_service",
+        "ocr_worker",
+        "turnstile",
+        "walterlens_service",
+        "weekly_notification_worker",
+      ],
     },
     {
       id: "group_connections",
@@ -1974,6 +2028,68 @@ async function loadSettings() {
         Number.isFinite(timeout) && timeout >= 1 && timeout <= 60 ? timeout : 15
       );
     }
+    if (els.maxConcurrentSessionsInput) {
+      const maxSessions = Number(settings?.max_concurrent_sessions_per_user);
+      els.maxConcurrentSessionsInput.value = String(
+        Number.isInteger(maxSessions) && maxSessions >= 0 ? maxSessions : 0
+      );
+    }
+    if (els.require2faForAdminRolesInput) {
+      els.require2faForAdminRolesInput.checked = Boolean(settings?.require_2fa_for_admin_roles);
+    }
+    if (els.weeklyDigestDayInput) {
+      const day = Number(settings?.weekly_digest_day_of_week);
+      els.weeklyDigestDayInput.value = String(
+        Number.isInteger(day) && day >= 0 && day <= 6 ? day : 1
+      );
+    }
+    if (els.weeklyDigestTimeInput) {
+      const digestTime = String(settings?.weekly_digest_time || "09:00").trim();
+      els.weeklyDigestTimeInput.value = /^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(digestTime)
+        ? digestTime
+        : "09:00";
+    }
+    if (els.weeklyDigestTimezoneInput) {
+      populateWeeklyDigestTimezoneOptions(
+        String(settings?.weekly_digest_timezone || "America/Chicago")
+      );
+    }
+    if (els.pauseNonSecurityEmailsInput) {
+      els.pauseNonSecurityEmailsInput.checked = Boolean(settings?.pause_non_security_emails);
+    }
+    if (els.pauseAllNotificationsInput) {
+      els.pauseAllNotificationsInput.checked = Boolean(settings?.pause_all_notifications);
+    }
+    if (els.maxUploadSizeMbInput) {
+      const maxUpload = Number(settings?.max_upload_size_mb);
+      els.maxUploadSizeMbInput.value = String(
+        Number.isInteger(maxUpload) && maxUpload >= 1 && maxUpload <= 250 ? maxUpload : 50
+      );
+    }
+    if (els.ocrTimeoutSecondsInput) {
+      const ocrTimeout = Number(settings?.ocr_timeout_seconds);
+      els.ocrTimeoutSecondsInput.value = String(
+        Number.isInteger(ocrTimeout) && ocrTimeout >= 5 && ocrTimeout <= 300
+          ? ocrTimeout
+          : 25
+      );
+    }
+    if (els.ocrRetryLimitInput) {
+      const retry = Number(settings?.ocr_retry_limit);
+      els.ocrRetryLimitInput.value = String(
+        Number.isInteger(retry) && retry >= 0 && retry <= 5 ? retry : 1
+      );
+    }
+    if (els.defaultDataExportFormatInput) {
+      const format = String(settings?.default_data_export_format || "csv").toLowerCase();
+      els.defaultDataExportFormatInput.checked = format === "json";
+    }
+    if (els.maintenanceModeEnabledInput) {
+      els.maintenanceModeEnabledInput.checked = Boolean(settings?.maintenance_mode_enabled);
+    }
+    if (els.maintenanceModeBannerTextInput) {
+      els.maintenanceModeBannerTextInput.value = String(settings?.maintenance_mode_banner_text || "");
+    }
     state.settingsAchievements = Array.isArray(settings?.achievements_catalog)
       ? settings.achievements_catalog
       : [];
@@ -2004,6 +2120,55 @@ async function saveSettings(event) {
     setStatus(els.settingsStatus, "Session timeout must be an integer between 1 and 60.", "error");
     return;
   }
+  const maxConcurrentSessions = Number(els.maxConcurrentSessionsInput?.value || 0);
+  if (!Number.isInteger(maxConcurrentSessions) || maxConcurrentSessions < 0 || maxConcurrentSessions > 1000) {
+    setStatus(
+      els.settingsStatus,
+      "Max concurrent sessions must be an integer between 0 (infinite) and 1000.",
+      "error"
+    );
+    return;
+  }
+  const weeklyDigestDay = Number(els.weeklyDigestDayInput?.value || 1);
+  if (!Number.isInteger(weeklyDigestDay) || weeklyDigestDay < 0 || weeklyDigestDay > 6) {
+    setStatus(els.settingsStatus, "Weekly digest day must be between 0 (Sunday) and 6 (Saturday).", "error");
+    return;
+  }
+  const weeklyDigestTime = String(els.weeklyDigestTimeInput?.value || "").trim();
+  if (!/^([01][0-9]|2[0-3]):[0-5][0-9]$/.test(weeklyDigestTime)) {
+    setStatus(els.settingsStatus, "Weekly digest time must be in HH:MM format.", "error");
+    return;
+  }
+  const weeklyDigestTimezone = String(els.weeklyDigestTimezoneInput?.value || "").trim();
+  if (!weeklyDigestTimezone) {
+    setStatus(els.settingsStatus, "Weekly digest timezone is required.", "error");
+    return;
+  }
+  const maxUploadSizeMb = Number(els.maxUploadSizeMbInput?.value || 0);
+  if (!Number.isInteger(maxUploadSizeMb) || maxUploadSizeMb < 1 || maxUploadSizeMb > 250) {
+    setStatus(els.settingsStatus, "Max upload size must be an integer between 1 and 250 MB.", "error");
+    return;
+  }
+  const ocrTimeoutSeconds = Number(els.ocrTimeoutSecondsInput?.value || 0);
+  if (!Number.isInteger(ocrTimeoutSeconds) || ocrTimeoutSeconds < 5 || ocrTimeoutSeconds > 300) {
+    setStatus(els.settingsStatus, "OCR timeout must be an integer between 5 and 300 seconds.", "error");
+    return;
+  }
+  const ocrRetryLimit = Number(els.ocrRetryLimitInput?.value || 0);
+  if (!Number.isInteger(ocrRetryLimit) || ocrRetryLimit < 0 || ocrRetryLimit > 5) {
+    setStatus(els.settingsStatus, "OCR retry limit must be an integer between 0 and 5.", "error");
+    return;
+  }
+  const defaultDataExportFormat = els.defaultDataExportFormatInput?.checked ? "json" : "csv";
+  if (!["csv", "json"].includes(defaultDataExportFormat)) {
+    setStatus(els.settingsStatus, "Default export format must be CSV or JSON.", "error");
+    return;
+  }
+  const maintenanceModeBannerText = String(els.maintenanceModeBannerTextInput?.value || "");
+  if (maintenanceModeBannerText.length > 500) {
+    setStatus(els.settingsStatus, "Maintenance banner text cannot exceed 500 characters.", "error");
+    return;
+  }
 
   setStatus(els.settingsStatus, "Saving settings...");
   try {
@@ -2011,6 +2176,19 @@ async function saveSettings(event) {
       appName,
       receiptKeepFiles: Boolean(els.receiptKeepFilesInput?.checked),
       sessionTimeoutMinutes: timeout,
+      maxConcurrentSessionsPerUser: maxConcurrentSessions,
+      require2faForAdminRoles: Boolean(els.require2faForAdminRolesInput?.checked),
+      weeklyDigestDayOfWeek: weeklyDigestDay,
+      weeklyDigestTime,
+      weeklyDigestTimezone,
+      pauseNonSecurityEmails: Boolean(els.pauseNonSecurityEmailsInput?.checked),
+      pauseAllNotifications: Boolean(els.pauseAllNotificationsInput?.checked),
+      maxUploadSizeMb,
+      ocrTimeoutSeconds,
+      ocrRetryLimit,
+      defaultDataExportFormat,
+      maintenanceModeEnabled: Boolean(els.maintenanceModeEnabledInput?.checked),
+      maintenanceModeBannerText,
       achievementsCatalog: state.settingsAchievements,
     });
     sessionStorage.setItem("appName", appName);
@@ -2021,6 +2199,33 @@ async function saveSettings(event) {
     console.error(err);
     if (handlePermissionError(err, "admin")) return;
     setStatus(els.settingsStatus, err.message || "Failed to update settings.", "error");
+  }
+}
+
+async function forceLogoutAllUsers() {
+  if (!hasPermission("settings.write")) {
+    openPermissionModal("admin");
+    return;
+  }
+  const password = window.prompt("Enter your password to force logout all users:");
+  if (!password) return;
+  const confirmed = window.confirm(
+    "This will revoke every active session for all users immediately. Continue?"
+  );
+  if (!confirmed) return;
+
+  setStatus(els.settingsStatus, "Revoking all active sessions...");
+  try {
+    const result = await api.admin.forceLogoutAllSessions(password);
+    setStatus(
+      els.settingsStatus,
+      result?.message || "All active sessions were revoked.",
+      "ok"
+    );
+  } catch (err) {
+    console.error(err);
+    if (handlePermissionError(err, "admin")) return;
+    setStatus(els.settingsStatus, err.message || "Failed to force logout all users.", "error");
   }
 }
 
@@ -2113,6 +2318,9 @@ function bindEvents() {
 
   if (els.settingsForm) {
     els.settingsForm.addEventListener("submit", saveSettings);
+  }
+  if (els.forceLogoutAllSessionsBtn) {
+    els.forceLogoutAllSessionsBtn.addEventListener("click", forceLogoutAllUsers);
   }
   if (els.toggleUsersPanelCaret) {
     els.toggleUsersPanelCaret.addEventListener("click", () => {
@@ -2403,6 +2611,7 @@ async function init() {
   setStatus(els.healthStatus, "");
   setStatus(els.healthDisconnectStatus, "");
   setStatus(els.permissionsStatus, "");
+  populateWeeklyDigestTimezoneOptions("America/Chicago");
   updateRecordsContext();
   setUsersPanelCollapsed(true);
   setSettingsPanelCollapsed(true);

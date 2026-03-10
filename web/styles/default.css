@@ -828,6 +828,19 @@ footer {
   color: white;
 }
 
+.maintenance-banner {
+  width: min(1100px, calc(100% - 2rem));
+  margin: 0.65rem auto 0;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid #d65a00;
+  border-radius: var(--radius-sm);
+  background: #ff8a00;
+  color: #ffffff;
+  font-weight: 700;
+  font-size: 0.9rem;
+  text-align: center;
+}
+
 .btn--warning {
   background: #e6a100;
   border-color: #e6a100;

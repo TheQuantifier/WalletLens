@@ -666,6 +666,13 @@ export const admin = {
     });
   },
 
+  forceLogoutAllSessions(password) {
+    return request("/admin/sessions/force-logout-all", {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+  },
+
   listNotifications() {
     return request("/admin/notifications");
   },

@@ -10,6 +10,7 @@ import {
 import { listUsersWithNotificationEmailEnabled } from "../models/user.model.js";
 import { sendEmail } from "../services/email.service.js";
 import { logActivity } from "../services/activity.service.js";
+import { getRuntimeAppSettings } from "../services/app_settings_runtime.service.js";
 
 const ALLOWED_NOTIFICATION_TAGS = new Set([
   "p",
@@ -107,6 +108,10 @@ async function sendNotificationBlastAsync({
 }
 
 export const getMine = asyncHandler(async (req, res) => {
+  const runtimeSettings = await getRuntimeAppSettings();
+  if (runtimeSettings.pause_all_notifications) {
+    return res.json({ notifications: [] });
+  }
   const notifications = await listActiveNotificationsForUser(req.user.id, 20);
   res.json({ notifications });
 });
@@ -227,6 +232,17 @@ export const resendAdmin = asyncHandler(async (req, res) => {
   }
   if (!notification.is_active) {
     return res.status(400).json({ message: "Cannot resend an inactive notification" });
+  }
+
+  const runtimeSettings = await getRuntimeAppSettings();
+  if (runtimeSettings.pause_all_notifications) {
+    return res.status(409).json({ message: "Notification delivery is paused in app settings." });
+  }
+  if (
+    runtimeSettings.pause_non_security_emails &&
+    String(notification.notification_type || "").toLowerCase() !== "security"
+  ) {
+    return res.status(409).json({ message: "Non-security email delivery is paused in app settings." });
   }
 
   const recipients = await listUsersWithNotificationEmailEnabled();

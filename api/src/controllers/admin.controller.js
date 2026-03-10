@@ -10,6 +10,7 @@ import {
   findUserAuthById,
   updateUserById,
 } from "../models/user.model.js";
+import { revokeAllActiveSessions } from "../models/session.model.js";
 import {
   listRecordsAdmin,
   getRecordByIdAdmin,
@@ -41,28 +42,28 @@ import {
 const SYSTEM_HEALTH_SERVICES = [
   {
     id: "database_connection",
-    label: "Database API",
+    label: "Neon PostgreSql DB",
     type: "api",
     deactivatable: true,
     purpose: "Stores users, records, app settings, notifications, and admin controls.",
   },
   {
     id: "brevo_api",
-    label: "Brevo API",
+    label: "Brevo",
     type: "api",
     deactivatable: true,
     purpose: "Delivers transactional emails such as notifications and account messages.",
   },
   {
     id: "ratesdb_api",
-    label: "RatesDB API",
+    label: "RatesDB",
     type: "api",
     deactivatable: true,
     purpose: "Fetches currency exchange rates used by budgeting and records.",
   },
   {
     id: "google_oauth_api",
-    label: "Google OAuth API",
+    label: "Google OAuth",
     type: "api",
     deactivatable: true,
     purpose: "Handles Google sign-in and account linking authentication flows.",
@@ -83,10 +84,17 @@ const SYSTEM_HEALTH_SERVICES = [
   },
   {
     id: "ai_provider",
-    label: "AI Provider",
-    type: "service",
+    label: "Gemini AI",
+    type: "api",
     deactivatable: true,
     purpose: "Powers AI parsing/assistant features used in receipt and finance workflows.",
+  },
+  {
+    id: "walterlens_service",
+    label: "WalterLens",
+    type: "service",
+    deactivatable: true,
+    purpose: "Runs the in-app assistant orchestration for finance chat and guided actions.",
   },
   {
     id: "parser_service",
@@ -207,6 +215,15 @@ async function testSystemHealthService(serviceId) {
     return {
       passed: hasAi,
       detail: hasAi ? `AI provider configured (${provider}).` : "AI API key is missing.",
+    };
+  }
+
+  if (id === "walterlens_service") {
+    const hasAi = Boolean(env.aiApiKey);
+    const provider = String(env.aiProvider || "unknown");
+    return {
+      passed: hasAi,
+      detail: hasAi ? `WalterLens runtime available (${provider}).` : "WalterLens requires AI API key configuration.",
     };
   }
 
@@ -424,6 +441,37 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
   });
 
   res.json({ user: updated });
+});
+
+export const forceLogoutAllUsersAdmin = asyncHandler(async (req, res) => {
+  const password = String(req.body?.password || "");
+  if (!password) {
+    return res.status(400).json({ message: "Password is required." });
+  }
+  const actor = await findUserAuthById(req.user.id);
+  if (!actor?.password_hash) {
+    return res.status(400).json({ message: "This account does not have a password set." });
+  }
+  const ok = await bcrypt.compare(password, actor.password_hash);
+  if (!ok) {
+    return res.status(401).json({ message: "Password is incorrect." });
+  }
+
+  const revokedSessions = await revokeAllActiveSessions();
+  await logActivity({
+    userId: req.user.id,
+    action: "admin_force_logout_all_users",
+    entityType: "session",
+    entityId: null,
+    metadata: { revokedSessions },
+    req,
+  });
+
+  res.json({
+    ok: true,
+    revokedSessions,
+    message: `Revoked ${revokedSessions} active session(s).`,
+  });
 });
 
 // ==========================================================

@@ -90,6 +90,18 @@ export async function revokeAllSessionsForUser(userId) {
   );
 }
 
+export async function revokeAllActiveSessions() {
+  const { rows } = await query(
+    `
+    UPDATE user_sessions
+    SET revoked_at = now()
+    WHERE revoked_at IS NULL
+    RETURNING id
+    `
+  );
+  return rows?.length || 0;
+}
+
 export async function listActiveSessionsForUser(userId) {
   const { rows } = await query(
     `
@@ -126,5 +138,40 @@ export async function cleanupOldSessions({ cutoffDays = 30 } = {}) {
     [safeDays]
   );
 
+  return rows?.length || 0;
+}
+
+export async function enforceMaxActiveSessionsForUser({
+  userId,
+  maxConcurrentSessions = 0,
+  keepSessionId = null,
+}) {
+  const limit = Number(maxConcurrentSessions);
+  if (!Number.isInteger(limit) || limit <= 0) return 0;
+
+  const { rows } = await query(
+    `
+    WITH ranked AS (
+      SELECT
+        id,
+        row_number() OVER (
+          ORDER BY
+            CASE WHEN id = $3 THEN 0 ELSE 1 END ASC,
+            last_seen_at DESC,
+            created_at DESC
+        ) AS rn
+      FROM user_sessions
+      WHERE user_id = $1
+        AND revoked_at IS NULL
+    )
+    UPDATE user_sessions s
+    SET revoked_at = now()
+    FROM ranked r
+    WHERE s.id = r.id
+      AND r.rn > $2
+    RETURNING s.id
+    `,
+    [userId, limit, keepSessionId]
+  );
   return rows?.length || 0;
 }

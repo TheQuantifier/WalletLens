@@ -39,6 +39,9 @@ let notificationToastShowing = false;
 let notificationToastCurrentId = "";
 let inactivityMonitorStarted = false;
 let inactivityTimedOut = false;
+const MAINTENANCE_MODE_ENABLED_KEY = "maintenanceModeEnabled";
+const MAINTENANCE_MODE_BANNER_TEXT_KEY = "maintenanceModeBannerText";
+const DEFAULT_EXPORT_FORMAT_KEY = "defaultDataExportFormat";
 
 /**
  * Pages that do NOT require authentication
@@ -867,28 +870,64 @@ function setAdminVisibility(role) {
 
 async function updateAppName() {
   const cached = sessionStorage.getItem("appName");
+  const cachedMaintenanceEnabled = sessionStorage.getItem(MAINTENANCE_MODE_ENABLED_KEY);
+  const cachedMaintenanceText = sessionStorage.getItem(MAINTENANCE_MODE_BANNER_TEXT_KEY) || "";
   if (cached) {
     const nameEl = document.getElementById("appName");
     if (nameEl) nameEl.textContent = cached;
     applyAppName(cached);
+  }
+  if (cachedMaintenanceEnabled === "true") {
+    applyMaintenanceBanner(true, cachedMaintenanceText);
   }
 
   try {
     const data = await api.appSettings.getPublic();
     const nextName = data?.appName || DEFAULT_APP_NAME;
     const timeoutMinutes = Number(data?.sessionTimeoutMinutes);
+    const maintenanceModeEnabled = Boolean(data?.maintenanceModeEnabled);
+    const maintenanceModeBannerText = String(data?.maintenanceModeBannerText || "").trim();
+    const defaultDataExportFormat = String(data?.defaultDataExportFormat || "csv").toLowerCase() === "json"
+      ? "json"
+      : "csv";
     const nameEl = document.getElementById("appName");
     if (nameEl) nameEl.textContent = nextName;
     sessionStorage.setItem("appName", nextName);
+    sessionStorage.setItem(MAINTENANCE_MODE_ENABLED_KEY, String(maintenanceModeEnabled));
+    sessionStorage.setItem(MAINTENANCE_MODE_BANNER_TEXT_KEY, maintenanceModeBannerText);
+    localStorage.setItem(DEFAULT_EXPORT_FORMAT_KEY, defaultDataExportFormat);
     if (Number.isFinite(timeoutMinutes) && timeoutMinutes >= 1) {
       localStorage.setItem(
         SESSION_TIMEOUT_MINUTES_KEY,
         String(Math.min(MAX_SESSION_TIMEOUT_MINUTES, Math.floor(timeoutMinutes)))
       );
     }
+    applyMaintenanceBanner(maintenanceModeEnabled, maintenanceModeBannerText);
     applyAppName(nextName);
   } catch {
     // ignore public settings failure
+  }
+}
+
+function applyMaintenanceBanner(enabled, message) {
+  const existing = document.getElementById("maintenanceBanner");
+  if (!enabled) {
+    if (existing) existing.remove();
+    return;
+  }
+
+  const text = String(message || "").trim() || "Please be aware: Maintenance is underway.";
+  const banner = existing || document.createElement("div");
+  banner.id = "maintenanceBanner";
+  banner.className = "maintenance-banner";
+  banner.textContent = text;
+  if (!existing) {
+    const header = document.getElementById("header");
+    if (header && header.parentNode) {
+      header.insertAdjacentElement("afterend", banner);
+    } else if (document.body) {
+      document.body.insertBefore(banner, document.body.firstChild);
+    }
   }
 }
 

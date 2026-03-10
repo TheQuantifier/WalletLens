@@ -317,6 +317,11 @@ function fallbackResponse(reply = "I couldn't parse that. Try asking in a differ
 }
 
 export async function runWalterLensChat({ message, context }) {
+  if (await isSystemHealthServiceDeactivated("walterlens_service")) {
+    return fallbackResponse(
+      "WalterLens service is disconnected by admin. Please try again later."
+    );
+  }
   if (await isSystemHealthServiceDeactivated("ai_provider")) {
     return fallbackResponse(
       "AI chat is disconnected by admin. Please try again later."

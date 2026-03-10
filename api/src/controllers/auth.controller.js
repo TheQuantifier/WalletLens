@@ -19,6 +19,7 @@ import {
 } from "../models/user.model.js";
 import {
   createSession,
+  enforceMaxActiveSessionsForUser,
   listActiveSessionsForUser,
   revokeAllSessionsForUser,
   revokeSessionById,
@@ -37,6 +38,7 @@ import {
 import { sendEmail } from "../services/email.service.js";
 import { logActivity } from "../services/activity.service.js";
 import { isSystemHealthServiceDeactivated } from "../services/system_health_controls.service.js";
+import { getRuntimeAppSettings } from "../services/app_settings_runtime.service.js";
 
 // If you have an R2 service, we’ll use it to delete objects on account deletion.
 // If your service file name differs, adjust the import path accordingly.
@@ -60,6 +62,22 @@ function hashCode(code) {
 function generateSixDigitCode() {
   const n = Math.floor(Math.random() * 1000000);
   return String(n).padStart(6, "0");
+}
+
+function isAdminRoleType(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  return normalized === "admin" || normalized === "support_admin" || normalized === "analyst";
+}
+
+async function createSessionWithPolicy({ userId, userAgent = "", ipAddress = "" }) {
+  const runtimeSettings = await getRuntimeAppSettings();
+  const session = await createSession({ userId, userAgent, ipAddress });
+  await enforceMaxActiveSessionsForUser({
+    userId,
+    maxConcurrentSessions: Number(runtimeSettings.max_concurrent_sessions_per_user || 0),
+    keepSessionId: session.id,
+  });
+  return { session, runtimeSettings };
 }
 
 async function sendSecurityNoticeEmail({ to, subject, text }) {
@@ -457,7 +475,12 @@ export const googleCallback = asyncHandler(async (req, res) => {
       mode,
     });
 
-    const session = await createSession({
+    const runtimeSettings = await getRuntimeAppSettings();
+    if (runtimeSettings.require_2fa_for_admin_roles && isAdminRoleType(user.role) && !user.two_fa_enabled) {
+      return failRedirect("Two-factor authentication is required for admin accounts.");
+    }
+
+    const { session } = await createSessionWithPolicy({
       userId: user.id,
       userAgent: req.get("user-agent") || "",
       ipAddress: getRequestIp(req),
@@ -525,7 +548,7 @@ export const register = asyncHandler(async (req, res) => {
     bio: "",
   });
 
-  const session = await createSession({
+  const { session } = await createSessionWithPolicy({
     userId: user.id,
     userAgent: req.get("user-agent") || "",
     ipAddress: getRequestIp(req),
@@ -562,6 +585,12 @@ export const login = asyncHandler(async (req, res) => {
   if (!ok) {
     return res.status(401).json({ message: "Invalid credentials" });
   }
+  const runtimeSettings = await getRuntimeAppSettings();
+  if (runtimeSettings.require_2fa_for_admin_roles && isAdminRoleType(user.role) && !user.two_fa_enabled) {
+    return res.status(403).json({
+      message: "Two-factor authentication is required for admin accounts.",
+    });
+  }
 
   if (user.two_fa_enabled) {
     const deviceId = req.cookies?.device_id || "";
@@ -574,7 +603,7 @@ export const login = asyncHandler(async (req, res) => {
         if (Number.isFinite(lastVerifiedMs) && Date.now() - lastVerifiedMs <= trustedWindowMs) {
           await touchTrustedDevice(user.id, deviceId);
 
-          const session = await createSession({
+          const { session } = await createSessionWithPolicy({
             userId: user.id,
             userAgent: req.get("user-agent") || "",
             ipAddress: getRequestIp(req),
@@ -619,7 +648,7 @@ export const login = asyncHandler(async (req, res) => {
     return res.json({ requires2fa: true, twoFactorToken: twoFaToken });
   }
 
-  const session = await createSession({
+  const { session } = await createSessionWithPolicy({
     userId: user.id,
     userAgent: req.get("user-agent") || "",
     ipAddress: getRequestIp(req),
@@ -986,7 +1015,8 @@ export const verifyTwoFaLogin = asyncHandler(async (req, res) => {
     userAgent: req.get("user-agent") || "",
   });
 
-  const session = await createSession({
+  const safeUser = await findUserById(payload.id);
+  const { session } = await createSessionWithPolicy({
     userId: payload.id,
     userAgent: req.get("user-agent") || "",
     ipAddress: getRequestIp(req),
@@ -995,7 +1025,6 @@ export const verifyTwoFaLogin = asyncHandler(async (req, res) => {
   setTokenCookie(res, token);
   setDeviceCookie(res, deviceId);
 
-  const safeUser = await findUserById(payload.id);
   await logActivity({
     userId: payload.id,
     action: "login",
