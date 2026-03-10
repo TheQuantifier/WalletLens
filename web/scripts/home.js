@@ -103,6 +103,13 @@ import { api } from "./api.js";
         day: "2-digit",
       });
 
+  const safeFmtDate = (iso) => {
+    if (!iso) return "—";
+    const d = new Date(iso + (iso?.length === 10 ? "T00:00:00" : ""));
+    if (Number.isNaN(d.getTime())) return "—";
+    return fmtDate(iso);
+  };
+
   const normalizeName = (name) => String(name || "").trim().toLowerCase();
 
   const normalizeCategoryList = (list) => {
@@ -709,6 +716,43 @@ import { api } from "./api.js";
         li.appendChild(right);
         listEl.appendChild(li);
       });
+  }
+
+  function renderUpcomingRecurring(listEl, items) {
+    if (!listEl) return;
+    listEl.innerHTML = "";
+    if (!items?.length) {
+      listEl.innerHTML = '<p class="subtle">No upcoming recurring items.</p>';
+      return;
+    }
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "upcoming-item";
+      const amount = fmtMoney(item.amount, item.currency || CURRENCY_FALLBACK);
+      const dateLabel = safeFmtDate(item.date || item.nextRun);
+      const categoryLabel = item.category || "Uncategorized";
+      row.innerHTML = `
+        <div>
+          <div class="label">${escapeHTML(item.name || "Recurring item")}</div>
+          <div class="meta">${dateLabel} · ${escapeHTML(categoryLabel)}</div>
+        </div>
+        <div>${amount}</div>
+      `;
+      listEl.appendChild(row);
+    });
+  }
+
+  async function loadUpcomingRecurring() {
+    const listEl = $("#recurringUpcomingHome");
+    if (!listEl) return;
+    try {
+      const res = await api.recurring.upcoming({ days: 30 });
+      const items = Array.isArray(res) ? res : (res?.items || res?.data || []);
+      renderUpcomingRecurring(listEl, items);
+    } catch (err) {
+      console.warn("Failed to load upcoming recurring:", err);
+      listEl.innerHTML = '<p class="subtle">Upcoming recurring is unavailable right now.</p>';
+    }
   }
 
   // ============================================================
@@ -1333,6 +1377,7 @@ import { api } from "./api.js";
         renderDashboard(records, dashboardView, accounts);
       });
       await renderDashboard(records, dashboardView, accounts);
+      await loadUpcomingRecurring();
 
       const redraw = debounce(() => {
         if (!currentComputed) return;

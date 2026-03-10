@@ -219,6 +219,11 @@
   background: linear-gradient(135deg, rgba(16, 185, 129, 0.28) 0%, rgba(5, 150, 105, 0.28) 60%, rgba(4, 120, 87, 0.3) 100%);
 }
 
+:root[data-theme="dark"] .upcoming-item {
+  background: rgba(15,23,42,0.7);
+  border-color: var(--border);
+}
+
 /* ===== Net Worth ===== */
 .net-worth {
   margin-bottom: 1.5rem;
@@ -436,6 +441,48 @@
 }
 .cat-list li:last-child {
   border-bottom: 0;
+}
+
+/* ===== Upcoming recurring widget ===== */
+.upcoming-recurring {
+  margin-bottom: 1.5rem;
+}
+
+.upcoming-header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 0.5rem;
+}
+
+.upcoming-card {
+  padding: 1rem 1.25rem;
+}
+
+.upcoming-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.upcoming-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.7rem 0.85rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+
+.upcoming-item .label {
+  font-weight: 600;
+}
+
+.upcoming-item .meta {
+  color: var(--muted);
+  font-size: 0.9rem;
 }
 
 /* ============================================================

@@ -599,6 +599,11 @@ document.addEventListener("DOMContentLoaded", () => {
     ruleBtn.dataset.rule = recordId;
     ruleBtn.textContent = "Create Rule";
 
+    const recurringBtn = document.createElement("button");
+    recurringBtn.type = "button";
+    recurringBtn.dataset.recurring = recordId;
+    recurringBtn.textContent = "Make Recurring";
+
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.dataset.delete = recordId;
@@ -607,6 +612,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     dropdown.appendChild(editBtn);
     dropdown.appendChild(ruleBtn);
+    dropdown.appendChild(recurringBtn);
     dropdown.appendChild(delBtn);
     wrap.appendChild(menuBtn);
     wrap.appendChild(dropdown);
@@ -735,6 +741,24 @@ document.addEventListener("DOMContentLoaded", () => {
         menu.style.top = "";
         menu.style.right = "";
       }
+      return;
+    }
+
+    if (e.target.dataset.recurring) {
+      const id = e.target.dataset.recurring;
+      const cached = allRecordsCache.find((r) => getRecordId(r) === id);
+      const record = cached || (await api.records.getOne(id));
+      if (!record) return;
+
+      const params = new URLSearchParams({
+        prefill: "1",
+        name: record.note || record.category || "Recurring item",
+        type: record.type || "expense",
+        category: record.category || "",
+        amount: record.amount ?? "",
+        note: record.note || "",
+      });
+      window.location.href = `recurring.html?${params.toString()}`;
       return;
     }
 

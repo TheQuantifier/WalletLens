@@ -286,6 +286,7 @@ export const records = {
 };
 
 // ======================================================================
+<<<<<<< Updated upstream
 // RULES MODULE
 // ======================================================================
 export const rules = {
@@ -313,6 +314,33 @@ export const rules = {
 
   applyAll() {
     return request("/rules/apply", { method: "POST" });
+=======
+// RECURRING MODULE
+// ======================================================================
+export const recurring = {
+  list(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/recurring${query ? `?${query}` : ""}`);
+  },
+  create(payload) {
+    return request("/recurring", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+  update(id, updates) {
+    return request(`/recurring/${id}`, {
+      method: "PATCH",
+      body: JSON.stringify(updates),
+    });
+  },
+  remove(id) {
+    return request(`/recurring/${id}`, { method: "DELETE" });
+  },
+  upcoming(params = {}) {
+    const query = new URLSearchParams(params).toString();
+    return request(`/recurring/upcoming${query ? `?${query}` : ""}`);
+>>>>>>> Stashed changes
   },
 };
 
@@ -845,7 +873,11 @@ export function getReceiptSummary(receipt) {
 export const api = {
   auth,
   records,
+<<<<<<< Updated upstream
   rules,
+=======
+  recurring,
+>>>>>>> Stashed changes
   receipts,
   walterlens,
   netWorth,

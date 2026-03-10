@@ -256,6 +256,68 @@ EXAMPLE:
   });
 
 
+============================================================
+ 3. RECURRING MODULE
+============================================================
+
+------------------------------------------------------------
+ recurring.list(params?)
+------------------------------------------------------------
+DESCRIPTION:
+  Returns recurring schedules for the user.
+
+EXAMPLE:
+  const list = await api.recurring.list();
+
+
+------------------------------------------------------------
+ recurring.create(payload)
+------------------------------------------------------------
+DESCRIPTION:
+  Creates a recurring schedule.
+
+EXAMPLE:
+  await api.recurring.create({
+    name: "Netflix",
+    type: "expense",
+    amount: 16.99,
+    category: "Entertainment",
+    note: "Subscription",
+    frequency: "monthly",
+    dayOfMonth: 15,
+    startDate: "2025-01-15",
+    endDate: null,
+    active: true
+  });
+
+
+------------------------------------------------------------
+ recurring.update(id, updates)
+------------------------------------------------------------
+DESCRIPTION:
+  Updates a recurring schedule.
+
+EXAMPLE:
+  await api.recurring.update("uuid", { active: false });
+
+
+------------------------------------------------------------
+ recurring.remove(id)
+------------------------------------------------------------
+DESCRIPTION:
+  Deletes a recurring schedule.
+
+
+------------------------------------------------------------
+ recurring.upcoming(params?)
+------------------------------------------------------------
+DESCRIPTION:
+  Returns upcoming occurrences for the user.
+
+EXAMPLE:
+  const upcoming = await api.recurring.upcoming({ days: 30 });
+
+
 ------------------------------------------------------------
  records.update(recordId, updates)
 ------------------------------------------------------------
