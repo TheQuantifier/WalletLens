@@ -4,6 +4,7 @@ import { sendEmail } from "../services/email.service.js";
 import env from "../config/env.js";
 import { createSupportTicket } from "../models/support_ticket.model.js";
 import { logActivity } from "../services/activity.service.js";
+import { isSystemHealthServiceDeactivated } from "../services/system_health_controls.service.js";
 
 const SUPPORT_EMAIL =
   process.env.SUPPORT_EMAIL || "support.wisewallet@manuswebworks.org";
@@ -45,6 +46,9 @@ export function validatePublicSupportPayload(payload = {}) {
 }
 
 async function verifyTurnstile(token, remoteip) {
+  if (await isSystemHealthServiceDeactivated("turnstile")) {
+    return { ok: false, message: "Captcha service is temporarily disconnected." };
+  }
   if (!env.turnstileSecretKey) return { ok: true };
   if (!token) {
     return { ok: false, message: "Captcha token is required." };

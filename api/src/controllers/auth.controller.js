@@ -36,6 +36,7 @@ import {
 } from "../models/twofa.model.js";
 import { sendEmail } from "../services/email.service.js";
 import { logActivity } from "../services/activity.service.js";
+import { isSystemHealthServiceDeactivated } from "../services/system_health_controls.service.js";
 
 // If you have an R2 service, we’ll use it to delete objects on account deletion.
 // If your service file name differs, adjust the import path accordingly.
@@ -376,13 +377,17 @@ async function resolveGoogleUser({ googleId, email, fullName, mode = "login" }) 
    GOOGLE AUTH: CONFIG + START + CALLBACK
 ===================================================== */
 export const googleConfig = asyncHandler(async (_req, res) => {
+  const deactivated = await isSystemHealthServiceDeactivated("google_oauth_api");
   res.json({
-    enabled: isGoogleAuthConfigured(_req),
+    enabled: !deactivated && isGoogleAuthConfigured(_req),
     clientId: env.googleClientId || "",
   });
 });
 
 export const googleStart = asyncHandler(async (req, res) => {
+  if (await isSystemHealthServiceDeactivated("google_oauth_api")) {
+    return res.status(503).json({ message: "Google login is disconnected by admin." });
+  }
   const googleRedirectUri = getGoogleRedirectUri(req);
   if (!isGoogleAuthConfigured(req)) {
     return res.status(503).json({ message: "Google login is not configured" });
@@ -419,6 +424,10 @@ export const googleCallback = asyncHandler(async (req, res) => {
   const returnTo = sanitizeReturnTo(decodedState.returnTo, mode, req, true);
   const failRedirect = (message) => res.redirect(appendUrlHashParams(returnTo, { auth_error: message }));
   const googleRedirectUri = getGoogleRedirectUri(req);
+
+  if (await isSystemHealthServiceDeactivated("google_oauth_api")) {
+    return failRedirect("Google login is disconnected by admin.");
+  }
 
   if (!isGoogleAuthConfigured(req)) {
     return failRedirect("Google login is not configured");

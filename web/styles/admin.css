@@ -507,6 +507,110 @@
   margin-bottom: 0.15rem;
 }
 
+.admin-health-list-wrap {
+  overflow-x: auto;
+}
+
+.admin-health-table td,
+.admin-health-table th {
+  vertical-align: middle;
+}
+
+.admin-health-table th:nth-child(5),
+.admin-health-table td:nth-child(5) {
+  text-align: center;
+}
+
+.admin-health-state {
+  font-weight: 700;
+  text-transform: capitalize;
+}
+
+.admin-health-state--active {
+  color: #1f6f37;
+}
+
+.admin-health-state--deactivated {
+  color: #c2410c;
+}
+
+.admin-health-state--down {
+  color: #b42318;
+}
+
+.admin-health-state--unconfigured,
+.admin-health-state--mixed-unconfigured {
+  color: #6b7280;
+}
+
+.admin-health-state--mixed-deactivated {
+  color: #c2410c;
+}
+
+.admin-health-state--mixed-down {
+  color: #b42318;
+}
+
+.admin-health-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.admin-health-group-row td {
+  background: #f8fafc;
+  border-top: 1px solid #dbe4f0;
+  font-weight: 700;
+}
+
+.admin-health-child-label {
+  padding-left: 1.4rem;
+}
+
+.admin-health-btn {
+  font-weight: 700;
+}
+
+.admin-health-btn--deactivate {
+  color: #b42318;
+}
+
+.admin-health-btn--deactivate:hover,
+.admin-health-btn--deactivate:focus-visible {
+  color: #7a271a;
+}
+
+.admin-health-btn--activate {
+  color: #1f6f37;
+}
+
+.admin-health-btn--activate:hover,
+.admin-health-btn--activate:focus-visible {
+  color: #14532d;
+}
+
+.admin-health-pass {
+  color: #1f6f37;
+  font-size: 0.82rem;
+  white-space: nowrap;
+  animation: healthPassFade 2.2s ease forwards;
+}
+
+@keyframes healthPassFade {
+  0% {
+    opacity: 1;
+    transform: translateX(0);
+  }
+  70% {
+    opacity: 1;
+    transform: translateX(-8px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
 .admin-export-output {
   min-height: 130px;
   max-height: 240px;

@@ -11,6 +11,7 @@ const PERMISSION_KEYS = [
   "support.write",
   "audit.read",
   "health.read",
+  "health.write",
 ];
 
 const DEFAULT_ROLE_PERMISSIONS = {
@@ -27,6 +28,7 @@ const DEFAULT_ROLE_PERMISSIONS = {
     "support.write",
     "audit.read",
     "health.read",
+    "health.write",
   ],
   support_admin: [
     "users.read",

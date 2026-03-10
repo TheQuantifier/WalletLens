@@ -715,6 +715,33 @@ export const admin = {
   getSystemHealth() {
     return request("/admin/system-health");
   },
+
+  testSystemHealthService(serviceId) {
+    return request(`/admin/system-health/${serviceId}/test`, {
+      method: "POST",
+    });
+  },
+
+  deactivateSystemHealthService(serviceId, password) {
+    return request(`/admin/system-health/${serviceId}/deactivate`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+  },
+
+  activateSystemHealthService(serviceId, password) {
+    return request(`/admin/system-health/${serviceId}/activate`, {
+      method: "POST",
+      body: JSON.stringify({ password }),
+    });
+  },
+
+  emergencyActivateDatabaseConnection(code) {
+    return request("/admin/system-health/database_connection/emergency-activate", {
+      method: "POST",
+      body: JSON.stringify({ code }),
+    });
+  },
 };
 
 // ======================================================================

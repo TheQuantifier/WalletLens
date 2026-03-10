@@ -50,6 +50,14 @@ const els = {
   healthRefreshBtn: document.getElementById("healthRefreshBtn"),
   healthSummary: document.getElementById("healthSummary"),
   healthStatus: document.getElementById("healthStatus"),
+  healthDisconnectModal: document.getElementById("adminHealthDisconnectModal"),
+  healthDisconnectForm: document.getElementById("adminHealthDisconnectForm"),
+  healthDisconnectTitle: document.getElementById("adminHealthDisconnectTitle"),
+  healthDisconnectMessage: document.getElementById("adminHealthDisconnectMessage"),
+  healthDisconnectCredentialLabel: document.getElementById("adminHealthDisconnectCredentialLabel"),
+  healthDisconnectPassword: document.getElementById("adminHealthDisconnectPassword"),
+  healthDisconnectBtn: document.getElementById("adminHealthDisconnectBtn"),
+  healthDisconnectStatus: document.getElementById("adminHealthDisconnectStatus"),
   permissionsPanel: document.getElementById("permissionsPanel"),
   permissionsPanelBody: document.getElementById("permissionsPanelBody"),
   togglePermissionsPanelCaret: document.getElementById("togglePermissionsPanelCaret"),
@@ -143,6 +151,10 @@ const state = {
   systemHealth: null,
   adminRolePermissions: {},
   savingPermissions: false,
+  testingHealthServiceIds: new Set(),
+  healthPassByService: {},
+  healthConfirmAction: "",
+  healthDisconnectServiceId: "",
   editingNotificationId: "",
   sorts: {
     users: { key: "", dir: "" },
@@ -164,6 +176,7 @@ const ROLE_PERMISSIONS = {
     "support.write",
     "audit.read",
     "health.read",
+    "health.write",
   ]),
   support_admin: new Set([
     "users.read",
@@ -196,6 +209,7 @@ const PERMISSIONS_GRID_ORDER = [
   "support.write",
   "audit.read",
   "health.read",
+  "health.write",
 ];
 const ADMIN_ROLES_FOR_GRID = ["user", "analyst", "support_admin"];
 
@@ -317,6 +331,7 @@ function applyPermissionVisibility() {
   const canSupportRead = hasPermission("support.read");
   const canSupportWrite = hasPermission("support.write");
   const canHealthRead = hasPermission("health.read");
+  const canHealthWrite = hasPermission("health.write");
 
   setElementVisible(document.getElementById("statsPanel"), canHealthRead);
   setElementVisible(els.usersPanel, canUsersRead);
@@ -366,6 +381,7 @@ function applyPermissionVisibility() {
   setReadOnlyBadge(els.achievementsPanel, "admin", canSettingsRead && !canSettingsWrite);
   setReadOnlyBadge(els.notificationsPanel, "support_admin", canNotificationsRead && !canNotificationsWrite);
   setReadOnlyBadge(els.supportPanel, "support_admin", canSupportRead && !canSupportWrite);
+  setReadOnlyBadge(els.systemHealthPanel, "admin", canHealthRead && !canHealthWrite);
 }
 
 function isPermissionError(err) {
@@ -1236,17 +1252,150 @@ async function loadSupportTickets() {
 function renderSystemHealth() {
   if (!els.healthSummary) return;
   if (!state.systemHealth) {
-    els.healthSummary.innerHTML = `<p class="subtle">System health unavailable.</p>`;
+    els.healthSummary.innerHTML = `<tr><td colspan="5" class="subtle">System health unavailable.</td></tr>`;
     return;
   }
-  const h = state.systemHealth;
-  els.healthSummary.innerHTML = `
-    <div class="admin-health-item"><strong>Database</strong><span>${h.dbConnected ? "Connected" : "Down"}</span></div>
-    <div class="admin-health-item"><strong>Email Provider</strong><span>${escapeHtml(h.emailProvider || "unknown")}</span></div>
-    <div class="admin-health-item"><strong>Failed Receipt Jobs</strong><span>${escapeHtml(String(h.failedReceiptJobs ?? 0))}</span></div>
-    <div class="admin-health-item"><strong>Queued/Running Jobs</strong><span>${escapeHtml(String(h.queuedOrRunningReceiptJobs ?? 0))}</span></div>
-    <div class="admin-health-item"><strong>Checked At</strong><span>${escapeHtml(formatDateTime(h.checkedAt))}</span></div>
-  `;
+  const services = Array.isArray(state.systemHealth?.services) ? state.systemHealth.services : [];
+  if (!services.length) {
+    els.healthSummary.innerHTML = `<tr><td colspan="5" class="subtle">No services found.</td></tr>`;
+    return;
+  }
+
+  const GROUPS = [
+    {
+      id: "api_connections",
+      label: "API Connections",
+      detail: "External APIs used by the app.",
+      serviceIds: [
+        "database_connection",
+        "brevo_api",
+        "ratesdb_api",
+        "google_oauth_api",
+        "turnstile",
+        "ai_provider",
+      ],
+    },
+    {
+      id: "code_services",
+      label: "Code Services (Python/Workers)",
+      detail: "Internal worker/runtime services.",
+      serviceIds: ["parser_service", "ocr_worker", "weekly_notification_worker"],
+    },
+    {
+      id: "group_connections",
+      label: "Group Connections",
+      detail: "SMTP/object storage and other non-API connections.",
+      serviceIds: ["smtp_connection", "object_storage_connection"],
+    },
+  ];
+
+  const serviceById = new Map(
+    services.map((service) => [String(service.id || "").trim(), service])
+  );
+  const grouped = [];
+  const seen = new Set();
+
+  for (const group of GROUPS) {
+    const groupServices = group.serviceIds
+      .map((id) => serviceById.get(id))
+      .filter(Boolean)
+      .sort((a, b) => {
+        const aLabel = String(a?.label || a?.id || "").toLowerCase();
+        const bLabel = String(b?.label || b?.id || "").toLowerCase();
+        return aLabel.localeCompare(bLabel);
+      });
+    if (!groupServices.length) continue;
+    for (const item of groupServices) {
+      seen.add(String(item.id || "").trim());
+    }
+    grouped.push({ ...group, services: groupServices });
+  }
+
+  const ungrouped = services.filter((service) => !seen.has(String(service.id || "").trim()));
+  if (ungrouped.length) {
+    grouped.push({
+      id: "other_services",
+      label: "Other Services",
+      detail: "Uncategorized health checks.",
+      services: ungrouped,
+    });
+  }
+
+  const resolveGroupState = (items) => {
+    const states = new Set(items.map((item) => String(item.state || "unknown").toLowerCase()));
+    if (states.size > 1) {
+      if (states.has("down")) return { key: "mixed-down", label: "mixed" };
+      if (states.has("deactivated")) return { key: "mixed-deactivated", label: "mixed" };
+      if (states.has("active") && states.has("unconfigured")) {
+        return { key: "mixed-unconfigured", label: "mixed" };
+      }
+      return { key: "unknown", label: "unknown" };
+    }
+    const hasActive = states.has("active");
+    if (hasActive) return { key: "active", label: "active" };
+    if (states.has("deactivated")) return { key: "deactivated", label: "deactivated" };
+    if (states.has("down")) return { key: "down", label: "down" };
+    if (states.has("unconfigured")) return { key: "unconfigured", label: "unconfigured" };
+    return { key: "unknown", label: "unknown" };
+  };
+
+  const canHealthWrite = hasPermission("health.write");
+  const renderServiceRow = (service) => {
+      const id = String(service.id || "");
+      const currentState = String(service.state || "unknown").toLowerCase();
+      const statusClass = `admin-health-state admin-health-state--${escapeHtml(currentState)}`;
+      const testing = state.testingHealthServiceIds.has(id);
+      const passText = state.healthPassByService[id] ? `<span class="admin-health-pass">${escapeHtml(state.healthPassByService[id])}</span>` : "";
+      const disableDeactivate = !canHealthWrite || !service.deactivatable || service.deactivated;
+      const disableActivate = !canHealthWrite || !service.deactivatable || !service.deactivated;
+      const isUnconfigured = currentState === "unconfigured";
+      const actionsHtml = isUnconfigured
+        ? `<span class="subtle">Configure first</span>`
+        : `<div class="admin-health-actions">
+              ${passText}
+              <button class="btn btn--link" type="button" data-action="test-health-service" data-id="${escapeHtml(id)}" ${testing ? "disabled" : ""}>
+                ${testing ? "Testing..." : "Test"}
+              </button>
+              ${
+                service.deactivated
+                  ? `<button class="btn btn--link admin-health-btn admin-health-btn--activate" type="button" data-action="activate-health-service" data-id="${escapeHtml(id)}" ${disableActivate ? "disabled" : ""}>
+                Activate
+              </button>`
+                  : `<button class="btn btn--link admin-health-btn admin-health-btn--deactivate" type="button" data-action="deactivate-health-service" data-id="${escapeHtml(id)}" ${disableDeactivate ? "disabled" : ""}>
+                Deactivate
+              </button>`
+              }
+            </div>`;
+      return `
+        <tr>
+          <td class="admin-health-child-label">${escapeHtml(service.label || id)}</td>
+          <td>${escapeHtml(service.type || "service")}</td>
+          <td><span class="${statusClass}">${escapeHtml(service.state || "unknown")}</span></td>
+          <td>${escapeHtml(service.detail || "—")}</td>
+          <td>${actionsHtml}</td>
+        </tr>
+      `;
+  };
+
+  els.healthSummary.innerHTML = grouped
+    .map((group) => {
+      const groupState = resolveGroupState(group.services);
+      const groupStateClass = `admin-health-state admin-health-state--${escapeHtml(groupState.key)}`;
+      const groupRows = group.services.map((service) => renderServiceRow(service)).join("");
+      return `
+        <tr class="admin-health-group-row">
+          <td>
+            <strong>${escapeHtml(group.label)}</strong>
+          </td>
+          <td>group</td>
+          <td><span class="${groupStateClass}">${escapeHtml(groupState.label)}</span></td>
+          <td>${escapeHtml(group.detail || `${group.services.length} service(s)`)}</td>
+          <td>—</td>
+        </tr>
+        ${groupRows}
+      `;
+    })
+    .join("");
 }
 
 async function loadSystemHealth() {
@@ -1261,6 +1410,149 @@ async function loadSystemHealth() {
     console.error(err);
     if (handlePermissionError(err, "support_admin")) return;
     setStatus(els.healthStatus, err.message || "Failed to load system health.", "error");
+  }
+}
+
+function openHealthServiceActionModal(serviceId, action) {
+  const services = Array.isArray(state.systemHealth?.services) ? state.systemHealth.services : [];
+  const service = services.find((item) => String(item.id) === String(serviceId || ""));
+  if (!service) return;
+  const mode = String(action || "").trim() === "activate" ? "activate" : "deactivate";
+  state.healthConfirmAction = mode;
+  state.healthDisconnectServiceId = String(service.id || "");
+  if (els.healthDisconnectTitle) {
+    els.healthDisconnectTitle.textContent = mode === "activate" ? "Activate Service" : "Deactivate Service";
+  }
+  if (els.healthDisconnectMessage) {
+    if (mode === "activate" && String(service.id) === "database_connection") {
+      els.healthDisconnectMessage.textContent =
+        `Are you sure you want to activate ${service.label}? Enter the emergency activation code and press Activate.`;
+    } else {
+      els.healthDisconnectMessage.textContent =
+        `Are you sure you want to ${mode} ${service.label}? Enter your password and press ${mode === "activate" ? "Activate" : "Deactivate"}.`;
+    }
+  }
+  if (els.healthDisconnectCredentialLabel) {
+    els.healthDisconnectCredentialLabel.textContent =
+      mode === "activate" && String(service.id) === "database_connection"
+        ? "Emergency Code"
+        : "Password";
+  }
+  if (els.healthDisconnectBtn) {
+    els.healthDisconnectBtn.textContent = mode === "activate" ? "Activate" : "Deactivate";
+  }
+  if (els.healthDisconnectPassword) {
+    els.healthDisconnectPassword.value = "";
+  }
+  setStatus(els.healthDisconnectStatus, "");
+  openModal(els.healthDisconnectModal);
+}
+
+async function submitHealthDisconnect(event) {
+  event.preventDefault();
+  const serviceId = String(state.healthDisconnectServiceId || "");
+  const action = String(state.healthConfirmAction || "deactivate");
+  if (!serviceId) return;
+  const credential = String(els.healthDisconnectPassword?.value || "").trim();
+  if (!credential) {
+    setStatus(
+      els.healthDisconnectStatus,
+      action === "activate" && serviceId === "database_connection"
+        ? "Enter your emergency activation code."
+        : "Enter your password.",
+      "error"
+    );
+    return;
+  }
+  if (els.healthDisconnectBtn) {
+    els.healthDisconnectBtn.disabled = true;
+  }
+  setStatus(
+    els.healthDisconnectStatus,
+    action === "activate" ? "Activating service..." : "Deactivating service..."
+  );
+  try {
+    let result = null;
+    if (action === "activate") {
+      if (serviceId === "database_connection") {
+        result = await api.admin.emergencyActivateDatabaseConnection(credential);
+      } else {
+        result = await api.admin.activateSystemHealthService(serviceId, credential);
+      }
+    } else {
+      result = await api.admin.deactivateSystemHealthService(serviceId, credential);
+    }
+    state.healthPassByService = {};
+    setStatus(
+      els.healthStatus,
+      result?.message || (action === "activate" ? "Service activated." : "Service deactivated."),
+      "ok"
+    );
+    closeModal(els.healthDisconnectModal);
+    if (serviceId === "database_connection" && action === "deactivate") {
+      if (state.systemHealth && Array.isArray(state.systemHealth.services)) {
+        state.systemHealth.services = state.systemHealth.services.map((item) => {
+          if (String(item.id) !== serviceId) return item;
+          return {
+            ...item,
+            deactivated: true,
+            state: "deactivated",
+          };
+        });
+        renderSystemHealth();
+      }
+    } else if (serviceId === "database_connection" && action === "activate") {
+      if (state.systemHealth && Array.isArray(state.systemHealth.services)) {
+        state.systemHealth.services = state.systemHealth.services.map((item) => {
+          if (String(item.id) !== serviceId) return item;
+          return {
+            ...item,
+            deactivated: false,
+            state: "active",
+          };
+        });
+        renderSystemHealth();
+      }
+    } else {
+      await loadSystemHealth();
+    }
+  } catch (err) {
+    console.error(err);
+    if (handlePermissionError(err, "admin")) return;
+    setStatus(
+      els.healthDisconnectStatus,
+      err.message || (action === "activate" ? "Failed to activate service." : "Failed to disconnect service."),
+      "error"
+    );
+  } finally {
+    if (els.healthDisconnectBtn) {
+      els.healthDisconnectBtn.disabled = false;
+    }
+  }
+}
+
+async function testHealthService(serviceId) {
+  const id = String(serviceId || "").trim();
+  if (!id) return;
+  state.testingHealthServiceIds.add(id);
+  renderSystemHealth();
+  try {
+    const result = await api.admin.testSystemHealthService(id);
+    if (result?.ok) {
+      state.healthPassByService[id] = "Pass";
+      setTimeout(() => {
+        delete state.healthPassByService[id];
+        renderSystemHealth();
+      }, 2200);
+    }
+    await loadSystemHealth();
+  } catch (err) {
+    console.error(err);
+    if (handlePermissionError(err, "support_admin")) return;
+    setStatus(els.healthStatus, err.message || "Service test failed.", "error");
+  } finally {
+    state.testingHealthServiceIds.delete(id);
+    renderSystemHealth();
   }
 }
 
@@ -1909,6 +2201,9 @@ function bindEvents() {
   if (els.publishNotificationBtn) {
     els.publishNotificationBtn.addEventListener("click", publishNotificationFromEditor);
   }
+  if (els.healthDisconnectForm) {
+    els.healthDisconnectForm.addEventListener("submit", submitHealthDisconnect);
+  }
   document.querySelectorAll("button[data-notification-cmd]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const cmd = String(btn.dataset.notificationCmd || "").trim();
@@ -2064,6 +2359,23 @@ function bindEvents() {
           setStatus(els.supportStatusMsg, err.message || "Failed to update ticket", "error");
         });
     }
+    if (action === "test-health-service") {
+      testHealthService(id);
+    }
+    if (action === "deactivate-health-service") {
+      if (!hasPermission("health.write")) {
+        openPermissionModal("admin");
+        return;
+      }
+      openHealthServiceActionModal(id, "deactivate");
+    }
+    if (action === "activate-health-service") {
+      if (!hasPermission("health.write")) {
+        openPermissionModal("admin");
+        return;
+      }
+      openHealthServiceActionModal(id, "activate");
+    }
   });
 }
 
@@ -2089,6 +2401,7 @@ async function init() {
   setStatus(els.auditStatus, "");
   setStatus(els.supportStatusMsg, "");
   setStatus(els.healthStatus, "");
+  setStatus(els.healthDisconnectStatus, "");
   setStatus(els.permissionsStatus, "");
   updateRecordsContext();
   setUsersPanelCollapsed(true);

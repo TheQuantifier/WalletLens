@@ -10,6 +10,7 @@ import {
   assessParsedReceipt,
   buildParsedReceiptPayload,
 } from "./receipt_normalization.service.js";
+import { isSystemHealthServiceDeactivated } from "./system_health_controls.service.js";
 
 export const RECEIPT_PROCESSING_STAGES = [
   "verifying_upload",
@@ -41,6 +42,9 @@ async function getReceiptKeepFiles() {
 }
 
 export async function processReceipt({ userId, receiptId }) {
+  if (await isSystemHealthServiceDeactivated("ocr_worker")) {
+    throw new Error("OCR worker is disconnected by admin.");
+  }
   let receipt = await getReceiptById(userId, receiptId);
   if (!receipt) throw new Error("Receipt not found");
 

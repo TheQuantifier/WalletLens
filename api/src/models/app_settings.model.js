@@ -10,6 +10,7 @@ export async function getAppSettings() {
       receipt_keep_files,
       session_timeout_minutes,
       admin_role_permissions,
+      system_health_controls,
       updated_by,
       created_at,
       updated_at
@@ -26,6 +27,7 @@ export async function updateAppSettings({
   receiptKeepFiles,
   sessionTimeoutMinutes,
   adminRolePermissions,
+  systemHealthControls,
   updatedBy,
 }) {
   const { rows } = await query(
@@ -35,7 +37,8 @@ export async function updateAppSettings({
         receipt_keep_files = COALESCE($2, receipt_keep_files),
         session_timeout_minutes = COALESCE($3, session_timeout_minutes),
         admin_role_permissions = COALESCE($4, admin_role_permissions),
-        updated_by = $5,
+        system_health_controls = COALESCE($5, system_health_controls),
+        updated_by = $6,
         updated_at = now()
     WHERE id = (
       SELECT id FROM app_settings ORDER BY created_at ASC LIMIT 1
@@ -46,6 +49,7 @@ export async function updateAppSettings({
       receipt_keep_files,
       session_timeout_minutes,
       admin_role_permissions,
+      system_health_controls,
       updated_by,
       created_at,
       updated_at
@@ -55,6 +59,7 @@ export async function updateAppSettings({
       receiptKeepFiles ?? null,
       sessionTimeoutMinutes ?? null,
       adminRolePermissions ?? null,
+      systemHealthControls ?? null,
       updatedBy || null,
     ]
   );

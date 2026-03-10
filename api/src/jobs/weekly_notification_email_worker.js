@@ -5,6 +5,7 @@ import {
 } from "../models/notification.model.js";
 import { sendEmail } from "../services/email.service.js";
 import { query } from "../config/db.js";
+import { isSystemHealthServiceDeactivated } from "../services/system_health_controls.service.js";
 
 let started = false;
 let timer = null;
@@ -27,6 +28,16 @@ function buildWeeklyDigestText(notifications = []) {
 }
 
 export async function sendWeeklyNotificationEmailsNow() {
+  if (await isSystemHealthServiceDeactivated("weekly_notification_worker")) {
+    return {
+      usersChecked: 0,
+      usersEmailed: 0,
+      usersFailed: 0,
+      notificationsDelivered: 0,
+      skipped: true,
+      reason: "weekly_notification_worker_disconnected",
+    };
+  }
   const users = await listUsersWithNotificationEmailEnabled();
   let usersEmailed = 0;
   let usersFailed = 0;

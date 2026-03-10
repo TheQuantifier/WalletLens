@@ -1,9 +1,13 @@
 // src/controllers/admin.controller.js
 import asyncHandler from "../middleware/async.js";
 import { query } from "../config/db.js";
+import bcrypt from "bcryptjs";
+import fs from "fs/promises";
+import env from "../config/env.js";
 import {
   listUsers,
   findUserById,
+  findUserAuthById,
   updateUserById,
 } from "../models/user.model.js";
 import {
@@ -23,6 +27,302 @@ import {
   buildEffectiveRolePermissionsMap,
   sanitizeRolePermissionOverrides,
 } from "../services/admin_permissions.service.js";
+import {
+  getSystemHealthControls,
+  setSystemHealthServiceDeactivated,
+  SYSTEM_HEALTH_SERVICE_IDS,
+} from "../services/system_health_controls.service.js";
+import {
+  getDatabaseEmergencyState,
+  isDatabaseEmergencyDeactivated,
+  setDatabaseEmergencyDeactivated,
+} from "../services/system_health_runtime.service.js";
+
+const SYSTEM_HEALTH_SERVICES = [
+  {
+    id: "database_connection",
+    label: "Database API",
+    type: "api",
+    deactivatable: true,
+    purpose: "Stores users, records, app settings, notifications, and admin controls.",
+  },
+  {
+    id: "brevo_api",
+    label: "Brevo API",
+    type: "api",
+    deactivatable: true,
+    purpose: "Delivers transactional emails such as notifications and account messages.",
+  },
+  {
+    id: "ratesdb_api",
+    label: "RatesDB API",
+    type: "api",
+    deactivatable: true,
+    purpose: "Fetches currency exchange rates used by budgeting and records.",
+  },
+  {
+    id: "google_oauth_api",
+    label: "Google OAuth API",
+    type: "api",
+    deactivatable: true,
+    purpose: "Handles Google sign-in and account linking authentication flows.",
+  },
+  {
+    id: "smtp_connection",
+    label: "SMTP Connection",
+    type: "connection",
+    deactivatable: true,
+    purpose: "Provides SMTP transport for outbound email delivery.",
+  },
+  {
+    id: "object_storage_connection",
+    label: "Object Storage Connection",
+    type: "connection",
+    deactivatable: true,
+    purpose: "Stores uploaded receipt files and related assets.",
+  },
+  {
+    id: "ai_provider",
+    label: "AI Provider",
+    type: "service",
+    deactivatable: true,
+    purpose: "Powers AI parsing/assistant features used in receipt and finance workflows.",
+  },
+  {
+    id: "parser_service",
+    label: "Receipt Parser Service",
+    type: "service",
+    deactivatable: true,
+    purpose: "Validates and normalizes parsed OCR text into structured receipt data.",
+  },
+  {
+    id: "ocr_worker",
+    label: "OCR Worker",
+    type: "service",
+    deactivatable: true,
+    purpose: "Extracts text from uploaded receipt images for record automation.",
+  },
+  {
+    id: "turnstile",
+    label: "Turnstile Verification",
+    type: "service",
+    deactivatable: true,
+    purpose: "Protects forms from bots using human-verification checks.",
+  },
+  {
+    id: "weekly_notification_worker",
+    label: "Weekly Notification Worker",
+    type: "service",
+    deactivatable: true,
+    purpose: "Schedules and sends weekly digest-style notification emails.",
+  },
+];
+
+async function testSystemHealthService(serviceId) {
+  const id = String(serviceId || "").trim();
+  if (!SYSTEM_HEALTH_SERVICE_IDS.has(id)) {
+    return { passed: false, detail: "Unknown service." };
+  }
+
+  if (id === "database_connection") {
+    if (isDatabaseEmergencyDeactivated()) {
+      return {
+        passed: false,
+        detail: "Database is disconnected by admin. Use emergency activate if admin auth is unavailable.",
+      };
+    }
+    const probe = await query("SELECT now() as now");
+    return {
+      passed: Boolean(probe?.rows?.[0]?.now),
+      detail: probe?.rows?.[0]?.now ? "Database responded successfully." : "Database probe failed.",
+    };
+  }
+
+  if (id === "brevo_api") {
+    const hasKey = Boolean(process.env.BREVO_API_KEY);
+    return {
+      passed: hasKey,
+      detail: hasKey ? "BREVO_API_KEY is configured." : "BREVO_API_KEY is missing.",
+    };
+  }
+
+  if (id === "ratesdb_api") {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 5000);
+    try {
+      const res = await fetch("https://free.ratesdb.com/v1/rates?from=USD", {
+        method: "GET",
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+      if (!res.ok) {
+        return {
+          passed: false,
+          detail: `RatesDB request failed (status ${res.status}).`,
+        };
+      }
+      return {
+        passed: true,
+        detail: "RatesDB provider responded successfully.",
+      };
+    } catch (err) {
+      clearTimeout(timeout);
+      return {
+        passed: false,
+        detail: err?.name === "AbortError"
+          ? "RatesDB request timed out."
+          : "RatesDB provider request failed.",
+      };
+    }
+  }
+
+  if (id === "google_oauth_api") {
+    const hasGoogleOauth =
+      Boolean(env.googleClientId) &&
+      Boolean(env.googleClientSecret) &&
+      Boolean(env.googleRedirectUri);
+    return {
+      passed: hasGoogleOauth,
+      detail: hasGoogleOauth
+        ? "Google OAuth credentials are configured."
+        : "Google OAuth credentials are missing.",
+    };
+  }
+
+  if (id === "smtp_connection") {
+    const hasSmtp =
+      Boolean(process.env.SMTP_HOST) &&
+      Boolean(process.env.SMTP_PORT) &&
+      Boolean(process.env.SMTP_USER) &&
+      Boolean(process.env.SMTP_PASS);
+    return {
+      passed: hasSmtp,
+      detail: hasSmtp ? "SMTP credentials are configured." : "SMTP credentials are missing.",
+    };
+  }
+
+  if (id === "ai_provider") {
+    const hasAi = Boolean(env.aiApiKey);
+    const provider = String(env.aiProvider || "unknown");
+    return {
+      passed: hasAi,
+      detail: hasAi ? `AI provider configured (${provider}).` : "AI API key is missing.",
+    };
+  }
+
+  if (id === "parser_service") {
+    try {
+      const parserModule = await import("../services/ai_parser.service.js");
+      const hasParserFn = typeof parserModule?.parseReceiptText === "function";
+      return {
+        passed: hasParserFn,
+        detail: hasParserFn ? "Receipt parser module is available." : "Receipt parser module is missing.",
+      };
+    } catch {
+      return {
+        passed: false,
+        detail: "Receipt parser module failed to load.",
+      };
+    }
+  }
+
+  if (id === "ocr_worker") {
+    if (!env.ocrEnabled) {
+      return { passed: false, detail: "OCR is disabled by configuration." };
+    }
+    try {
+      await fs.access(env.ocrWorkerScript);
+      return { passed: true, detail: "OCR worker script is available." };
+    } catch {
+      return { passed: false, detail: "OCR worker script is missing." };
+    }
+  }
+
+  if (id === "turnstile") {
+    const hasKey = Boolean(env.turnstileSecretKey);
+    return {
+      passed: hasKey,
+      detail: hasKey ? "Turnstile secret key is configured." : "Turnstile secret key is missing.",
+    };
+  }
+
+  if (id === "object_storage_connection") {
+    try {
+      const [{ r2 }, { HeadObjectCommand }] = await Promise.all([
+        import("../services/r2.service.js"),
+        import("@aws-sdk/client-s3"),
+      ]);
+      const key = `_healthcheck/${Date.now()}-${Math.random().toString(16).slice(2)}.txt`;
+      await r2.send(new HeadObjectCommand({
+        Bucket: env.objectStore.bucket,
+        Key: key,
+      }));
+      return {
+        passed: true,
+        detail: "Object storage responded successfully.",
+      };
+    } catch (err) {
+      const statusCode = Number(err?.$metadata?.httpStatusCode || 0);
+      if (statusCode === 404) {
+        return {
+          passed: true,
+          detail: "Object storage responded successfully.",
+        };
+      }
+      return {
+        passed: false,
+        detail: statusCode
+          ? `Object storage request failed (status ${statusCode}).`
+          : "Object storage request failed.",
+      };
+    }
+  }
+
+  if (id === "weekly_notification_worker") {
+    const enabled = Boolean(env.runWeeklyNotificationWorkerInApi);
+    return {
+      passed: enabled,
+      detail: enabled ? "Weekly worker is enabled in API process." : "Weekly worker is disabled in API process.",
+    };
+  }
+
+  return { passed: false, detail: "Unknown service." };
+}
+
+async function buildSystemHealthServicesSnapshot() {
+  const controls = await getSystemHealthControls();
+  const dbEmergency = getDatabaseEmergencyState();
+  const services = [];
+  for (const service of SYSTEM_HEALTH_SERVICES) {
+    const control = controls?.[service.id];
+    const deactivated = service.id === "database_connection"
+      ? Boolean(dbEmergency?.deactivated)
+      : Boolean(control?.deactivated);
+    const testResult = await testSystemHealthService(service.id);
+    let state = testResult.passed ? "active" : "down";
+    if (!testResult.passed && String(testResult.detail || "").toLowerCase().includes("missing")) {
+      state = "unconfigured";
+    }
+    if (deactivated) state = "deactivated";
+    services.push({
+      id: service.id,
+      label: service.label,
+      type: service.type,
+      state,
+      deactivatable: service.deactivatable,
+      deactivated,
+      detail: service.purpose || testResult.detail,
+      testedAt: new Date().toISOString(),
+      deactivatedAt: service.id === "database_connection"
+        ? dbEmergency?.deactivatedAt || null
+        : control?.deactivatedAt || null,
+      deactivatedBy: service.id === "database_connection"
+        ? dbEmergency?.deactivatedBy || null
+        : control?.deactivatedBy || null,
+    });
+  }
+  return services;
+}
 
 // ==========================================================
 // USERS
@@ -434,40 +734,187 @@ export const updateSupportTicketAdmin = asyncHandler(async (req, res) => {
 // SYSTEM HEALTH
 // ==========================================================
 export const getSystemHealthAdmin = asyncHandler(async (_req, res) => {
-  const dbProbe = await query("SELECT now() as now");
-  const dbConnected = Boolean(dbProbe?.rows?.[0]?.now);
+  const services = await buildSystemHealthServicesSnapshot();
+  res.json({ health: { services, checkedAt: new Date().toISOString() } });
+});
 
-  const hasBrevo = Boolean(process.env.BREVO_API_KEY);
-  const hasSmtp =
-    Boolean(process.env.SMTP_HOST) &&
-    Boolean(process.env.SMTP_PORT) &&
-    Boolean(process.env.SMTP_USER) &&
-    Boolean(process.env.SMTP_PASS);
-
-  const { rows: failedJobsRows } = await query(
-    `
-    SELECT COUNT(*)::int AS failed_receipt_jobs
-    FROM receipt_jobs
-    WHERE status = 'failed'
-    `
-  );
-  const { rows: queuedJobsRows } = await query(
-    `
-    SELECT COUNT(*)::int AS queued_receipt_jobs
-    FROM receipt_jobs
-    WHERE status in ('queued', 'running')
-    `
-  );
-
+export const testSystemHealthServiceAdmin = asyncHandler(async (req, res) => {
+  const serviceId = String(req.params.serviceId || "").trim();
+  if (!SYSTEM_HEALTH_SERVICE_IDS.has(serviceId)) {
+    return res.status(404).json({ message: "Unknown system health service" });
+  }
+  const result = await testSystemHealthService(serviceId);
+  const services = await buildSystemHealthServicesSnapshot();
+  const service = services.find((item) => item.id === serviceId) || null;
   res.json({
-    health: {
-      dbConnected,
-      emailProvider: hasBrevo ? "brevo" : hasSmtp ? "smtp" : "dev_stream",
-      hasBrevoKey: hasBrevo,
-      hasSmtpConfig: hasSmtp,
-      failedReceiptJobs: Number(failedJobsRows?.[0]?.failed_receipt_jobs || 0),
-      queuedOrRunningReceiptJobs: Number(queuedJobsRows?.[0]?.queued_receipt_jobs || 0),
-      checkedAt: new Date().toISOString(),
-    },
+    ok: Boolean(result.passed),
+    message: result.passed ? "Connection test passed." : "Connection test failed.",
+    result,
+    service,
+  });
+});
+
+export const deactivateSystemHealthServiceAdmin = asyncHandler(async (req, res) => {
+  const serviceId = String(req.params.serviceId || "").trim();
+  if (!SYSTEM_HEALTH_SERVICE_IDS.has(serviceId)) {
+    return res.status(404).json({ message: "Unknown system health service" });
+  }
+  const serviceMeta = SYSTEM_HEALTH_SERVICES.find((item) => item.id === serviceId);
+  if (!serviceMeta?.deactivatable) {
+    return res.status(400).json({ message: "This service cannot be deactivated." });
+  }
+
+  const password = String(req.body?.password || "");
+  if (!password) {
+    return res.status(400).json({ message: "Password is required." });
+  }
+  const actor = await findUserAuthById(req.user.id);
+  if (!actor?.password_hash) {
+    return res.status(400).json({ message: "This account does not have a password set." });
+  }
+  const ok = await bcrypt.compare(password, actor.password_hash);
+  if (!ok) {
+    return res.status(401).json({ message: "Password is incorrect." });
+  }
+
+  if (serviceId === "database_connection") {
+    await logActivity({
+      userId: req.user.id,
+      action: "admin_system_health_service_deactivate",
+      entityType: "system_health_service",
+      entityId: serviceId,
+      metadata: { serviceId, mode: "runtime_emergency_toggle" },
+      req,
+    });
+    const runtimeState = setDatabaseEmergencyDeactivated({
+      deactivated: true,
+      actorUserId: req.user.id,
+    });
+    return res.json({
+      ok: true,
+      message:
+        "Database disconnected. If admin auth becomes unavailable, use /api/admin/system-health/database_connection/emergency-activate with the emergency code.",
+      service: {
+        id: serviceId,
+        label: serviceMeta.label,
+        type: serviceMeta.type,
+        state: "deactivated",
+        deactivatable: true,
+        deactivated: true,
+        detail: "Database is disconnected by admin.",
+        testedAt: new Date().toISOString(),
+        deactivatedAt: runtimeState?.deactivatedAt || null,
+        deactivatedBy: runtimeState?.deactivatedBy || null,
+      },
+    });
+  }
+
+  await setSystemHealthServiceDeactivated({
+    serviceId,
+    deactivated: true,
+    actorUserId: req.user.id,
+  });
+
+  await logActivity({
+    userId: req.user.id,
+    action: "admin_system_health_service_deactivate",
+    entityType: "system_health_service",
+    entityId: serviceId,
+    metadata: { serviceId },
+    req,
+  });
+
+  const services = await buildSystemHealthServicesSnapshot();
+  const service = services.find((item) => item.id === serviceId) || null;
+  res.json({
+    ok: true,
+    message: `${serviceMeta.label} disconnected.`,
+    service,
+  });
+});
+
+export const activateSystemHealthServiceAdmin = asyncHandler(async (req, res) => {
+  const serviceId = String(req.params.serviceId || "").trim();
+  if (!SYSTEM_HEALTH_SERVICE_IDS.has(serviceId)) {
+    return res.status(404).json({ message: "Unknown system health service" });
+  }
+  const serviceMeta = SYSTEM_HEALTH_SERVICES.find((item) => item.id === serviceId);
+  if (!serviceMeta?.deactivatable) {
+    return res.status(400).json({ message: "This service cannot be activated." });
+  }
+
+  const password = String(req.body?.password || "");
+  if (!password) {
+    return res.status(400).json({ message: "Password is required." });
+  }
+  const actor = await findUserAuthById(req.user.id);
+  if (!actor?.password_hash) {
+    return res.status(400).json({ message: "This account does not have a password set." });
+  }
+  const ok = await bcrypt.compare(password, actor.password_hash);
+  if (!ok) {
+    return res.status(401).json({ message: "Password is incorrect." });
+  }
+
+  if (serviceId === "database_connection") {
+    const runtimeState = setDatabaseEmergencyDeactivated({
+      deactivated: false,
+      actorUserId: req.user.id,
+    });
+    return res.json({
+      ok: true,
+      message: `${serviceMeta.label} activated.`,
+      service: {
+        id: serviceId,
+        label: serviceMeta.label,
+        type: serviceMeta.type,
+        state: "active",
+        deactivatable: true,
+        deactivated: false,
+        detail: "Database emergency disconnect cleared.",
+        testedAt: new Date().toISOString(),
+        deactivatedAt: runtimeState?.deactivatedAt || null,
+        deactivatedBy: runtimeState?.deactivatedBy || null,
+      },
+    });
+  }
+
+  await setSystemHealthServiceDeactivated({
+    serviceId,
+    deactivated: false,
+    actorUserId: req.user.id,
+  });
+
+  await logActivity({
+    userId: req.user.id,
+    action: "admin_system_health_service_activate",
+    entityType: "system_health_service",
+    entityId: serviceId,
+    metadata: { serviceId },
+    req,
+  });
+
+  const services = await buildSystemHealthServicesSnapshot();
+  const service = services.find((item) => item.id === serviceId) || null;
+  res.json({
+    ok: true,
+    message: `${serviceMeta.label} activated.`,
+    service,
+  });
+});
+
+export const emergencyActivateDatabaseConnectionAdmin = asyncHandler(async (req, res) => {
+  const code = String(req.body?.code || "").trim();
+  if (!env.systemHealthEmergencyCode) {
+    return res.status(503).json({ message: "Emergency activation code is not configured." });
+  }
+  if (!code || code !== String(env.systemHealthEmergencyCode)) {
+    return res.status(401).json({ message: "Invalid emergency activation code." });
+  }
+  setDatabaseEmergencyDeactivated({ deactivated: false, actorUserId: null });
+  res.json({
+    ok: true,
+    message: "Database emergency disconnect cleared.",
+    activatedAt: new Date().toISOString(),
   });
 });

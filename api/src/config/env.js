@@ -84,6 +84,7 @@ const env = {
 
   turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY || "",
   turnstileVerifyUrl: process.env.TURNSTILE_VERIFY_URL || "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+  systemHealthEmergencyCode: process.env.SYSTEM_HEALTH_EMERGENCY_CODE || "",
 };
 
 export default env;

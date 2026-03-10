@@ -538,7 +538,7 @@
             <button class="admin-caret-toggle" id="toggleSystemHealthPanelCaret" type="button" aria-expanded="false" aria-controls="systemHealthPanelBody" aria-label="Expand System Health section">></button>
             <div>
               <h2>System Health</h2>
-              <p class="subtle">Live service checks for DB, mail, and workers.</p>
+              <p class="subtle">APIs, services, and connections with live test and emergency disconnect actions.</p>
             </div>
           </div>
           <div class="admin-actions">
@@ -546,8 +546,21 @@
           </div>
         </div>
         <div id="systemHealthPanelBody">
-          <div id="healthSummary" class="admin-health-grid">
-            <p class="subtle">Loading system health…</p>
+          <div class="table-wrap admin-health-list-wrap">
+            <table class="admin-table admin-health-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>State</th>
+                  <th>Details</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="healthSummary">
+                <tr><td colspan="5" class="subtle">Loading system health…</td></tr>
+              </tbody>
+            </table>
           </div>
           <p id="healthStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
         </div>
@@ -675,6 +688,29 @@
       <div class="admin-actions">
         <button class="btn btn--primary" type="button" data-close-modal>OK</button>
       </div>
+    </div>
+  </div>
+
+  <div id="adminHealthDisconnectModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminHealthDisconnectTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminHealthDisconnectTitle">Disconnect Service</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <p id="adminHealthDisconnectMessage" class="subtle">
+        Are you sure? Enter your password and press Disconnect.
+      </p>
+      <form id="adminHealthDisconnectForm" class="admin-form">
+        <label>
+          <span id="adminHealthDisconnectCredentialLabel">Password</span>
+          <input id="adminHealthDisconnectPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <div class="admin-actions">
+          <button class="btn btn--primary" id="adminHealthDisconnectBtn" type="submit">Disconnect</button>
+          <button class="btn btn--link" type="button" data-close-modal>Cancel</button>
+        </div>
+        <p id="adminHealthDisconnectStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </form>
     </div>
   </div>
 

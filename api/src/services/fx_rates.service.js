@@ -1,5 +1,6 @@
 // src/services/fx_rates.service.js
 import { getFxRatesByBase, upsertFxRates } from "../models/fx_rates.model.js";
+import { isSystemHealthServiceDeactivated } from "./system_health_controls.service.js";
 
 const PROVIDER = "ratesdb";
 const DEFAULT_BASE = "USD";
@@ -70,6 +71,11 @@ export async function getFxRates({ base = DEFAULT_BASE } = {}) {
 
   if (existing && toDateKey(existing.fetched_at) === todayKey) {
     return existing;
+  }
+
+  if (await isSystemHealthServiceDeactivated("ratesdb_api")) {
+    if (existing) return existing;
+    throw new Error("RatesDB API is disconnected by admin.");
   }
 
   let providerBase = baseCurrency;

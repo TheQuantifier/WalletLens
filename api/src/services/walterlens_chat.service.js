@@ -1,6 +1,7 @@
 // src/services/walterlens_chat.service.js
 import env from "../config/env.js";
 import { GoogleGenAI } from "@google/genai";
+import { isSystemHealthServiceDeactivated } from "./system_health_controls.service.js";
 
 const USE_GEMINI = (env.aiProvider || "gemini").toLowerCase() === "gemini";
 const MAX_CHARS = Number(env.aiMaxChars || 5000);
@@ -316,6 +317,11 @@ function fallbackResponse(reply = "I couldn't parse that. Try asking in a differ
 }
 
 export async function runWalterLensChat({ message, context }) {
+  if (await isSystemHealthServiceDeactivated("ai_provider")) {
+    return fallbackResponse(
+      "AI chat is disconnected by admin. Please try again later."
+    );
+  }
   if (!USE_GEMINI || !env.aiApiKey) {
     return fallbackResponse(
       "AI chat is not configured yet. I can still help with basic insights and record edits."

@@ -14,6 +14,7 @@ import {
   buildEffectiveRolePermissionsMap,
   sanitizeRolePermissionOverrides,
 } from "../services/admin_permissions.service.js";
+import { sanitizeSystemHealthControls } from "../services/system_health_controls.service.js";
 
 export const getPublic = asyncHandler(async (_req, res) => {
   const settings = await getAppSettings();
@@ -30,6 +31,7 @@ export const getAdmin = asyncHandler(async (_req, res) => {
     const catalogRows = await listAchievementsCatalog();
     settings.achievements_catalog = sanitizeAchievementsCatalog(catalogRows);
     settings.admin_role_permissions = sanitizeRolePermissionOverrides(settings.admin_role_permissions);
+    settings.system_health_controls = sanitizeSystemHealthControls(settings.system_health_controls);
     const effective = buildEffectiveRolePermissionsMap(settings.admin_role_permissions);
     settings.admin_role_permissions_effective = Object.fromEntries(
       Object.entries(effective).map(([role, permissions]) => [role, [...permissions]])
@@ -44,12 +46,14 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     receiptKeepFiles,
     sessionTimeoutMinutes,
     adminRolePermissions,
+    systemHealthControls,
     achievementsCatalog,
   } = req.body;
   const hasAppName = appName !== undefined;
   const hasReceiptKeepFiles = receiptKeepFiles !== undefined;
   const hasSessionTimeoutMinutes = sessionTimeoutMinutes !== undefined;
   const hasAdminRolePermissions = adminRolePermissions !== undefined;
+  const hasSystemHealthControls = systemHealthControls !== undefined;
   const hasAchievementsCatalog = achievementsCatalog !== undefined;
 
   if (
@@ -57,6 +61,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     !hasReceiptKeepFiles &&
     !hasSessionTimeoutMinutes &&
     !hasAdminRolePermissions &&
+    !hasSystemHealthControls &&
     !hasAchievementsCatalog
   ) {
     return res.status(400).json({ message: "At least one setting is required" });
@@ -72,6 +77,17 @@ export const updateAdmin = asyncHandler(async (req, res) => {
       return res.status(400).json({ message: "adminRolePermissions must be an object keyed by role" });
     }
     normalizedAdminRolePermissions = sanitizeRolePermissionOverrides(adminRolePermissions);
+  }
+  let normalizedSystemHealthControls = null;
+  if (hasSystemHealthControls) {
+    if (
+      !systemHealthControls ||
+      typeof systemHealthControls !== "object" ||
+      Array.isArray(systemHealthControls)
+    ) {
+      return res.status(400).json({ message: "systemHealthControls must be an object keyed by service id" });
+    }
+    normalizedSystemHealthControls = sanitizeSystemHealthControls(systemHealthControls);
   }
 
   if (hasAppName && !String(appName).trim()) {
@@ -113,13 +129,15 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     hasAppName ||
     hasReceiptKeepFiles ||
     hasSessionTimeoutMinutes ||
-    hasAdminRolePermissions;
+    hasAdminRolePermissions ||
+    hasSystemHealthControls;
   const updated = needsAppSettingsUpdate
     ? await updateAppSettings({
         appName: hasAppName ? String(appName).trim() : null,
         receiptKeepFiles: hasReceiptKeepFiles ? receiptKeepFiles : null,
         sessionTimeoutMinutes: hasSessionTimeoutMinutes ? Number(sessionTimeoutMinutes) : null,
         adminRolePermissions: hasAdminRolePermissions ? normalizedAdminRolePermissions : null,
+        systemHealthControls: hasSystemHealthControls ? normalizedSystemHealthControls : null,
         updatedBy: req.user.id,
       })
     : await getAppSettings();
@@ -129,6 +147,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
   if (updated) {
     updated.achievements_catalog = achievementsCatalogSanitized;
     updated.admin_role_permissions = sanitizeRolePermissionOverrides(updated.admin_role_permissions);
+    updated.system_health_controls = sanitizeSystemHealthControls(updated.system_health_controls);
     const effective = buildEffectiveRolePermissionsMap(updated.admin_role_permissions);
     updated.admin_role_permissions_effective = Object.fromEntries(
       Object.entries(effective).map(([role, permissions]) => [role, [...permissions]])
@@ -145,6 +164,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
       receiptKeepFiles: updated?.receipt_keep_files,
       sessionTimeoutMinutes: updated?.session_timeout_minutes,
       adminRolePermissions: updated?.admin_role_permissions,
+      systemHealthControls: updated?.system_health_controls,
       achievementsCatalogCount: Array.isArray(achievementsCatalogSanitized)
         ? achievementsCatalogSanitized.length
         : null,

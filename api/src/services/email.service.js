@@ -3,6 +3,7 @@ import nodemailer from "nodemailer";
 
 import env from "../config/env.js";
 import { getAppSettings } from "../models/app_settings.model.js";
+import { isSystemHealthServiceDeactivated } from "./system_health_controls.service.js";
 
 const hasSmtpConfig =
   !!process.env.SMTP_HOST &&
@@ -42,6 +43,17 @@ function getTransporter() {
 }
 
 export async function sendEmail({ to, subject, text, replyTo, from }) {
+  if (hasBrevoApiKey && (await isSystemHealthServiceDeactivated("brevo_api"))) {
+    const error = new Error("Brevo API is disconnected.");
+    error.status = 503;
+    throw error;
+  }
+  if (!hasBrevoApiKey && hasSmtpConfig && (await isSystemHealthServiceDeactivated("smtp_connection"))) {
+    const error = new Error("SMTP connection is disconnected.");
+    error.status = 503;
+    throw error;
+  }
+
   const needsAppName = [subject, text, replyTo, from].some(
     (value) => typeof value === "string" && value.includes(APP_NAME_PLACEHOLDER)
   );

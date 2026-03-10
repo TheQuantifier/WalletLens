@@ -10,6 +10,7 @@ import {
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 import env from "../config/env.js";
+import { isSystemHealthServiceDeactivated } from "./system_health_controls.service.js";
 
 // ---------------------------------------------------------
 // R2 / S3-compatible client (Cloudflare R2)
@@ -43,6 +44,9 @@ export function makeObjectKey({ userId, fileId, filename }) {
 // Presigned PUT (direct upload from client)
 // ---------------------------------------------------------
 export async function presignPut({ key, contentType, expiresIn = 60 }) {
+  if (await isSystemHealthServiceDeactivated("object_storage_connection")) {
+    throw new Error("Object storage is disconnected by admin.");
+  }
   const cmd = new PutObjectCommand({
     Bucket: env.objectStore.bucket,
     Key: key,
@@ -56,6 +60,9 @@ export async function presignPut({ key, contentType, expiresIn = 60 }) {
 // Presigned GET (temporary download access)
 // ---------------------------------------------------------
 export async function presignGet({ key, expiresIn = 60 }) {
+  if (await isSystemHealthServiceDeactivated("object_storage_connection")) {
+    throw new Error("Object storage is disconnected by admin.");
+  }
   const cmd = new GetObjectCommand({
     Bucket: env.objectStore.bucket,
     Key: key,
@@ -68,6 +75,9 @@ export async function presignGet({ key, expiresIn = 60 }) {
 // HEAD object (existence / metadata check)
 // ---------------------------------------------------------
 export async function headObject({ key }) {
+  if (await isSystemHealthServiceDeactivated("object_storage_connection")) {
+    throw new Error("Object storage is disconnected by admin.");
+  }
   const cmd = new HeadObjectCommand({
     Bucket: env.objectStore.bucket,
     Key: key,
@@ -80,6 +90,9 @@ export async function headObject({ key }) {
 // DELETE object
 // ---------------------------------------------------------
 export async function deleteObject({ key }) {
+  if (await isSystemHealthServiceDeactivated("object_storage_connection")) {
+    throw new Error("Object storage is disconnected by admin.");
+  }
   const cmd = new DeleteObjectCommand({
     Bucket: env.objectStore.bucket,
     Key: key,

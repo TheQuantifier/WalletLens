@@ -1,6 +1,7 @@
 // src/services/ai_parser.service.js
 import env from "../config/env.js";
 import { GoogleGenAI } from "@google/genai";
+import { isSystemHealthServiceDeactivated } from "./system_health_controls.service.js";
 
 const MAX_CHARS = Number(env.aiMaxChars || 5000);
 const USE_GEMINI = (env.aiProvider || "gemini").toLowerCase() === "gemini";
@@ -242,6 +243,8 @@ async function parseWindow(ai, modelName, windowText) {
 export async function parseReceiptText(ocrText) {
   if (!ocrText || ocrText.trim().length < 5) return null;
   if (!USE_GEMINI) return null;
+  if (await isSystemHealthServiceDeactivated("parser_service")) return null;
+  if (await isSystemHealthServiceDeactivated("ai_provider")) return null;
 
   try {
     const ai = new GoogleGenAI({ apiKey: env.aiApiKey });
