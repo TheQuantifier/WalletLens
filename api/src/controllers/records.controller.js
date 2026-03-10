@@ -166,7 +166,7 @@ export const create = asyncHandler(async (req, res) => {
 // FULL EDIT SUPPORT (even for receipt-linked records)
 // ==========================================================
 export const update = asyncHandler(async (req, res) => {
-  const { type, amount, category, date, note } = req.body;
+  const { type, amount, category, date, note, applyRules = false } = req.body;
 
   const existing = await getRecordById(req.user.id, req.params.id);
   if (!existing) {
@@ -201,6 +201,26 @@ export const update = asyncHandler(async (req, res) => {
   }
 
   if (note !== undefined) changes.note = String(note);
+
+  if (applyRules === true) {
+    const candidate = {
+      type: changes.type ?? existing.type,
+      amount: changes.amount ?? existing.amount,
+      category: changes.category ?? existing.category,
+      date: changes.date ?? existing.date,
+      note: changes.note ?? existing.note,
+      linkedReceiptId: existing.linked_receipt_id ?? existing.linkedReceiptId ?? null,
+    };
+
+    const applied = await applyStoredRulesToRecordInput(req.user.id, candidate, {
+      origin:
+        existing.linked_receipt_id || existing.linkedReceiptId ? "receipt" : "manual",
+    });
+
+    changes.type = applied.record.type;
+    changes.category = applied.record.category;
+    changes.note = applied.record.note;
+  }
 
   const updated = await updateRecord(req.user.id, req.params.id, changes);
 

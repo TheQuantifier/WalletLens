@@ -949,7 +949,10 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     const applyRules = type === "income" ? applyRulesIncome?.checked : applyRulesExpense?.checked;
-    if (applyRules && automationRules.length) {
+    const applyRulesClientSide = applyRules && automationRules.length > 0;
+    const applyRulesServerSide = applyRules && !applyRulesClientSide;
+
+    if (applyRulesClientSide) {
       const origin = modal.dataset.linkedReceiptId ? "receipt" : "manual";
       payload = applyRulesToRecord(payload, automationRules, { origin });
       document.getElementById(`${type}Category`).value = payload.category || "";
@@ -979,8 +982,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      if (editId) await api.records.update(editId, payload);
-      else await api.records.create({ ...payload, applyRules: false });
+      if (editId) {
+        await api.records.update(editId, {
+          ...payload,
+          applyRules: applyRulesServerSide,
+        });
+      } else {
+        await api.records.create({
+          ...payload,
+          applyRules: applyRulesServerSide,
+        });
+      }
 
       hideModal(modal);
       form.reset();
