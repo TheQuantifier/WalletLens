@@ -207,7 +207,8 @@
 }
 
 .index-mock-total {
-  font-size: 1.2rem;
+  font-size: 1rem;
+  color: var(--muted);
 }
 
 .index-mock-row {
@@ -264,6 +265,7 @@
   font-size: 0.82rem;
   color: var(--muted);
 }
+
 
 .index-cta-panel h2,
 .index-cta-panel h2,
@@ -409,6 +411,43 @@
   font-size: 0.88rem;
 }
 
+.index-section--walterlens .index-section-heading {
+  max-width: 760px;
+}
+
+.index-walterlens-panel {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1.25rem;
+  background: rgba(15,23,42,0.04);
+  border: 1px solid rgba(15,23,42,0.08);
+}
+
+.index-wl-line {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.index-wl-line span {
+  display: inline-flex;
+  max-width: 80%;
+  padding: 0.7rem 0.9rem;
+  border-radius: 0.9rem;
+  font-size: 0.95rem;
+  line-height: 1.4;
+  background: #ffffff;
+  box-shadow: 0 10px 24px rgba(15,23,42,0.08);
+}
+
+.index-wl-line--user {
+  justify-content: flex-end;
+}
+
+.index-wl-line--user span {
+  background: rgba(14,116,144,0.12);
+  border: 1px solid rgba(14,116,144,0.15);
+}
+
 .index-story {
   display: grid;
   gap: 1rem;
@@ -456,7 +495,9 @@
 :root[data-theme="dark"] .index-trust,
 :root[data-theme="dark"] .index-compare-card--after,
 :root[data-theme="dark"] .index-compare-card--before,
-:root[data-theme="dark"] .index-testimonial {
+:root[data-theme="dark"] .index-testimonial,
+:root[data-theme="dark"] .index-walterlens-panel,
+:root[data-theme="dark"] .index-wl-line span {
   background: rgba(17, 24, 39, 0.6);
   border-color: #2a2e35;
   color: #f8fafc;

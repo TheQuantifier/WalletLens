@@ -9,6 +9,7 @@
   border-bottom: 1px solid var(--border);
 }
 
+
 /* Title (left) + Actions (right) */
 .records-header {
   display: flex;
@@ -179,6 +180,7 @@
 .actions-dropdown button:hover {
   background: rgba(0, 0, 0, 0.04);
 }
+
 
 /* =========================================================
    BADGES (Receipt / Manual)
