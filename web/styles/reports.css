@@ -7,11 +7,49 @@
   padding: 1.5rem;
   border-radius: var(--radius);
   border: 1px solid rgba(15,23,42,0.08);
-  background: linear-gradient(135deg, rgba(14,165,164,0.08), rgba(245,158,11,0.06));
+  background: linear-gradient(135deg, rgba(14,165,164,0.1), rgba(245,158,11,0.08));
+  position: relative;
+  overflow: hidden;
 }
 
-.summary h2 {
-  font-size: 1.9rem;
+.report-hero::after {
+  content: "";
+  position: absolute;
+  inset: -40% -10% auto auto;
+  width: 360px;
+  height: 360px;
+  background: radial-gradient(circle at 30% 30%, rgba(14,165,164,0.35), transparent 70%);
+  opacity: 0.55;
+  pointer-events: none;
+}
+
+.hero-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1.25rem;
+}
+
+.hero-kicker {
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--primary);
+  margin: 0 0 0.35rem;
+}
+
+.report-hero h1 {
+  font-size: clamp(2rem, 2.6vw + 1rem, 3rem);
+  margin: 0;
+  color: var(--text);
+}
+
+.hero-sub {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  max-width: 520px;
 }
 
 /* Controls row (range + refresh + status) */
@@ -21,7 +59,7 @@
   gap: 0.75rem;
   align-items: flex-end;
   justify-content: flex-start;
-  margin: 0.75rem 0 1rem;
+  margin: 0.75rem 0 0;
 }
 
 .reports-controls .control {
@@ -50,15 +88,21 @@
   gap: 1rem;
 }
 
+.cards--kpis {
+  margin-top: 1.5rem;
+}
+
 .card {
   width: 100%;
   text-align: left;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
+  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.9));
   color: var(--text);
   border-radius: var(--radius);
   border: 1px solid rgba(15,23,42,0.08);
   padding: 1rem;
   box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
 }
 
 .card h3 {
@@ -72,6 +116,34 @@
   color: var(--text);
 }
 
+.card::after {
+  content: "";
+  position: absolute;
+  inset: auto -30% -40% auto;
+  width: 180px;
+  height: 180px;
+  background: radial-gradient(circle at 20% 20%, rgba(14,165,164,0.18), transparent 70%);
+  opacity: 0.7;
+  pointer-events: none;
+}
+
+.insight-band {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.insight {
+  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(243,246,255,0.85));
+  border: 1px dashed rgba(15,23,42,0.18);
+  color: var(--text);
+  padding: 0.75rem 0.9rem;
+  border-radius: calc(var(--radius) - 2px);
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
 /* ===== CHART SECTIONS ===== */
 .chart-section {
   background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.92));
@@ -82,6 +154,7 @@
   box-shadow: var(--shadow-sm);
   color: var(--text);
   min-width: 0;
+  position: relative;
 }
 
 .chart-section h2 {
@@ -89,6 +162,19 @@
   margin-bottom: 1rem;
   color: var(--primary);
   font-size: 1.3rem;
+}
+
+.chart-section--split {
+  background: linear-gradient(180deg, rgba(236,250,249,0.95), rgba(250,244,235,0.92));
+}
+
+.chart-section--timeline {
+  background: linear-gradient(180deg, rgba(240,248,255,0.96), rgba(255,255,255,0.9));
+}
+
+.section-sub {
+  margin: 0.3rem 0 0;
+  color: var(--muted);
 }
 
 /* ===== LINE CHART HEADER WITH TOGGLES ===== */
@@ -142,6 +228,10 @@
   justify-content: center;
 }
 
+.chart-row--tall .chart-box {
+  height: 380px;
+}
+
 .chart-box {
   min-width: 0;
   text-align: center;
@@ -150,9 +240,9 @@
   height: 360px;
 }
 
-/* ===== RESPONSIVE PIE CHARTS ===== */
-#pieChartExpenses,
-#pieChartIncome {
+/* ===== RESPONSIVE BAR CHARTS ===== */
+#barChartExpenses,
+#barChartIncome {
   width: 100% !important;
   height: 100% !important;
   max-width: 100%;
@@ -172,12 +262,26 @@
 
 /* ===== DATLABELS ===== */
 .chartjs-datalabels {
-  font-family: system-ui, sans-serif;
+  font-family: "IBM Plex Sans", "Space Grotesk", system-ui, sans-serif;
   font-weight: 700 !important;
   font-size: 14px !important;
   color: #ffffff !important;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
 }
+
+/* ===== ANIMATIONS ===== */
+@keyframes riseIn {
+  from { transform: translateY(12px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.summary,
+.chart-section {
+  animation: riseIn 0.55s ease both;
+}
+
+.chart-section:nth-of-type(2) { animation-delay: 0.08s; }
+.chart-section:nth-of-type(3) { animation-delay: 0.16s; }
 
 /* ===== RESPONSIVE ===== */
 @media(max-width: 1024px) {
@@ -187,8 +291,8 @@
   #monthlyChart {
     height: 300px !important;
   }
-  #pieChartExpenses,
-  #pieChartIncome {
+  #barChartExpenses,
+  #barChartIncome {
     height: 100% !important;
   }
   .chart-box {
@@ -209,8 +313,8 @@
     height: 260px !important;
   }
 
-  #pieChartExpenses,
-  #pieChartIncome {
+  #barChartExpenses,
+  #barChartIncome {
     height: 260px !important;
   }
 
@@ -234,12 +338,25 @@
   box-shadow: var(--shadow-sm);
 }
 
+[data-theme="dark"] .chart-section--split {
+  background: linear-gradient(180deg, rgba(12,34,40,0.95), rgba(25,27,40,0.95));
+}
+
+[data-theme="dark"] .chart-section--timeline {
+  background: linear-gradient(180deg, rgba(10,18,36,0.95), rgba(18,24,42,0.95));
+}
+
+[data-theme="dark"] .insight {
+  background: linear-gradient(135deg, rgba(18,27,45,0.96), rgba(22,35,55,0.92));
+  border-color: rgba(148,163,184,0.25);
+}
+
 [data-theme="dark"] .toggles label {
   color: var(--text);
 }
 
-[data-theme="dark"] #pieChartExpenses,
-[data-theme="dark"] #pieChartIncome,
+[data-theme="dark"] #barChartExpenses,
+[data-theme="dark"] #barChartIncome,
 [data-theme="dark"] #monthlyChart {
   background-color: transparent;
 }

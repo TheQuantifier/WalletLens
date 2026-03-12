@@ -11,11 +11,17 @@ import { api } from "./api.js";
 
     totalExpenses: $("#total-expenses"),
     totalIncome: $("#total-income"),
+    netCashflow: $("#net-cashflow"),
     monthlyAverage: $("#monthly-average"),
     topCategory: $("#top-category"),
+    savingsRate: $("#savings-rate"),
 
-    pieExp: $("#pieChartExpenses"),
-    pieInc: $("#pieChartIncome"),
+    insightPrimary: $("#insight-primary"),
+    insightSecondary: $("#insight-secondary"),
+    insightTertiary: $("#insight-tertiary"),
+
+    barExp: $("#barChartExpenses"),
+    barInc: $("#barChartIncome"),
     monthly: $("#monthlyChart"),
 
     toggleExp: $("#toggle-expenses"),
@@ -24,7 +30,7 @@ import { api } from "./api.js";
   };
 
   let cache = [];
-  let charts = { expPie: null, incPie: null, monthly: null };
+  let charts = { expBar: null, incBar: null, monthly: null };
   const PAGE_SIZE = 500;
 
   const debounce = (fn, delay = 200) => {
@@ -127,41 +133,13 @@ import { api } from "./api.js";
 
   const palette = () =>
     theme() === "dark"
-      ? ["#60a5fa", "#38bdf8", "#818cf8", "#22d3ee", "#93c5fd", "#67e8f9", "#a5b4fc", "#fca5a5"]
-      : ["#0057b8", "#00a3e0", "#1e3a8a", "#0ea5e9", "#2563eb", "#0891b2", "#3b82f6", "#ef4444"];
+      ? ["#2dd4bf", "#38bdf8", "#818cf8", "#22d3ee", "#a78bfa", "#fb7185", "#f59e0b", "#60a5fa"]
+      : ["#0f766e", "#2563eb", "#f59e0b", "#0ea5e9", "#7c3aed", "#ef4444", "#14b8a6", "#f97316"];
 
   const chartText = () => (theme() === "dark" ? "#e5e7eb" : "#111827");
   const chartGrid = () => (theme() === "dark" ? "rgba(255,255,255,0.08)" : "rgba(17,24,39,0.10)");
   const incomeLineColor = () => (theme() === "dark" ? "#60a5fa" : "#0057b8");
   const expenseLineColor = () => (theme() === "dark" ? "#fca5a5" : "#ef4444");
-
-  const togglePieIndex = (chart, index) => {
-    if (!chart) return;
-    if (typeof chart.toggleDataVisibility === "function") {
-      chart.toggleDataVisibility(index);
-    } else {
-      const meta = chart.getDatasetMeta(0);
-      if (meta?.data?.[index]) {
-        meta.data[index].hidden = !meta.data[index].hidden;
-      }
-    }
-    chart.update();
-  };
-
-  const isPieIndexVisible = (chart, index) => {
-    if (!chart) return true;
-    if (typeof chart.getDataVisibility === "function") {
-      return chart.getDataVisibility(index);
-    }
-    const meta = chart.getDatasetMeta?.(0);
-    return !(meta?.data?.[index]?.hidden);
-  };
-
-  const pieLegend = () => ({
-    position: "bottom",
-    labels: { color: chartText() },
-    onClick: (e, item, legend) => togglePieIndex(legend?.chart, item.index),
-  });
 
   const destroyCharts = () => {
     Object.values(charts).forEach((c) => {
@@ -169,7 +147,7 @@ import { api } from "./api.js";
         c?.destroy?.();
       } catch {}
     });
-    charts = { expPie: null, incPie: null, monthly: null };
+    charts = { expBar: null, incBar: null, monthly: null };
   };
 
   const startOfDay = (d) => {
@@ -247,14 +225,20 @@ import { api } from "./api.js";
     return [...m.entries()];
   };
 
-  const sortCategoriesAlpha = (entries) =>
-    (entries || []).slice().sort((a, b) => a[0].localeCompare(b[0], undefined, { sensitivity: "base" }));
-
   const topCategoryByAmount = (entries) =>
     (entries || []).reduce(
       (best, current) => (current[1] > best[1] ? current : best),
       ["—", 0]
     );
+
+  const topCategories = (entries, limit = 7) => {
+    const sorted = (entries || []).slice().sort((a, b) => b[1] - a[1]);
+    if (sorted.length <= limit) return sorted;
+    const top = sorted.slice(0, limit);
+    const restTotal = sorted.slice(limit).reduce((s, [, v]) => s + v, 0);
+    if (restTotal > 0) top.push(["Other", restTotal]);
+    return top;
+  };
 
   const monthKeyFromDate = (d) => {
     if (!d || Number.isNaN(d.getTime())) return "";
@@ -350,6 +334,26 @@ import { api } from "./api.js";
     el.textContent = text;
   };
 
+  const fmtPercent = (value) => {
+    if (!Number.isFinite(value)) return "—";
+    return `${value.toFixed(1)}%`;
+  };
+
+  const fmtCompact = (value, currency) => {
+    const formatted = fmtMoney(value, currency);
+    if (formatted.length <= 10) return formatted;
+    try {
+      return new Intl.NumberFormat(undefined, {
+        style: "currency",
+        currency,
+        notation: "compact",
+        maximumFractionDigits: 1,
+      }).format(value);
+    } catch {
+      return formatted;
+    }
+  };
+
 
   const computeAndRender = () => {
     const rangeVal = els.range?.value || "all";
@@ -373,6 +377,9 @@ import { api } from "./api.js";
     setText(els.totalExpenses, fmtMoney(totalExp, displayCur));
     setText(els.totalIncome, fmtMoney(totalInc, displayCur));
 
+    const netCash = totalInc - totalExp;
+    setText(els.netCashflow, fmtMoney(netCash, displayCur));
+
     const timeSeries = buildTimeSeries(records, rangeWindow);
     const monthsCount = Math.max(1, countDistinctMonths(records));
     const avgMonthlyExp = totalExp / monthsCount;
@@ -381,39 +388,95 @@ import { api } from "./api.js";
     const expCats = groupByCategory(expenses);
     setText(els.topCategory, topCategoryByAmount(expCats)[0] || "—");
 
+    const savings = totalInc > 0 ? ((totalInc - totalExp) / totalInc) * 100 : NaN;
+    setText(els.savingsRate, fmtPercent(savings));
+
+    const topExp = topCategoryByAmount(expCats);
+    const topShare = totalExp > 0 ? (topExp[1] / totalExp) * 100 : NaN;
+    setText(
+      els.insightPrimary,
+      topExp[0] && topExp[0] !== "—"
+        ? `Top spend: ${topExp[0]} at ${fmtPercent(topShare)} of expenses.`
+        : "Add a few records to unlock insights."
+    );
+    setText(
+      els.insightSecondary,
+      `Net cashflow: ${fmtMoney(netCash, displayCur)} for this range.`
+    );
+    setText(
+      els.insightTertiary,
+      `Active months: ${Math.max(1, monthsCount)} with records in range.`
+    );
+
     destroyCharts();
 
-    // Pie: Expenses
-    if (els.pieExp && window.Chart) {
-      const ctx = els.pieExp.getContext("2d");
-      const expCatsAlpha = sortCategoriesAlpha(expCats);
-      const labels = expCatsAlpha.map(([k]) => k);
-      const data = expCatsAlpha.map(([, v]) => v);
-      const colors = labels.map((_, i) => palette()[i % palette().length]);
+    // Bars: Expenses
+    if (els.barExp && window.Chart) {
+      const ctx = els.barExp.getContext("2d");
+      const expCatsTop = topCategories(expCats, 7);
+      const labels = expCatsTop.map(([k]) => k);
+      const data = expCatsTop.map(([, v]) => v);
+      const maxExp = data.length ? Math.max(...data) : 0;
 
-      charts.expPie = new Chart(ctx, {
-        type: "doughnut",
+      charts.expBar = new Chart(ctx, {
+        type: "bar",
         data: {
           labels,
-          datasets: [{ data, backgroundColor: colors, borderWidth: 1 }],
+          datasets: [
+            {
+              label: "Expenses",
+              data,
+              borderRadius: 10,
+              backgroundColor: labels.map((_, i) => palette()[i % palette().length]),
+              barThickness: 18,
+            },
+          ],
         },
         options: {
+          indexAxis: "y",
           responsive: true,
           maintainAspectRatio: false,
-          legend: pieLegend(),
           plugins: {
-            legend: pieLegend(),
-            datalabels: {
-              color: "#fff",
-              font: { weight: "bold" },
-              formatter: (value, ctx) => {
-                if (!isPieIndexVisible(ctx.chart, ctx.dataIndex)) {
-                  return "";
-                }
-                const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                if (!sum) return "0%";
-                return `${((value / sum) * 100).toFixed(1)}%`;
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${fmtMoney(ctx.parsed.x, displayCur)}`,
               },
+            },
+            datalabels: {
+              anchor: "end",
+              align: "right",
+              color: chartText(),
+              clamp: true,
+              clip: false,
+              offset: 6,
+              padding: 4,
+              font: { size: 11, weight: "700" },
+              formatter: (value) => fmtCompact(value, displayCur),
+            },
+          },
+          layout: {
+            padding: { top: 12, right: 46, bottom: 16, left: 10 },
+          },
+          scales: {
+            x: {
+              grid: { color: chartGrid() },
+              grace: "12%",
+              suggestedMax: maxExp ? maxExp * 1.12 : undefined,
+              ticks: {
+                color: chartText(),
+                callback: (v) => {
+                  try {
+                    return new Intl.NumberFormat(undefined, { notation: "compact" }).format(v);
+                  } catch {
+                    return v;
+                  }
+                },
+              },
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: chartText() },
             },
           },
         },
@@ -421,38 +484,74 @@ import { api } from "./api.js";
       });
     }
 
-    // Pie: Income
-    if (els.pieInc && window.Chart) {
-      const ctx = els.pieInc.getContext("2d");
+    // Bars: Income
+    if (els.barInc && window.Chart) {
+      const ctx = els.barInc.getContext("2d");
       const incCats = groupByCategory(income);
-      const incCatsAlpha = sortCategoriesAlpha(incCats);
-      const labels = incCatsAlpha.map(([k]) => k);
-      const data = incCatsAlpha.map(([, v]) => v);
-      const colors = labels.map((_, i) => palette()[i % palette().length]);
+      const incCatsTop = topCategories(incCats, 7);
+      const labels = incCatsTop.map(([k]) => k);
+      const data = incCatsTop.map(([, v]) => v);
+      const maxInc = data.length ? Math.max(...data) : 0;
 
-      charts.incPie = new Chart(ctx, {
-        type: "doughnut",
+      charts.incBar = new Chart(ctx, {
+        type: "bar",
         data: {
           labels,
-          datasets: [{ data, backgroundColor: colors, borderWidth: 1 }],
+          datasets: [
+            {
+              label: "Income",
+              data,
+              borderRadius: 10,
+              backgroundColor: labels.map((_, i) => palette()[i % palette().length]),
+              barThickness: 18,
+            },
+          ],
         },
         options: {
+          indexAxis: "y",
           responsive: true,
           maintainAspectRatio: false,
-          legend: pieLegend(),
           plugins: {
-            legend: pieLegend(),
-            datalabels: {
-              color: "#fff",
-              font: { weight: "bold" },
-              formatter: (value, ctx) => {
-                if (!isPieIndexVisible(ctx.chart, ctx.dataIndex)) {
-                  return "";
-                }
-                const sum = ctx.chart.data.datasets[0].data.reduce((a, b) => a + b, 0);
-                if (!sum) return "0%";
-                return `${((value / sum) * 100).toFixed(1)}%`;
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => `${ctx.label}: ${fmtMoney(ctx.parsed.x, displayCur)}`,
               },
+            },
+            datalabels: {
+              anchor: "end",
+              align: "right",
+              color: chartText(),
+              clamp: true,
+              clip: false,
+              offset: 6,
+              padding: 4,
+              font: { size: 11, weight: "700" },
+              formatter: (value) => fmtCompact(value, displayCur),
+            },
+          },
+          layout: {
+            padding: { top: 12, right: 46, bottom: 16, left: 10 },
+          },
+          scales: {
+            x: {
+              grid: { color: chartGrid() },
+              grace: "12%",
+              suggestedMax: maxInc ? maxInc * 1.12 : undefined,
+              ticks: {
+                color: chartText(),
+                callback: (v) => {
+                  try {
+                    return new Intl.NumberFormat(undefined, { notation: "compact" }).format(v);
+                  } catch {
+                    return v;
+                  }
+                },
+              },
+            },
+            y: {
+              grid: { display: false },
+              ticks: { color: chartText() },
             },
           },
         },
@@ -466,6 +565,16 @@ import { api } from "./api.js";
       const showExp = els.toggleExp?.checked ?? true;
       const showInc = els.toggleInc?.checked ?? true;
 
+      const makeFill = (color) => (context) => {
+        const { chart } = context;
+        const { ctx: c, chartArea } = chart;
+        if (!chartArea) return color;
+        const grad = c.createLinearGradient(0, chartArea.top, 0, chartArea.bottom);
+        grad.addColorStop(0, `${color}55`);
+        grad.addColorStop(1, `${color}05`);
+        return grad;
+      };
+
       charts.monthly = new Chart(ctx, {
         type: "line",
         data: {
@@ -476,32 +585,37 @@ import { api } from "./api.js";
               data: timeSeries.expense,
               hidden: !showExp,
               borderColor: expenseLineColor(),
-              backgroundColor: expenseLineColor(),
+              backgroundColor: makeFill(expenseLineColor()),
               pointBackgroundColor: expenseLineColor(),
               pointRadius: 3,
               pointHoverRadius: 6,
               pointHitRadius: 16,
               borderWidth: 2,
               tension: 0.25,
+              fill: true,
             },
             {
               label: "Income",
               data: timeSeries.income,
               hidden: !showInc,
               borderColor: incomeLineColor(),
-              backgroundColor: incomeLineColor(),
+              backgroundColor: makeFill(incomeLineColor()),
               pointBackgroundColor: incomeLineColor(),
               pointRadius: 3,
               pointHoverRadius: 6,
               pointHitRadius: 16,
               borderWidth: 2,
               tension: 0.25,
+              fill: true,
             },
           ],
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
+          layout: {
+            padding: { top: 10, right: 14, bottom: 18, left: 8 },
+          },
           interaction: {
             mode: "index",
             intersect: false,
