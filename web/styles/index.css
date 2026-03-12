@@ -517,7 +517,10 @@
 @media (max-width: 640px) {
   .index-auth-actions {
     width: 100%;
+    flex-direction: column;
+    align-items: stretch;
     justify-content: flex-end;
+    gap: 0.5rem;
   }
 
   .index-hero {
