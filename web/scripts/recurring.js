@@ -81,6 +81,9 @@ document.addEventListener("DOMContentLoaded", () => {
     "Other",
   ];
 
+  let expenseCategoryOptions = [...EXPENSE_CATEGORIES];
+  let incomeCategoryOptions = [...INCOME_CATEGORIES];
+
   const uniq = (arr) => Array.from(new Set(arr.filter(Boolean)));
   const weekdayLabel = (value) => WEEKDAY_OPTIONS.find((item) => item.value === Number(value))?.label || String(value);
   const MONTH_NAME_LOOKUP = new Map([
@@ -263,6 +266,26 @@ document.addEventListener("DOMContentLoaded", () => {
     renderYearlyDayList();
   };
 
+  const renderCategoryOptions = (selectedValue = "") => {
+    if (!els.category) return;
+    const type = els.type?.value || "expense";
+    const options = type === "income" ? incomeCategoryOptions : expenseCategoryOptions;
+
+    els.category.innerHTML = '<option value="" disabled selected>Select a category</option>';
+    options.forEach((category) => {
+      const option = document.createElement("option");
+      option.value = category;
+      option.textContent = category;
+      els.category.appendChild(option);
+    });
+
+    if (selectedValue && options.includes(selectedValue)) {
+      els.category.value = selectedValue;
+    } else {
+      els.category.value = "";
+    }
+  };
+
   const populateCategoryOptions = async () => {
     let customExpense = [];
     let customIncome = [];
@@ -275,21 +298,9 @@ document.addEventListener("DOMContentLoaded", () => {
       customIncome = [];
     }
 
-    const combined = uniq([
-      ...EXPENSE_CATEGORIES,
-      ...INCOME_CATEGORIES,
-      ...customExpense,
-      ...customIncome,
-    ]);
-
-    if (!els.category) return;
-    els.category.innerHTML = '<option value="" disabled selected>Select a category</option>';
-    combined.forEach((c) => {
-      const opt = document.createElement("option");
-      opt.value = c;
-      opt.textContent = c;
-      els.category.appendChild(opt);
-    });
+    expenseCategoryOptions = uniq([...EXPENSE_CATEGORIES, ...customExpense]);
+    incomeCategoryOptions = uniq([...INCOME_CATEGORIES, ...customIncome]);
+    renderCategoryOptions(els.category?.value || "");
   };
 
   const formatMoney = (value) => {
@@ -528,6 +539,7 @@ document.addEventListener("DOMContentLoaded", () => {
     selectedRuleValues = [];
     if (els.active) els.active.checked = true;
     if (els.frequency) els.frequency.value = "monthly";
+    renderCategoryOptions("");
     syncRuleUiForFrequency();
   };
 
@@ -544,7 +556,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (els.name) els.name.value = item.name || "";
     if (els.type) els.type.value = item.type || "expense";
     if (els.amount) els.amount.value = item.amount ?? "";
-    if (els.category) els.category.value = item.category || "";
+    renderCategoryOptions(item.category || "");
     if (els.note) els.note.value = item.note || "";
     if (els.frequency) els.frequency.value = item.frequency || "monthly";
     selectedRuleValues = Array.isArray(item.recurrenceValues) ? [...item.recurrenceValues] : [];
@@ -591,6 +603,7 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   els.frequency?.addEventListener("change", () => syncRuleUiForFrequency(true));
+  els.type?.addEventListener("change", () => renderCategoryOptions(""));
 
   els.ruleInput?.addEventListener("input", () => {
     if (els.ruleInput.classList.contains("hidden")) return;
