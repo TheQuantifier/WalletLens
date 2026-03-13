@@ -110,6 +110,8 @@ import { api } from "./api.js";
     return fmtDate(iso);
   };
 
+  const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+
   const normalizeName = (name) => String(name || "").trim().toLowerCase();
 
   const normalizeCategoryList = (list) => {
@@ -984,15 +986,48 @@ import { api } from "./api.js";
     setText("#kpiIncome", fmtMoney(comp.total_income, comp.currency));
     setText("#kpiSpending", fmtMoney(comp.total_spending, comp.currency));
     setText("#kpiBalance", fmtMoney(comp.net_balance, comp.currency));
+    setText("#heroProjectedSavings", fmtMoney(comp.net_balance, comp.currency));
 
     setText("#kpiPeriodIncome", viewLabel);
     setText("#kpiPeriodSpending", viewLabel);
     setText("#kpiPeriodBalance", viewLabel);
+    setText("#heroProjectedDelta", `Net ${viewLabel.toLowerCase()}`);
 
     setText(
       "#lastUpdated",
       "Data updated " + new Date(comp.last_updated).toLocaleString()
     );
+
+    const cashflowEl = $("#heroCashflowHealth");
+    const cashflowDeltaEl = $("#heroCashflowDelta");
+    if (cashflowEl) {
+      const income = Number(comp.total_income) || 0;
+      const spending = Number(comp.total_spending) || 0;
+      const netCashflow = income - spending;
+      const surplusRatio = income > 0 ? netCashflow / income : netCashflow > 0 ? 1 : 0;
+      const gradientProgress =
+        netCashflow < 0
+          ? clamp((netCashflow + Math.max(income, spending, 1)) / Math.max(income, spending, 1), 0, 1) * 0.25
+          : 0.25 + clamp(surplusRatio / 0.1, 0, 1) * 0.75;
+      const hue = gradientProgress * 145;
+      const lightness = 46 - gradientProgress * 6;
+
+      cashflowEl.textContent = fmtMoney(netCashflow, comp.currency);
+      cashflowEl.classList.add("value--gradient");
+      cashflowEl.style.setProperty("--cashflow-color", `hsl(${hue} 78% ${lightness}%)`);
+
+      if (cashflowDeltaEl) {
+        if (netCashflow < 0) {
+          cashflowDeltaEl.textContent = "Spending is greater than income";
+        } else if (income <= 0) {
+          cashflowDeltaEl.textContent = "Add income to evaluate surplus health";
+        } else if (surplusRatio < 0.1) {
+          cashflowDeltaEl.textContent = `Orange zone: ${(surplusRatio * 100).toFixed(1)}% of income left after spending`;
+        } else {
+          cashflowDeltaEl.textContent = `Healthy surplus: ${(surplusRatio * 100).toFixed(1)}% of income left after spending`;
+        }
+      }
+    }
 
     const getSpendingHue = (ratio) => {
       const clamped = Math.max(0, Math.min(1, ratio));
