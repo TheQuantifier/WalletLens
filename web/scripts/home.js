@@ -119,6 +119,10 @@ import { api } from "./api.js";
   };
 
   const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+  const startOfLocalDay = (date) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const addDays = (date, days) =>
+    new Date(date.getFullYear(), date.getMonth(), date.getDate() + days);
   const formatMonthKey = (date) => {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, "0");
@@ -451,6 +455,175 @@ import { api } from "./api.js";
     };
   }
 
+  function aggregateExpensesByCategory(records) {
+    const map = new Map();
+    (records || []).forEach((record) => {
+      if (record?.type !== "expense") return;
+      const category = String(record.category || "Uncategorized").trim() || "Uncategorized";
+      map.set(category, (map.get(category) || 0) + Number(record.amount || 0));
+    });
+    return map;
+  }
+
+  function buildWeeklyFocus(records, currency = CURRENCY_FALLBACK) {
+    const today = startOfLocalDay(new Date());
+    const weekStart = addDays(today, -today.getDay());
+    const nextWeekStart = addDays(weekStart, 7);
+    const previousWeekStart = addDays(weekStart, -7);
+
+    const isInRange = (record, start, end) => {
+      if (!record?.date) return false;
+      const date = startOfLocalDay(new Date(record.date));
+      return date >= start && date < end;
+    };
+
+    const currentWeek = (records || []).filter((record) =>
+      isInRange(record, weekStart, nextWeekStart)
+    );
+    const previousWeek = (records || []).filter((record) =>
+      isInRange(record, previousWeekStart, weekStart)
+    );
+
+    const currentExpenses = currentWeek.filter((record) => record.type === "expense");
+    const currentIncome = currentWeek.filter((record) => record.type === "income");
+    const weeklySpent = currentExpenses.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+    const weeklyIncome = currentIncome.reduce((sum, record) => sum + Number(record.amount || 0), 0);
+    const weeklyNet = weeklyIncome - weeklySpent;
+
+    const currentByCategory = aggregateExpensesByCategory(currentWeek);
+    const previousByCategory = aggregateExpensesByCategory(previousWeek);
+    const rankedCategories = Array.from(currentByCategory.entries()).sort((a, b) => b[1] - a[1]);
+    const focusItems = [];
+    const topCategory = rankedCategories[0] || null;
+
+    if (topCategory && weeklySpent > 0) {
+      const [category, amount] = topCategory;
+      const previousAmount = previousByCategory.get(category) || 0;
+      const increase = amount - previousAmount;
+      const share = amount / weeklySpent;
+
+      if (increase >= 20 && (previousAmount === 0 || increase / Math.max(previousAmount, 1) >= 0.15)) {
+        focusItems.push(`${category} is up ${fmtMoney(increase, currency)} from last week.`);
+      }
+
+      if (share >= 0.3) {
+        focusItems.push(`${category} is ${Math.round(share * 100)}% of this week's spending.`);
+      }
+    }
+
+    if (weeklyNet < 0) {
+      focusItems.push(
+        `This week is running ${fmtMoney(Math.abs(weeklyNet), currency)} negative${
+          topCategory?.[0] ? `; start with ${topCategory[0]}.` : "."
+        }`
+      );
+    } else if (topCategory) {
+      focusItems.push(
+        `Keep ${topCategory[0]} near ${fmtMoney(topCategory[1], currency)} or lower to protect this week's surplus.`
+      );
+    }
+
+    if (!focusItems.length) {
+      if (!currentWeek.length) {
+        focusItems.push("No transactions recorded this week yet.");
+      } else if (!currentExpenses.length) {
+        focusItems.push("No spending recorded this week yet.");
+      } else {
+        focusItems.push("Spending is steady this week with no major category spikes.");
+      }
+    }
+
+    return focusItems.slice(0, 3);
+  }
+
+  function buildBudgetFocus(spendVelocity, currency = CURRENCY_FALLBACK) {
+    if (!spendVelocity?.hasBudget || !spendVelocity?.sheet || !spendVelocity?.summary) return [];
+
+    const { daysElapsed, daysTotal } = getPeriodProgress(spendVelocity.range);
+    const paceRatio = clamp(daysElapsed / daysTotal, 0, 1);
+    const standardSpent = spendVelocity.summary?.totals?.standard || {};
+    const sheet = spendVelocity.sheet || {};
+    const focusItems = [];
+
+    const standardEntries = Object.entries(standardSpent)
+      .map(([key, spent]) => ({
+        key,
+        spent: Number(spent || 0),
+        budget: Number(sheet[key] || 0),
+      }))
+      .filter((entry) => entry.budget > 0 && entry.spent > 0)
+      .map((entry) => ({
+        ...entry,
+        usageRatio: entry.spent / entry.budget,
+        pacePressure:
+          paceRatio > 0 ? (entry.spent / entry.budget) / paceRatio : entry.spent / entry.budget,
+      }))
+      .sort((a, b) => {
+        if (b.pacePressure === a.pacePressure) return b.spent - a.spent;
+        return b.pacePressure - a.pacePressure;
+      });
+
+    const biggestRisk = standardEntries[0] || null;
+    if (biggestRisk && biggestRisk.usageRatio >= 0.6 && biggestRisk.pacePressure >= 1.35) {
+      const label =
+        biggestRisk.key.charAt(0).toUpperCase() + biggestRisk.key.slice(1);
+      focusItems.push(
+        `${label} has used ${Math.round(biggestRisk.usageRatio * 100)}% of its budget ${daysElapsed} days into the month.`
+      );
+    }
+
+    const customEntries = Array.isArray(spendVelocity.summary?.totals?.custom)
+      ? spendVelocity.summary.totals.custom
+          .map((entry) => {
+            const budget = Number(entry?.budget || 0);
+            const spent = Number(entry?.spent || 0);
+            return {
+              category: String(entry?.category || "").trim(),
+              budget,
+              spent,
+              usageRatio: budget > 0 ? spent / budget : 0,
+              pacePressure: budget > 0 && paceRatio > 0 ? (spent / budget) / paceRatio : 0,
+            };
+          })
+          .filter((entry) => entry.category && entry.budget > 0 && entry.spent > 0)
+          .sort((a, b) => b.pacePressure - a.pacePressure)
+      : [];
+
+    const customRisk = customEntries[0] || null;
+    if (customRisk && customRisk.usageRatio >= 0.6 && customRisk.pacePressure >= 1.35) {
+      focusItems.push(
+        `${customRisk.category} has used ${Math.round(customRisk.usageRatio * 100)}% of its budget already.`
+      );
+    }
+
+    if (!focusItems.length && biggestRisk && biggestRisk.usageRatio >= 0.45 && biggestRisk.pacePressure >= 1.15) {
+      const label =
+        biggestRisk.key.charAt(0).toUpperCase() + biggestRisk.key.slice(1);
+      focusItems.push(
+        `${label} is trending above budget pace by ${Math.round((biggestRisk.pacePressure - 1) * 100)}%.`
+      );
+    }
+
+    return focusItems.slice(0, 2);
+  }
+
+  function renderWeeklyFocus(items = []) {
+    const listEl = $("#focusList");
+    if (!listEl) return;
+    listEl.innerHTML = "";
+
+    (items.length ? items : ["No spending focus identified for this week."]).forEach((item) => {
+      const li = document.createElement("li");
+      const dot = document.createElement("span");
+      dot.className = "focus-dot";
+      const text = document.createElement("span");
+      text.textContent = item;
+      li.appendChild(dot);
+      li.appendChild(text);
+      listEl.appendChild(li);
+    });
+  }
+
   // ============================================================
   //  SPEND VELOCITY + TOP CATEGORIES
   // ============================================================
@@ -514,9 +687,18 @@ import { api } from "./api.js";
         budgetTotal,
         spent,
         range: summary?.range,
+        sheet,
+        summary,
       };
     } catch {
-      return { hasBudget: false, budgetTotal: 0, spent: 0, range: null };
+      return {
+        hasBudget: false,
+        budgetTotal: 0,
+        spent: 0,
+        range: null,
+        sheet: null,
+        summary: null,
+      };
     }
   }
 
@@ -1512,6 +1694,10 @@ import { api } from "./api.js";
     const computed = computeOverview(filteredRecords);
     const projection = computeMonthlyProjection(bankRecords);
     const spendVelocity = await loadSpendVelocity();
+    const weeklyFocus = [
+      ...buildBudgetFocus(spendVelocity, computed.currency),
+      ...buildWeeklyFocus(bankRecords, computed.currency),
+    ].slice(0, 3);
     const netWorthData = await getNetWorthData(bankRecords, computed.currency);
 
     currentComputed = computed;
@@ -1519,6 +1705,7 @@ import { api } from "./api.js";
     currentSpendVelocity = spendVelocity;
 
     renderKpis(computed, viewLabel, projection);
+    renderWeeklyFocus(weeklyFocus);
     renderSpendVelocity(spendVelocity, computed.currency);
     renderNetWorth(netWorthData);
     renderExpensesTable($("#txnTbody"), filteredRecords, computed.currency);
