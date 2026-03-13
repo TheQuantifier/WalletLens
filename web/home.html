@@ -51,7 +51,18 @@
 
         <div class="hero-metrics" aria-label="Key insights">
           <div class="hero-metric">
-            <span class="label">Projected savings</span>
+            <span class="label">
+              Projected savings
+              <span class="info-popover">
+                <button type="button" class="info-popover__trigger" aria-label="Projected savings guidance">
+                  i
+                </button>
+                <span class="info-popover__panel" role="tooltip">
+                  Projected savings are estimated future amounts of money accumulated through regular deposits, interest, or cost-cutting measures, calculated based on current financial data and assumptions. In this app, projected savings = current month income minus spending, plus the expected savings for the remaining days of the month at your current daily pace. Example: if you have earned $3,600 and spent $2,400 over 12 days, you have saved $1,200 so far. If that $100 daily savings pace continues for 19 more days, your projected savings becomes $3,100.
+                  <strong>Arvest Bank</strong>
+                </span>
+              </span>
+            </span>
             <span class="value" id="heroProjectedSavings">—</span>
             <span class="delta subtle" id="heroProjectedDelta">Based on last 30 days</span>
           </div>

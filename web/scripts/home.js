@@ -422,6 +422,7 @@ import { api } from "./api.js";
     const monthRecords = filterRecordsByView(records, "Monthly");
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
     const daysElapsed = Math.max(1, now.getDate());
+    const daysRemaining = Math.max(0, daysInMonth - daysElapsed);
 
     const totalIncome = monthRecords
       .filter((r) => r.type === "income")
@@ -430,14 +431,21 @@ import { api } from "./api.js";
       .filter((r) => r.type === "expense")
       .reduce((s, r) => s + Number(r.amount || 0), 0);
 
+    const currentNetSaved = totalIncome - totalSpending;
     const avgIncomePerDay = totalIncome / daysElapsed;
     const avgSpendingPerDay = totalSpending / daysElapsed;
-    const projectedNet = (avgIncomePerDay - avgSpendingPerDay) * daysInMonth;
+    const projectedAdditionalSavings = (avgIncomePerDay - avgSpendingPerDay) * daysRemaining;
+    const assumedGrowthRate = 0;
+    const projectedSavings = currentNetSaved + projectedAdditionalSavings;
 
     return {
-      projectedNet,
+      projectedSavings,
+      currentNetSaved,
+      projectedAdditionalSavings,
+      assumedGrowthRate,
       daysElapsed,
       daysInMonth,
+      daysRemaining,
       totalIncome,
       totalSpending,
     };
@@ -1084,20 +1092,45 @@ import { api } from "./api.js";
     setText("#kpiIncome", fmtMoney(comp.total_income, comp.currency));
     setText("#kpiSpending", fmtMoney(comp.total_spending, comp.currency));
     setText("#kpiBalance", fmtMoney(comp.net_balance, comp.currency));
-    setText("#heroProjectedSavings", fmtMoney(projection.projectedNet, comp.currency));
+    setText("#heroProjectedSavings", fmtMoney(projection.projectedSavings, comp.currency));
 
     setText("#kpiPeriodIncome", viewLabel);
     setText("#kpiPeriodSpending", viewLabel);
     setText("#kpiPeriodBalance", viewLabel);
     setText(
       "#heroProjectedDelta",
-      `Forecasted end of month (${projection.daysElapsed}/${projection.daysInMonth} days)`
+      `${projection.daysRemaining} projected days at current pace`
     );
 
     setText(
       "#lastUpdated",
       "Data updated " + new Date(comp.last_updated).toLocaleString()
     );
+
+    const projectedSavingsEl = $("#heroProjectedSavings");
+    if (projectedSavingsEl) {
+      const projectedSavings = Number(projection.projectedSavings) || 0;
+      const projectedIncome = Number(projection.totalIncome) || 0;
+      const projectedRatio =
+        projectedIncome > 0 ? projectedSavings / projectedIncome : projectedSavings > 0 ? 1 : 0;
+      const projectedGradientProgress =
+        projectedSavings < 0
+          ? clamp(
+              (projectedSavings + Math.max(projectedIncome, Math.abs(projectedSavings), 1)) /
+                Math.max(projectedIncome, Math.abs(projectedSavings), 1),
+              0,
+              1
+            ) * 0.25
+          : 0.25 + clamp(projectedRatio / 0.1, 0, 1) * 0.75;
+      const projectedHue = projectedGradientProgress * 145;
+      const projectedLightness = 46 - projectedGradientProgress * 6;
+
+      projectedSavingsEl.classList.add("value--gradient");
+      projectedSavingsEl.style.setProperty(
+        "--cashflow-color",
+        `hsl(${projectedHue} 78% ${projectedLightness}%)`
+      );
+    }
 
     const cashflowEl = $("#heroCashflowHealth");
     const cashflowDeltaEl = $("#heroCashflowDelta");
@@ -1113,25 +1146,25 @@ import { api } from "./api.js";
       const hue = gradientProgress * 145;
       const lightness = 46 - gradientProgress * 6;
 
-      if (income > 0) {
-        cashflowEl.textContent = fmtPercent(surplusRatio);
-        cashflowEl.classList.add("value--gradient");
-        cashflowEl.style.setProperty("--cashflow-color", `hsl(${hue} 78% ${lightness}%)`);
-      } else {
-        cashflowEl.textContent = "—";
-        cashflowEl.classList.remove("value--gradient");
-        cashflowEl.style.removeProperty("--cashflow-color");
-      }
+      cashflowEl.textContent = fmtMoney(netCashflow, comp.currency);
+      cashflowEl.classList.add("value--gradient");
+      cashflowEl.style.setProperty("--cashflow-color", `hsl(${hue} 78% ${lightness}%)`);
 
       if (cashflowDeltaEl) {
-        if (income <= 0) {
-          cashflowDeltaEl.textContent = "Add income to evaluate surplus health";
-        } else if (netCashflow < 0) {
-          cashflowDeltaEl.textContent = `Deficit: ${fmtPercent(Math.abs(surplusRatio))} of income`;
+        if (netCashflow < 0) {
+          if (income <= 0) {
+            cashflowDeltaEl.textContent = "Deficit: 100.0%+ of income";
+          } else {
+            cashflowDeltaEl.textContent = `Deficit: ${Math.abs(surplusRatio * 100).toFixed(1)}% of income`;
+          }
+        } else if (income <= 0) {
+          cashflowDeltaEl.textContent = "No income recorded in this view";
+        } else if (surplusRatio === 0) {
+          cashflowDeltaEl.textContent = "Break-even: 0.0% of income left after spending";
         } else if (surplusRatio < 0.1) {
-          cashflowDeltaEl.textContent = `Orange zone: ${fmtPercent(surplusRatio)} of income left after spending`;
+          cashflowDeltaEl.textContent = `Orange zone: ${(surplusRatio * 100).toFixed(1)}% of income left after spending`;
         } else {
-          cashflowDeltaEl.textContent = `Healthy surplus: ${fmtPercent(surplusRatio)} of income left after spending`;
+          cashflowDeltaEl.textContent = `Healthy surplus: ${(surplusRatio * 100).toFixed(1)}% of income left after spending`;
         }
       }
     }
