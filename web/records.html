@@ -399,6 +399,29 @@
       </div>
     </div>
 
+    <div id="receiptItemsModal" class="modal hidden" aria-labelledby="receiptItemsTitle">
+      <div class="modal-content">
+        <h2 id="receiptItemsTitle">Receipt Items</h2>
+        <p id="receiptItemsSubtitle" class="subtle">Line items saved for this receipt.</p>
+
+        <div id="receiptItemsStatus" class="status-banner subtle is-hidden" aria-live="polite"></div>
+
+        <div class="receipt-items-panel">
+          <div class="receipt-items-header">
+            <span>Item</span>
+            <span>Price</span>
+          </div>
+          <div id="receiptItemsList" class="receipt-items-list" aria-live="polite">
+            <p class="subtle">Loading…</p>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btnCloseReceiptItems" class="btn" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
     <!-- ========================================================
          CUSTOM CATEGORY MODAL
     ========================================================= -->

@@ -16,6 +16,7 @@ import netWorthRoutes from "./net_worth.routes.js";
 import achievementsRoutes from "./achievements.routes.js";
 import notificationsRoutes from "./notifications.routes.js";
 import rulesRoutes from "./rules.routes.js";
+import recurringRoutes from "./recurring.routes.js";
 
 const router = express.Router();
 
@@ -34,5 +35,6 @@ router.use("/net-worth", netWorthRoutes);
 router.use("/achievements", achievementsRoutes);
 router.use("/notifications", notificationsRoutes);
 router.use("/rules", rulesRoutes);
+router.use("/recurring", recurringRoutes);
 
 export default router;

@@ -36,6 +36,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnDeleteRecordOnly = document.getElementById("btnDeleteRecordOnly");
   const btnDeleteRecordAndReceipt = document.getElementById("btnDeleteRecordAndReceipt");
   const btnCancelDeleteRecord = document.getElementById("btnCancelDeleteRecord");
+  const receiptItemsModal = document.getElementById("receiptItemsModal");
+  const receiptItemsSubtitle = document.getElementById("receiptItemsSubtitle");
+  const receiptItemsStatus = document.getElementById("receiptItemsStatus");
+  const receiptItemsList = document.getElementById("receiptItemsList");
+  const btnCloseReceiptItems = document.getElementById("btnCloseReceiptItems");
 
   const statusExpense = document.getElementById("recordsStatusExpense");
   const statusIncome = document.getElementById("recordsStatusIncome");
@@ -57,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // NEW: cache so we don’t hit API on each keystroke
   let allRecordsCache = [];
   let automationRules = [];
+  const receiptCache = new Map();
 
   const debounce = (fn, delay = 200) => {
     let t;
@@ -214,6 +220,21 @@ document.addEventListener("DOMContentLoaded", () => {
       style: "currency",
       currency,
     }).format(converted);
+  };
+
+  const showInlineStatus = (el, message, kind = "ok") => {
+    if (!el) return;
+    el.textContent = message;
+    el.classList.remove("is-hidden");
+    el.classList.toggle("is-ok", kind === "ok");
+    el.classList.toggle("is-error", kind === "error");
+  };
+
+  const hideInlineStatus = (el) => {
+    if (!el) return;
+    el.textContent = "";
+    el.classList.add("is-hidden");
+    el.classList.remove("is-ok", "is-error");
   };
 
   const normalizeCategoryList = (list) => {
@@ -470,6 +491,118 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Support both camelCase and snake_case for linked receipt id
   const getLinkedReceiptId = (r) => r?.linkedReceiptId ?? r?.linked_receipt_id ?? "";
+  const getReceiptTaxAmount = (receipt) =>
+    Number(
+      receipt?.tax_amount ??
+      receipt?.taxAmount ??
+      receipt?.parsed_data?.taxAmount ??
+      receipt?.parsedData?.taxAmount ??
+      0
+    ) || 0;
+
+  const normalizeReceiptItems = (receipt) => {
+    const rawItems =
+      receipt?.items ??
+      receipt?.parsed_data?.items ??
+      receipt?.parsedData?.items ??
+      [];
+
+    const items = Array.isArray(rawItems) ? rawItems : [];
+    return items.map((item, index) => {
+      const name = String(
+        item?.name ??
+        item?.description ??
+        item?.title ??
+        `Item ${index + 1}`
+      ).trim() || `Item ${index + 1}`;
+      const rawPrice =
+        item?.price ??
+        item?.amount ??
+        item?.total ??
+        item?.value ??
+        0;
+      const price = Number(rawPrice);
+      return {
+        name,
+        price: Number.isFinite(price) ? price : 0,
+      };
+    });
+  };
+
+  const renderReceiptItems = (receipt) => {
+    if (!receiptItemsList) return;
+    const currency = receipt?.currency || "USD";
+    const items = normalizeReceiptItems(receipt);
+    const taxAmount = getReceiptTaxAmount(receipt);
+
+    receiptItemsList.innerHTML = "";
+
+    if (!items.length && !Number.isFinite(taxAmount)) {
+      receiptItemsList.innerHTML = '<p class="subtle receipt-items-empty">No saved line items were found for this receipt.</p>';
+      return;
+    }
+
+    items.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "receipt-items-row";
+
+      const name = document.createElement("span");
+      name.textContent = item.name;
+
+      const price = document.createElement("span");
+      price.textContent = fmtMoney(item.price, currency);
+
+      row.appendChild(name);
+      row.appendChild(price);
+      receiptItemsList.appendChild(row);
+    });
+
+    const taxRow = document.createElement("div");
+    taxRow.className = "receipt-items-row receipt-items-row--tax";
+
+    const taxLabel = document.createElement("span");
+    taxLabel.textContent = "Taxes";
+
+    const taxValue = document.createElement("span");
+    taxValue.textContent = fmtMoney(taxAmount, currency);
+
+    taxRow.appendChild(taxLabel);
+    taxRow.appendChild(taxValue);
+    receiptItemsList.appendChild(taxRow);
+  };
+
+  const openReceiptItemsModal = async (record) => {
+    const linkedReceiptId = getLinkedReceiptId(record);
+    if (!linkedReceiptId) return;
+
+    if (receiptItemsSubtitle) {
+      const label = record.note || record.category || "this receipt";
+      receiptItemsSubtitle.textContent = `Line items saved for ${label}.`;
+    }
+    hideInlineStatus(receiptItemsStatus);
+    if (receiptItemsList) {
+      receiptItemsList.innerHTML = '<p class="subtle receipt-items-empty">Loading…</p>';
+    }
+    showModal(receiptItemsModal);
+
+    try {
+      let receipt = receiptCache.get(linkedReceiptId);
+      if (!receipt) {
+        receipt = await api.receipts.getOne(linkedReceiptId);
+        receiptCache.set(linkedReceiptId, receipt);
+      }
+      renderReceiptItems(receipt);
+    } catch (err) {
+      if (receiptItemsList) {
+        receiptItemsList.innerHTML = '<p class="subtle receipt-items-empty">Unable to load receipt items.</p>';
+      }
+      showInlineStatus(
+        receiptItemsStatus,
+        `Failed to load receipt items: ${err?.message || "Unknown error"}`,
+        "error"
+      );
+    }
+  };
 
   const getSortValue = (record, key) => {
     if (key === "date") {
@@ -604,6 +737,11 @@ document.addEventListener("DOMContentLoaded", () => {
     recurringBtn.dataset.recurring = recordId;
     recurringBtn.textContent = "Make Recurring";
 
+    const viewItemsBtn = document.createElement("button");
+    viewItemsBtn.type = "button";
+    viewItemsBtn.dataset.viewReceiptItems = recordId;
+    viewItemsBtn.textContent = "View Items";
+
     const delBtn = document.createElement("button");
     delBtn.type = "button";
     delBtn.dataset.delete = recordId;
@@ -613,6 +751,7 @@ document.addEventListener("DOMContentLoaded", () => {
     dropdown.appendChild(editBtn);
     dropdown.appendChild(ruleBtn);
     dropdown.appendChild(recurringBtn);
+    if (linkedReceiptId) dropdown.appendChild(viewItemsBtn);
     dropdown.appendChild(delBtn);
     wrap.appendChild(menuBtn);
     wrap.appendChild(dropdown);
@@ -660,8 +799,12 @@ document.addEventListener("DOMContentLoaded", () => {
   btnDeleteRecordOnly.addEventListener("click", () => performDelete(false));
   btnDeleteRecordAndReceipt.addEventListener("click", () => performDelete(true));
   btnCancelDeleteRecord.addEventListener("click", () => hideModal(deleteRecordModal));
+  btnCloseReceiptItems?.addEventListener("click", () => hideModal(receiptItemsModal));
   deleteRecordModal?.addEventListener("click", (e) => {
     if (e.target.classList.contains("modal")) hideModal(deleteRecordModal);
+  });
+  receiptItemsModal?.addEventListener("click", (e) => {
+    if (e.target.classList.contains("modal")) hideModal(receiptItemsModal);
   });
 
   // ===============================
@@ -671,6 +814,7 @@ document.addEventListener("DOMContentLoaded", () => {
     hideModal(addExpenseModal);
     hideModal(addIncomeModal);
     hideModal(deleteRecordModal);
+    hideModal(receiptItemsModal);
     hideModal(customCategoryModal);
   };
 
@@ -759,6 +903,18 @@ document.addEventListener("DOMContentLoaded", () => {
         note: record.note || "",
       });
       window.location.href = `recurring.html?${params.toString()}`;
+      return;
+    }
+
+    if (e.target.dataset.viewReceiptItems) {
+      const id = e.target.dataset.viewReceiptItems;
+      const cached = allRecordsCache.find((r) => getRecordId(r) === id);
+      const record = cached || (await api.records.getOne(id));
+      if (!record) return;
+
+      document.querySelectorAll(".actions-dropdown").forEach((m) => m.classList.add("hidden"));
+      document.querySelectorAll(".actions-btn").forEach((b) => b.setAttribute("aria-expanded", "false"));
+      await openReceiptItemsModal(record);
       return;
     }
 
