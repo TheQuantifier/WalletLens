@@ -30,6 +30,15 @@ const DEFAULT_ROLE_PERMISSIONS = {
     "health.read",
     "health.write",
   ],
+  org_admin: [
+    "users.read",
+    "users.write",
+    "notifications.read",
+    "notifications.write",
+    "support.read",
+    "support.write",
+    "audit.read",
+  ],
   support_admin: [
     "users.read",
     "notifications.read",
@@ -47,10 +56,11 @@ const DEFAULT_ROLE_PERMISSIONS = {
     "audit.read",
     "health.read",
   ],
+  org_user: [],
   user: [],
 };
 
-const CONFIGURABLE_ROLES = ["user", "analyst", "support_admin"];
+const CONFIGURABLE_ROLES = ["user", "org_user", "org_admin", "analyst", "support_admin"];
 
 function normalizePermission(value) {
   return String(value || "").trim().toLowerCase();

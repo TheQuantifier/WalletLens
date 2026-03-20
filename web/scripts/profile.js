@@ -1,4 +1,5 @@
 import { api } from "./api.js";
+import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
 
 /* ----------------------------------------
    DOM ELEMENTS
@@ -98,61 +99,65 @@ const currentIdentity = {
 };
 
 const linkAccountBtn = $("linkAccountBtn");
-const linkAccountModal = $("linkAccountModal");
-const closeLinkAccountModal = $("closeLinkAccountModal");
-const cancelLinkAccount = $("cancelLinkAccount");
-const confirmLinkAccount = $("confirmLinkAccount");
-const bankGrid = $("bankGrid");
+const syncAccountsBtn = $("syncAccountsBtn");
+const unlinkAccountModal = $("unlinkAccountModal");
+const unlinkAccountText = $("unlinkAccountText");
+const closeUnlinkAccountModal = $("closeUnlinkAccountModal");
+const cancelUnlinkAccount = $("cancelUnlinkAccount");
+const unlinkWithoutExportBtn = $("unlinkWithoutExportBtn");
+const exportAndUnlinkBtn = $("exportAndUnlinkBtn");
 
-const LINKED_ACCOUNTS_KEY = "linked_accounts";
-try {
-  const legacy = JSON.parse(localStorage.getItem(IDENTITY_KEY) || "null");
-  if (legacy?.name !== undefined) {
-    const { address, employer, income } = legacy || {};
-    localStorage.setItem(IDENTITY_KEY, JSON.stringify({ address, employer, income }));
-  }
-} catch {
-  // ignore legacy cleanup errors
-}
-const BANK_OPTIONS = [
-  { id: "bofa", name: "Bank of America", desc: "Checking, Savings, Credit Card" },
-  { id: "capital-one", name: "Capital One", desc: "Checking, Savings, Card" },
-  { id: "chase", name: "Chase", desc: "Checking, Savings, Credit Card" },
-  { id: "citi", name: "Citi", desc: "Checking, Savings, Credit Card" },
-  { id: "discover", name: "Discover", desc: "Credit Card, Savings" },
-  { id: "pnc", name: "PNC", desc: "Checking, Savings, Auto Loan" },
-  { id: "td", name: "TD Bank", desc: "Checking, Savings, Credit Card" },
-  { id: "truist", name: "Truist", desc: "Checking, Savings, Credit Card" },
-  { id: "us-bank", name: "U.S. Bank", desc: "Checking, Savings, Credit Card" },
-  { id: "wells", name: "Wells Fargo", desc: "Checking, Savings, Mortgage" },
-];
+let plaidAccounts = [];
+let plaidConfigured = true;
+let plaidHandler = null;
+let pendingUnlinkContext = null;
+const expandedBankGroups = new Set();
+let bankGroupsInitialized = false;
 
-let selectedBankId = "";
-
-const loadLinkedAccounts = () => {
-  const raw = localStorage.getItem(LINKED_ACCOUNTS_KEY);
-  if (!raw) return [];
-  try {
-    const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed : [];
-  } catch {
-    return [];
-  }
+const formatMoney = (value, currency = "USD") => {
+  const amount = Number(value);
+  if (!Number.isFinite(amount)) return "Balance unavailable";
+  return new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: currency || "USD",
+  }).format(amount);
 };
 
-const saveLinkedAccounts = (accounts) => {
-  localStorage.setItem(LINKED_ACCOUNTS_KEY, JSON.stringify(accounts));
+const getAccountLabel = (account) => {
+  const base = account?.officialName || account?.name || "Linked account";
+  const mask = account?.mask ? ` ••••${account.mask}` : "";
+  return `${base}${mask}`;
+};
+
+const getAccountDescription = (account) => {
+  const pieces = [
+    account?.institutionName || "",
+    account?.subtype || account?.type || "",
+    formatMoney(account?.currentBalance, account?.currency || "USD"),
+  ].filter(Boolean);
+  return pieces.join(" • ");
 };
 
 const renderLinkedAccounts = () => {
   if (!linkedAccountsList) return;
-  const accounts = loadLinkedAccounts();
-  if (!accounts.length) {
+  if (!plaidConfigured) {
+    linkedAccountsList.innerHTML = `
+      <div class="linked-item">
+        <div>
+          <p class="label">Plaid sandbox is not configured</p>
+          <p class="subtle">Add PLAID_CLIENT_ID and PLAID_SECRET on the API before linking accounts.</p>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  if (!plaidAccounts.length) {
     linkedAccountsList.innerHTML = `
       <div class="linked-item">
         <div>
           <p class="label">No accounts linked yet</p>
-          <p class="subtle">Connect a bank or card to sync balances.</p>
+          <p class="subtle">Connect a Plaid sandbox institution to start importing transactions.</p>
         </div>
       </div>
     `;
@@ -160,56 +165,339 @@ const renderLinkedAccounts = () => {
   }
 
   linkedAccountsList.innerHTML = "";
-  accounts.forEach((acc) => {
-    const row = document.createElement("div");
-    row.className = "linked-item";
-    row.innerHTML = `
-      <div>
-        <p class="label">${acc.name}</p>
-        <p class="subtle">${acc.desc}</p>
-      </div>
-      <div class="linked-meta">
-        <span class="linked-badge">Pending</span>
-        <button class="btn btn--link" data-remove="${acc.id}" type="button">Remove</button>
-      </div>
-    `;
-    linkedAccountsList.appendChild(row);
+  const groups = new Map();
+  plaidAccounts.forEach((account) => {
+    const key =
+      String(account?.institutionName || account?.institutionId || "Linked Institution").trim() ||
+      "Linked Institution";
+    if (!groups.has(key)) {
+      groups.set(key, []);
+    }
+    groups.get(key).push(account);
   });
-};
 
-const renderBankOptions = () => {
-  if (!bankGrid) return;
-  bankGrid.innerHTML = "";
-  BANK_OPTIONS.forEach((bank) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "bank-option";
-    btn.dataset.bankId = bank.id;
-    btn.innerHTML = `
-      <span class="label">${bank.name}</span>
-      <span class="subtle">${bank.desc}</span>
-    `;
-    btn.addEventListener("click", () => {
-      selectedBankId = bank.id;
-      const options = bankGrid.querySelectorAll(".bank-option");
-      options.forEach((opt) => {
-        opt.classList.toggle("is-selected", opt.dataset.bankId === selectedBankId);
-        opt.setAttribute("aria-selected", opt.dataset.bankId === selectedBankId ? "true" : "false");
-      });
+  Array.from(groups.entries())
+    .sort((a, b) => a[0].localeCompare(b[0]))
+    .forEach(([bankName, accounts], index) => {
+      if (!bankGroupsInitialized && index === 0) {
+        expandedBankGroups.add(bankName);
+      }
+
+      const isExpanded = expandedBankGroups.has(bankName);
+      const wrapper = document.createElement("div");
+      wrapper.className = "linked-group";
+
+      const header = document.createElement("div");
+      header.className = "linked-group__header";
+
+      const toggle = document.createElement("button");
+      toggle.type = "button";
+      toggle.className = "linked-group__toggle";
+      toggle.dataset.toggleBank = bankName;
+      toggle.setAttribute("aria-expanded", isExpanded ? "true" : "false");
+      toggle.innerHTML = `
+        <span class="linked-group__summary">
+          <span class="linked-group__caret">${isExpanded ? "v" : ">"}</span>
+          <span>
+            <span class="label">${bankName}</span>
+            <span class="subtle">${accounts.length} connected account${accounts.length === 1 ? "" : "s"}</span>
+          </span>
+        </span>
+      `;
+      header.appendChild(toggle);
+
+      const actions = document.createElement("div");
+      actions.className = "linked-group__meta";
+      const disconnectBtn = document.createElement("button");
+      disconnectBtn.type = "button";
+      disconnectBtn.className = "btn btn--link";
+      disconnectBtn.dataset.removeBank = bankName;
+      disconnectBtn.textContent = "Disconnect";
+      actions.appendChild(disconnectBtn);
+      header.appendChild(actions);
+
+      wrapper.appendChild(header);
+
+      if (isExpanded) {
+        const accountsWrap = document.createElement("div");
+        accountsWrap.className = "linked-group__accounts";
+
+        accounts.forEach((acc) => {
+          const row = document.createElement("div");
+          row.className = "linked-account-row";
+          row.innerHTML = `
+            <div>
+              <p class="label">${getAccountLabel(acc)}</p>
+              <p class="subtle">${getAccountDescription(acc)}</p>
+            </div>
+            <div class="linked-account-row__meta">
+              <button class="btn btn--link" data-remove="${acc.id}" type="button">Remove</button>
+            </div>
+          `;
+          accountsWrap.appendChild(row);
+        });
+
+        wrapper.appendChild(accountsWrap);
+      }
+
+      linkedAccountsList.appendChild(wrapper);
     });
-    bankGrid.appendChild(btn);
+
+  bankGroupsInitialized = true;
+};
+
+const closeUnlinkModal = () => {
+  pendingUnlinkContext = null;
+  unlinkAccountModal?.classList.add("hidden");
+};
+
+const openUnlinkModal = (target) => {
+  if (!target || !unlinkAccountModal) return;
+  pendingUnlinkContext = target;
+  if (unlinkAccountText) {
+    unlinkAccountText.textContent =
+      target.kind === "bank"
+        ? `Do you want to export ${target.bankName} history before disconnecting all linked accounts from that bank?`
+        : `Do you want to export ${getAccountLabel(target.account)} history before unlinking it?`;
+  }
+  unlinkAccountModal.classList.remove("hidden");
+};
+
+const refreshLinkedAccounts = async () => {
+  try {
+    const payload = await api.plaid.accounts();
+    plaidConfigured = payload?.configured !== false;
+    plaidAccounts = Array.isArray(payload?.accounts) ? payload.accounts : [];
+  } catch (err) {
+    plaidConfigured = err?.status === 503 ? false : plaidConfigured;
+    if (err?.status !== 503) {
+      showStatus("Failed to load linked accounts.", "error");
+      clearStatusSoon(3000);
+    }
+  }
+  renderLinkedAccounts();
+};
+
+const syncLinkedAccounts = async ({ silent = false } = {}) => {
+  try {
+    if (!silent) showStatus("Syncing Plaid transactions...");
+    const payload = await api.plaid.sync();
+    plaidAccounts = Array.isArray(payload?.accounts) ? payload.accounts : plaidAccounts;
+    renderLinkedAccounts();
+    if (!silent) {
+      const imported = Number(payload?.sync?.imported || 0);
+      showStatus(imported ? `Synced ${imported} transaction${imported === 1 ? "" : "s"}.` : "Plaid sync complete.");
+      clearStatusSoon(2500);
+    }
+  } catch (err) {
+    if (!silent) {
+      showStatus("Plaid sync failed: " + (err?.message || "Unknown error"), "error");
+      clearStatusSoon(3500);
+    }
+  }
+};
+
+const openPlaidLink = async () => {
+  if (!window.Plaid?.create) {
+    showStatus("Plaid Link failed to load. Refresh and try again.", "error");
+    clearStatusSoon(3500);
+    return;
+  }
+
+  try {
+    showStatus("Preparing Plaid Link...");
+    const token = await api.plaid.createLinkToken();
+    plaidConfigured = token?.configured !== false;
+
+    plaidHandler = window.Plaid.create({
+      token: token.linkToken,
+      onSuccess: async (publicToken, metadata) => {
+        try {
+          showStatus("Importing linked accounts...");
+          const exchange = await api.plaid.exchangePublicToken({
+            publicToken,
+            institution: metadata?.institution || null,
+          });
+          plaidAccounts = Array.isArray(exchange?.accounts) ? exchange.accounts : plaidAccounts;
+          renderLinkedAccounts();
+          const imported = Number(exchange?.sync?.imported || 0);
+          showStatus(imported ? `Connected account and imported ${imported} transactions.` : "Connected account.");
+          clearStatusSoon(3500);
+        } catch (err) {
+          showStatus("Plaid import failed: " + (err?.message || "Unknown error"), "error");
+          clearStatusSoon(3500);
+        }
+      },
+      onExit: (err) => {
+        if (err) {
+          showStatus("Plaid Link closed: " + (err.display_message || err.error_message || "Try again."), "error");
+          clearStatusSoon(3500);
+        }
+      },
+    });
+
+    plaidHandler.open();
+  } catch (err) {
+    plaidConfigured = err?.status === 503 ? false : plaidConfigured;
+    renderLinkedAccounts();
+    showStatus("Unable to start Plaid Link: " + (err?.message || "Unknown error"), "error");
+    clearStatusSoon(3500);
+  }
+};
+
+const getLinkedAccountRecords = async (accountId) => {
+  const records = await api.records.getAll({ limit: 1000 });
+  return (Array.isArray(records) ? records : []).filter((record) => {
+    const linkedAccountId = record?.linkedPlaidAccountId ?? record?.linked_plaid_account_id ?? "";
+    return linkedAccountId === accountId;
   });
 };
 
-const openLinkAccountModal = () => {
-  if (!linkAccountModal) return;
-  selectedBankId = "";
-  renderBankOptions();
-  linkAccountModal.classList.remove("hidden");
+const exportLinkedAccountHistory = async (target) => {
+  const bundle = await api.settings.exportAllData();
+  const selectedAccountIds =
+    target.kind === "bank"
+      ? new Set((target.accounts || []).map((account) => account.id))
+      : new Set([target.account.id]);
+  const records = (Array.isArray(bundle?.records) ? bundle.records : []).filter((record) => {
+    const linkedAccountId = record?.linkedPlaidAccountId ?? record?.linked_plaid_account_id ?? "";
+    return selectedAccountIds.has(linkedAccountId);
+  });
+  const accountRows = (Array.isArray(bundle?.plaidAccounts) ? bundle.plaidAccounts : []).filter((entry) =>
+    selectedAccountIds.has(entry?.id)
+  );
+  const relatedItemIds = new Set(accountRows.map((entry) => entry?.plaid_item_ref).filter(Boolean));
+  const itemRows = (Array.isArray(bundle?.plaidItems) ? bundle.plaidItems : []).filter((item) =>
+    relatedItemIds.has(item?.id)
+  );
+  const netWorthSnapshots = Array.isArray(bundle?.netWorthSnapshots) ? bundle.netWorthSnapshots : [];
+
+  if (!records.length && !accountRows.length && !itemRows.length && !netWorthSnapshots.length) {
+    return false;
+  }
+
+  const exportLabel =
+    target.kind === "bank"
+      ? target.bankName || "linked_bank"
+      : target.account?.name || "history";
+  const filenameBase = `linked_account_${String(exportLabel).toLowerCase().replace(/[^a-z0-9]+/g, "_")}_${new Date()
+    .toISOString()
+    .slice(0, 10)}`;
+
+  await exportSheets({
+    title:
+      target.kind === "bank"
+        ? `${target.bankName} History`
+        : `${getAccountLabel(target.account)} History`,
+    filenameBase,
+    format: getPreferredExportFormat(),
+    sheets: [
+      {
+        name: "Account",
+        rows: accountRows.map((entry) => ({
+          Name: entry?.name || "",
+          OfficialName: entry?.official_name || "",
+          Mask: entry?.mask || "",
+          Type: entry?.type || "",
+          Subtype: entry?.subtype || "",
+          InstitutionName: entry?.institution_name || "",
+          CurrentBalance: Number(entry?.current_balance || 0),
+          AvailableBalance: Number(entry?.available_balance || 0),
+          Currency: entry?.currency || "USD",
+          Active: Boolean(entry?.is_active),
+        })),
+      },
+      {
+        name: "Linked Item",
+        rows: itemRows.map((item) => ({
+          PlaidItemId: item?.plaid_item_id || "",
+          InstitutionId: item?.institution_id || "",
+          InstitutionName: item?.institution_name || "",
+          Status: item?.status || "",
+          LastSyncedAt: item?.last_synced_at || "",
+          CreatedAt: item?.created_at || "",
+        })),
+      },
+      {
+        name: "Records",
+        rows: records.map((record) => ({
+          Date: String(record?.date || "").slice(0, 10),
+          Type: record?.type || "",
+          Category: record?.category || "",
+          Amount: Number(record?.amount ?? 0),
+          Currency: record?.currency || "USD",
+          Note: record?.note || "",
+          Origin: api.getUploadType(record),
+        })),
+      },
+      {
+        name: "Net Worth Snapshots",
+        rows: netWorthSnapshots.map((snapshot) => ({
+          SnapshotDate: snapshot?.snapshot_date || "",
+          AssetsTotal: Number(snapshot?.assets_total || 0),
+          LiabilitiesTotal: Number(snapshot?.liabilities_total || 0),
+          NetWorth: Number(snapshot?.net_worth || 0),
+          Currency: snapshot?.currency || "USD",
+          Note: "These snapshots may include this linked account and are removed after unlinking.",
+        })),
+      },
+    ].filter((sheet) => Array.isArray(sheet.rows) && sheet.rows.length),
+  });
+
+  return true;
 };
 
-const closeLinkModal = () => {
-  linkAccountModal?.classList.add("hidden");
+const unlinkLinkedAccount = async ({ exportFirst = false } = {}) => {
+  if (!pendingUnlinkContext) {
+    closeUnlinkModal();
+    return;
+  }
+
+  const accountsToRemove =
+    pendingUnlinkContext.kind === "bank"
+      ? (pendingUnlinkContext.accounts || []).filter(Boolean)
+      : [pendingUnlinkContext.account].filter(Boolean);
+  if (!accountsToRemove.length) {
+    closeUnlinkModal();
+    return;
+  }
+
+  try {
+    if (exportFirst) {
+      showStatus("Exporting linked account history...");
+      await exportLinkedAccountHistory(pendingUnlinkContext);
+    }
+
+    showStatus(
+      pendingUnlinkContext.kind === "bank" ? "Disconnecting linked bank..." : "Removing linked account..."
+    );
+    for (const account of accountsToRemove) {
+      // eslint-disable-next-line no-await-in-loop
+      await api.plaid.removeAccount(account.id);
+    }
+    const removedIds = new Set(accountsToRemove.map((account) => account.id));
+    plaidAccounts = plaidAccounts.filter((entry) => !removedIds.has(entry.id));
+    renderLinkedAccounts();
+    closeUnlinkModal();
+    showStatus(
+      exportFirst
+        ? pendingUnlinkContext.kind === "bank"
+          ? "History exported and bank disconnected."
+          : "History exported and linked account removed."
+        : pendingUnlinkContext.kind === "bank"
+          ? "Bank disconnected."
+          : "Linked account removed."
+    );
+    clearStatusSoon(3000);
+  } catch (err) {
+    showStatus(
+      `Failed to ${pendingUnlinkContext.kind === "bank" ? "disconnect bank" : "remove linked account"}: ${
+        err?.message || "Unknown error"
+      }`,
+      "error"
+    );
+    clearStatusSoon(3500);
+  }
 };
 
 // AVATAR ELEMENTS
@@ -503,11 +791,7 @@ async function loadUserProfile() {
     applyAvatarPreview(currentAvatarUrl, displayName);
     applyHeaderAvatar(currentAvatarUrl, displayName);
 
-    if (linkedAccountsList) {
-      renderLinkedAccounts();
-    }
-
-    await Promise.all([loadRecentActivity(), loadAchievements()]);
+    await Promise.all([refreshLinkedAccounts(), loadRecentActivity(), loadAchievements()]);
   } catch (err) {
     showStatus("Please log in to view your profile.", "error");
     window.location.href = "login.html";
@@ -531,6 +815,9 @@ const ACTION_LABELS = {
   receipt_delete: "Deleted receipt",
   budget_sheet_create: "Created budget",
   budget_sheet_update: "Updated budget",
+  plaid_link: "Linked Plaid account",
+  plaid_sync: "Synced Plaid transactions",
+  plaid_unlink: "Removed Plaid account",
 };
 
 const formatActivityDate = (value) => {
@@ -704,8 +991,8 @@ document.addEventListener("keydown", (e) => {
   if (avatarModal && !avatarModal.classList.contains("hidden")) {
     avatarModal.classList.add("hidden");
   }
-  if (linkAccountModal && !linkAccountModal.classList.contains("hidden")) {
-    linkAccountModal.classList.add("hidden");
+  if (unlinkAccountModal && !unlinkAccountModal.classList.contains("hidden")) {
+    closeUnlinkModal();
   }
 });
 
@@ -724,44 +1011,47 @@ cancelBtn?.addEventListener("click", () => {
   }
 });
 
-linkAccountBtn?.addEventListener("click", openLinkAccountModal);
-closeLinkAccountModal?.addEventListener("click", closeLinkModal);
-cancelLinkAccount?.addEventListener("click", closeLinkModal);
-linkAccountModal?.addEventListener("click", (e) => {
-  if (e.target === linkAccountModal || e.target?.dataset?.close === "link-account") {
-    closeLinkModal();
+linkAccountBtn?.addEventListener("click", openPlaidLink);
+syncAccountsBtn?.addEventListener("click", () => syncLinkedAccounts());
+closeUnlinkAccountModal?.addEventListener("click", closeUnlinkModal);
+cancelUnlinkAccount?.addEventListener("click", closeUnlinkModal);
+unlinkAccountModal?.addEventListener("click", (e) => {
+  if (e.target === unlinkAccountModal || e.target?.dataset?.close === "unlink-account") {
+    closeUnlinkModal();
   }
 });
-
-confirmLinkAccount?.addEventListener("click", () => {
-  if (!selectedBankId) {
-    showStatus("Select a bank to continue.", "error");
-    clearStatusSoon(2000);
-    return;
-  }
-
-  const bank = BANK_OPTIONS.find((b) => b.id === selectedBankId);
-  if (!bank) return;
-
-  const accounts = loadLinkedAccounts();
-  if (!accounts.find((a) => a.id === bank.id)) {
-    accounts.push({ ...bank });
-    saveLinkedAccounts(accounts);
-    renderLinkedAccounts();
-  }
-
-  closeLinkModal();
-  showStatus("Link request saved. Backend connection coming soon.");
-  clearStatusSoon(2500);
-});
+unlinkWithoutExportBtn?.addEventListener("click", () => unlinkLinkedAccount({ exportFirst: false }));
+exportAndUnlinkBtn?.addEventListener("click", () => unlinkLinkedAccount({ exportFirst: true }));
 
 linkedAccountsList?.addEventListener("click", (e) => {
   const target = e.target;
   if (!(target instanceof HTMLElement)) return;
+  const toggleBtn = target.closest("[data-toggle-bank]");
+  if (toggleBtn instanceof HTMLElement) {
+    const bankName = toggleBtn.getAttribute("data-toggle-bank");
+    if (!bankName) return;
+    if (expandedBankGroups.has(bankName)) {
+      expandedBankGroups.delete(bankName);
+    } else {
+      expandedBankGroups.add(bankName);
+    }
+    renderLinkedAccounts();
+    return;
+  }
+  const removeBank = target.getAttribute("data-remove-bank");
+  if (removeBank) {
+    const accounts = plaidAccounts.filter(
+      (entry) =>
+        (String(entry?.institutionName || entry?.institutionId || "Linked Institution").trim() ||
+          "Linked Institution") === removeBank
+    );
+    if (!accounts.length) return;
+    openUnlinkModal({ kind: "bank", bankName: removeBank, accounts });
+    return;
+  }
   const removeId = target.getAttribute("data-remove");
   if (!removeId) return;
-
-  const accounts = loadLinkedAccounts().filter((a) => a.id !== removeId);
-  saveLinkedAccounts(accounts);
-  renderLinkedAccounts();
+  const account = plaidAccounts.find((entry) => entry.id === removeId);
+  if (!account) return;
+  openUnlinkModal({ kind: "account", account });
 });

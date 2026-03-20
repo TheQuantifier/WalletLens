@@ -105,7 +105,7 @@ export const getCategories = asyncHandler(async (req, res) => {
 // POST /api/records
 // ==========================================================
 export const create = asyncHandler(async (req, res) => {
-  const { type, amount, category, date, note, applyRules = true } = req.body;
+  const { type, amount, category, date, note, applyRules = true, currency } = req.body;
 
   if (!type || amount === undefined || amount === null || !category) {
     return res
@@ -136,6 +136,7 @@ export const create = asyncHandler(async (req, res) => {
     date: parsedDate,
     note: note !== undefined ? String(note) : "",
     linkedReceiptId: null,
+    currency: currency ? String(currency).trim().toUpperCase() : "USD",
   };
 
   if (applyRules !== false) {
@@ -169,7 +170,7 @@ export const create = asyncHandler(async (req, res) => {
 // FULL EDIT SUPPORT (even for receipt-linked records)
 // ==========================================================
 export const update = asyncHandler(async (req, res) => {
-  const { type, amount, category, date, note, applyRules = false } = req.body;
+  const { type, amount, category, date, note, applyRules = false, currency } = req.body;
 
   const existing = await getRecordById(req.user.id, req.params.id);
   if (!existing) {
@@ -204,6 +205,9 @@ export const update = asyncHandler(async (req, res) => {
   }
 
   if (note !== undefined) changes.note = String(note);
+  if (currency !== undefined) {
+    changes.currency = String(currency || "USD").trim().toUpperCase() || "USD";
+  }
 
   if (applyRules === true) {
     const candidate = {

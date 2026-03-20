@@ -147,7 +147,20 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
       });
   };
 
-  const loadLinkedAccounts = () => {
+  const loadLinkedAccounts = async () => {
+    try {
+      const payload = await api.plaid.accounts();
+      if (Array.isArray(payload?.accounts) && payload.accounts.length) {
+        return payload.accounts.map((account) => ({
+          ...account,
+          id: account.id,
+          name: account.officialName || account.name || account.institutionName || "Linked account",
+        }));
+      }
+    } catch {
+      // fall back to legacy local storage data
+    }
+
     const raw = localStorage.getItem(LINKED_ACCOUNTS_KEY);
     if (!raw) return [];
     try {
@@ -214,8 +227,10 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
     record?.bankId ||
     record?.accountId ||
     record?.institutionId ||
+    record?.linkedPlaidAccountId ||
     record?.bank_id ||
     record?.account_id ||
+    record?.linked_plaid_account_id ||
     record?.institution_id ||
     "";
 
@@ -892,7 +907,12 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
 
     ctx.clearRect(0, 0, parentWidth, 260);
 
-    if (!series?.length) return;
+    if (!series?.length) {
+      canvas.__netWorthSeries = [];
+      canvas.__netWorthCurrency = currency;
+      canvas.__netWorthDims = null;
+      return;
+    }
 
     const P = { t: 20, r: 20, b: 45, l: 78 };
     const innerW = canvas.width / dpr - P.l - P.r;
@@ -1199,27 +1219,123 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
     return months;
   }
 
-  async function getNetWorthData(records, currency) {
+  function buildLinkedAccountNetWorthItems(accounts = []) {
+    const assets = [];
+    const liabilities = [];
+    const ASSET_TYPES = new Set(["depository", "investment", "brokerage", "other"]);
+    const LIABILITY_TYPES = new Set(["credit", "loan"]);
+
+    (accounts || []).forEach((account) => {
+      const amount = getAccountBalance(account);
+      const name = account?.officialName || account?.name || account?.institutionName || "Linked account";
+      const item = {
+        id: account?.id || name,
+        name,
+        amount: Math.abs(amount),
+        source: "plaid",
+      };
+
+      const type = String(account?.type || "").toLowerCase();
+      if (LIABILITY_TYPES.has(type)) {
+        liabilities.push(item);
+        return;
+      }
+
+      if (ASSET_TYPES.has(type)) {
+        assets.push(item);
+        return;
+      }
+
+      if (amount < 0) {
+        liabilities.push(item);
+        return;
+      }
+
+      assets.push(item);
+    });
+
+    return { assets, liabilities };
+  }
+
+  function buildNetWorthTrend(records, currentNetWorth, monthsBack = 12) {
+    const months = buildMonthlyNet(records, monthsBack);
+    if (!months.length) return [];
+
+    const trend = new Array(months.length);
+    let runningNetWorth = Number(currentNetWorth || 0);
+
+    for (let index = months.length - 1; index >= 0; index -= 1) {
+      trend[index] = {
+        label: months[index].label,
+        value: runningNetWorth,
+      };
+      runningNetWorth -= Number(months[index].net || 0);
+    }
+
+    return trend;
+  }
+
+  function normalizeNetWorthTrend(trend, currentNetWorth, asOf = new Date()) {
+    const safeCurrentNetWorth = Number(currentNetWorth || 0);
+    const currentDate = new Date(asOf || new Date());
+    const currentMonthLabel = currentDate.toLocaleDateString(undefined, { month: "short" });
+    const safeTrend = Array.isArray(trend)
+      ? trend
+          .map((point) => ({
+            label: String(point?.label || "").trim(),
+            value: Number(point?.value),
+          }))
+          .filter((point) => point.label && Number.isFinite(point.value))
+      : [];
+
+    if (!safeTrend.length) return [];
+
+    const normalized = safeTrend.slice(-12).map((point) => ({ ...point }));
+    const lastPoint = normalized[normalized.length - 1];
+    if (lastPoint?.label === currentMonthLabel) {
+      lastPoint.value = safeCurrentNetWorth;
+      return normalized;
+    }
+
+    normalized.push({ label: currentMonthLabel, value: safeCurrentNetWorth });
+    return normalized.slice(-12);
+  }
+
+  async function getNetWorthData(records, currency, accounts = []) {
     const items = await loadNetWorthItems();
-    const { assets, liabilities } = splitNetWorthItems(items);
-    const hasData = assets.length > 0 || liabilities.length > 0;
+    const { assets: manualAssets, liabilities: manualLiabilities } = splitNetWorthItems(items);
+    const { assets: linkedAssets, liabilities: linkedLiabilities } = buildLinkedAccountNetWorthItems(accounts);
+    const hasLinkedAccounts = Array.isArray(accounts) && accounts.length > 0;
+    const assets = [...linkedAssets, ...manualAssets];
+    const liabilities = [...linkedLiabilities, ...manualLiabilities];
+    const hasData = hasLinkedAccounts && (assets.length > 0 || liabilities.length > 0);
+    let overview = null;
+    try {
+      overview = await api.netWorth.overview(365);
+    } catch {
+      overview = null;
+    }
+
     const assetsTotal = assets.reduce((s, a) => s + a.amount, 0);
     const liabilitiesTotal = liabilities.reduce((s, l) => s + l.amount, 0);
     const netWorthNow = assetsTotal - liabilitiesTotal;
-
-    const months = buildMonthlyNet([], 12);
-    const trend = hasData
-      ? months.map((m) => ({ label: m.label, value: netWorthNow }))
-      : [];
+    const snapshotTrend = normalizeNetWorthTrend(
+      Array.isArray(overview?.trend) ? overview.trend : [],
+      netWorthNow,
+      overview?.asOf || new Date().toISOString()
+    );
+    const fallbackTrend = hasData ? buildNetWorthTrend(records, netWorthNow, 12) : [];
 
     return {
-      currency,
-      asOf: hasData ? new Date().toISOString() : null,
+      currency: overview?.currency || currency,
+      asOf: hasData ? overview?.asOf || new Date().toISOString() : null,
       assets,
       liabilities,
-      trend,
-      baseBalance: 0,
+      trend: snapshotTrend.length ? snapshotTrend : fallbackTrend,
+      baseBalance: netWorthNow,
+      snapshotBacked: snapshotTrend.length > 0,
       hasData,
+      hasLinkedAccounts,
     };
   }
 
@@ -1227,10 +1343,13 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
     if (!data) return;
     const netWorthSection = $("#netWorthSection");
     const netWorthGrid = $("#netWorthGrid");
+    const netWorthChart = $("#netWorthChart");
     const assetsTotal = (data.assets || []).reduce((s, a) => s + a.amount, 0);
     const liabilitiesTotal = (data.liabilities || []).reduce((s, l) => s + l.amount, 0);
     const netWorth = assetsTotal - liabilitiesTotal;
-    const hasNetWorthData = Boolean(data.hasData || data.assets?.length || data.liabilities?.length || data.trend?.length);
+    const hasNetWorthData = Boolean(
+      data.hasLinkedAccounts && (data.hasData || data.assets?.length || data.liabilities?.length || data.trend?.length)
+    );
 
     netWorthSection?.classList.toggle("net-worth--empty", !hasNetWorthData);
     if (netWorthGrid) netWorthGrid.setAttribute("aria-hidden", hasNetWorthData ? "false" : "true");
@@ -1241,18 +1360,25 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
       setText("#liabilitiesTotal", "—");
       setText("#netWorthDelta", "Connect accounts to see your net worth trend.");
       setText("#netWorthUpdated", "No net worth data yet");
+      if (netWorthChart) {
+        drawNetWorthChart(netWorthChart, [], data.currency || CURRENCY_FALLBACK);
+      }
     } else {
       setText("#netWorthTotal", fmtMoney(netWorth, data.currency));
       setText("#assetsTotal", fmtMoney(assetsTotal, data.currency));
       setText("#liabilitiesTotal", fmtMoney(liabilitiesTotal, data.currency));
 
-      const deltaBase = data.trend?.length ? data.trend[0].value : netWorth;
-      const delta = netWorth - deltaBase;
-      const deltaLabel = delta >= 0 ? "up" : "down";
-      setText(
-        "#netWorthDelta",
-        `${delta >= 0 ? "+" : "-"}${fmtMoney(Math.abs(delta), data.currency)} ${deltaLabel} vs previous period`
-      );
+      if (data.snapshotBacked && data.trend?.length > 1) {
+        const deltaBase = data.trend[0].value;
+        const delta = netWorth - deltaBase;
+        const deltaLabel = delta >= 0 ? "up" : "down";
+        setText(
+          "#netWorthDelta",
+          `${delta >= 0 ? "+" : "-"}${fmtMoney(Math.abs(delta), data.currency)} ${deltaLabel} vs previous period`
+        );
+      } else {
+        setText("#netWorthDelta", "Tracking started recently. The trend will improve as snapshots accumulate.");
+      }
       setText(
         "#netWorthUpdated",
         data.asOf ? `Updated ${new Date(data.asOf).toLocaleDateString()}` : "No net worth data yet"
@@ -1284,8 +1410,14 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
         const del = document.createElement("button");
         del.type = "button";
         del.className = "networth-item__remove";
-        del.textContent = "Remove";
-        del.addEventListener("click", () => removeNetWorthItem(item.id));
+        if (item.source === "plaid") {
+          del.textContent = "Linked";
+          del.disabled = true;
+          del.title = "Remove this account from the Profile page to exclude it from net worth.";
+        } else {
+          del.textContent = "Remove";
+          del.addEventListener("click", () => removeNetWorthItem(item.id));
+        }
         li.appendChild(name);
         li.appendChild(value);
         li.appendChild(del);
@@ -1296,9 +1428,7 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
     renderList(assetsList, data.assets, "asset");
     renderList(liabilitiesList, data.liabilities, "liability");
 
-    if (data.trend?.length) {
-      drawNetWorthChart($("#netWorthChart"), data.trend, data.currency);
-    }
+    drawNetWorthChart(netWorthChart, data.trend || [], data.currency);
   }
 
   const addNetWorthItem = async (type, name, amount) => {
@@ -1577,6 +1707,11 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
   //  API LOADER
   // ============================================================
   async function loadFromAPI() {
+    try {
+      await api.plaid.sync();
+    } catch {
+      // Plaid sync is best-effort on dashboard load.
+    }
     const records = await api.records.getAll();
     allRecordsCache = Array.isArray(records) ? records : [];
     return records;
@@ -1790,7 +1925,7 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
       ...buildBudgetFocus(spendVelocity, computed.currency),
       ...buildWeeklyFocus(bankRecords, computed.currency),
     ]).slice(0, 3);
-    const netWorthData = await getNetWorthData(bankRecords, computed.currency);
+    const netWorthData = await getNetWorthData(bankRecords, computed.currency, accounts);
 
     currentComputed = computed;
     currentNetWorth = netWorthData;
@@ -1845,7 +1980,7 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
         legacyView === "All" ? "All Time" : legacyView;
       const dashboardView =
         normalizedView || normalizedLegacy || "All Time";
-      const accounts = loadLinkedAccounts();
+      const accounts = await loadLinkedAccounts();
 
       setupBankFilter(accounts, () => {
         renderDashboard(records, dashboardView, accounts);

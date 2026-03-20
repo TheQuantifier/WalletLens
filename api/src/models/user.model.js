@@ -21,6 +21,7 @@ export async function createUser({
   fullName,
   location = "",
   role = "user",
+  organizationId = null,
   phoneNumber = "",
   bio = "",
   avatarUrl = "",
@@ -33,13 +34,13 @@ export async function createUser({
   const { rows } = await query(
     `
     INSERT INTO users
-      (username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url, address, employer, income_range,
+      (username, email, password_hash, google_id, full_name, location, role, organization_id, phone_number, bio, avatar_url, address, employer, income_range,
        custom_expense_categories, custom_income_categories)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
     RETURNING
       id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, phone_number, bio, avatar_url,
+      full_name, location, role, organization_id, phone_number, bio, avatar_url,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     `,
@@ -51,6 +52,7 @@ export async function createUser({
       fullName,
       location,
       role,
+      organizationId,
       phoneNumber,
       bio,
       avatarUrl,
@@ -69,7 +71,7 @@ export async function findUserById(id) {
     `
     SELECT
       id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, phone_number, bio, avatar_url,
+      full_name, location, role, organization_id, phone_number, bio, avatar_url,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
@@ -88,6 +90,7 @@ export async function findUserAuthById(id) {
     `
     SELECT
       id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      organization_id,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
@@ -107,6 +110,7 @@ export async function findUserAuthByIdentifier(identifier) {
     `
     SELECT
       id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      organization_id,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
@@ -124,6 +128,7 @@ export async function findUserAuthByGoogleId(googleId) {
     `
     SELECT
       id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      organization_id,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
@@ -144,7 +149,7 @@ export async function linkUserGoogleId(id, googleId) {
         updated_at = now()
     WHERE id = $2
     RETURNING
-      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+      id, username, email, password_hash, google_id, full_name, location, role, organization_id, phone_number, bio, avatar_url,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       two_fa_enabled, two_fa_method, two_fa_confirmed_at,
       created_at, updated_at
@@ -162,6 +167,7 @@ export async function updateUserById(id, changes = {}) {
     fullName: "full_name",
     location: "location",
     role: "role",
+    organizationId: "organization_id",
     phoneNumber: "phone_number",
     bio: "bio",
     avatarUrl: "avatar_url",
@@ -197,7 +203,7 @@ export async function updateUserById(id, changes = {}) {
     WHERE id = $${i}
     RETURNING
       id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, phone_number, bio, avatar_url,
+      full_name, location, role, organization_id, phone_number, bio, avatar_url,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     `,
@@ -269,7 +275,31 @@ export async function updateUserNotificationSettings(
   return rows[0] || null;
 }
 
-export async function listUsersWithNotificationEmailEnabled() {
+export async function listUsersWithNotificationEmailEnabled({
+  roleFilter = [],
+  organizationIdFilter = "",
+} = {}) {
+  const roles = Array.isArray(roleFilter)
+    ? roleFilter.map((role) => String(role || "").trim().toLowerCase()).filter(Boolean)
+    : [];
+  const params = [];
+  const where = [
+    `notification_email_enabled = true`,
+    `email IS NOT NULL`,
+    `trim(email) <> ''`,
+  ];
+  let i = 1;
+
+  if (roles.length) {
+    where.push(`lower(role) = ANY($${i++}::text[])`);
+    params.push(roles);
+  }
+  const organizationId = String(organizationIdFilter || "").trim();
+  if (organizationId) {
+    where.push(`organization_id = $${i++}`);
+    params.push(organizationId);
+  }
+
   const { rows } = await query(
     `
     SELECT
@@ -277,18 +307,38 @@ export async function listUsersWithNotificationEmailEnabled() {
       email,
       full_name
     FROM users
-    WHERE notification_email_enabled = true
-      AND email IS NOT NULL
-      AND trim(email) <> ''
-    `
+    WHERE ${where.join(" AND ")}
+    `,
+    params
   );
   return rows || [];
 }
 
-export async function listUsers({ limit = 50, offset = 0, queryText = "" } = {}) {
+export async function listUsers({
+  limit = 50,
+  offset = 0,
+  queryText = "",
+  roleFilter = [],
+  organizationIdFilter = "",
+} = {}) {
   const params = [];
   const where = [];
   let i = 1;
+
+  const roles = Array.isArray(roleFilter)
+    ? roleFilter.map((role) => String(role || "").trim().toLowerCase()).filter(Boolean)
+    : [];
+
+  if (roles.length) {
+    where.push(`lower(role) = ANY($${i++}::text[])`);
+    params.push(roles);
+  }
+
+  const organizationId = String(organizationIdFilter || "").trim();
+  if (organizationId) {
+    where.push(`organization_id = $${i++}`);
+    params.push(organizationId);
+  }
 
   if (queryText) {
     where.push(`(
@@ -317,7 +367,7 @@ export async function listUsers({ limit = 50, offset = 0, queryText = "" } = {})
     `
     SELECT
       id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, phone_number, bio, avatar_url,
+      full_name, location, role, organization_id, phone_number, bio, avatar_url,
       address, employer, income_range, custom_expense_categories, custom_income_categories,
       created_at, updated_at
     FROM users

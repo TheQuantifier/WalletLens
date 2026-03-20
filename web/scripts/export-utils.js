@@ -271,6 +271,8 @@ function normalizeRecordRows(records = []) {
           ? "receipt"
           : record.linked_recurring_id || record.linkedRecurringId
             ? "recurring"
+            : record.linked_plaid_account_id || record.linkedPlaidAccountId
+              ? "plaid"
             : "manual")
     ).toLowerCase();
 
@@ -331,6 +333,50 @@ function normalizeSimpleRows(items = [], config = {}) {
     });
     return row;
   });
+}
+
+function normalizePlaidItemRows(items = []) {
+  return (items || []).map((item) => ({
+    PlaidItemId: item.plaid_item_id || "",
+    InstitutionId: item.institution_id || "",
+    InstitutionName: item.institution_name || "",
+    Status: item.status || "",
+    LastSyncedAt: item.last_synced_at || "",
+    CreatedAt: item.created_at || "",
+    UpdatedAt: item.updated_at || "",
+  }));
+}
+
+function normalizePlaidAccountRows(accounts = []) {
+  return (accounts || []).map((account) => ({
+    Name: account.name || "",
+    OfficialName: account.official_name || "",
+    Mask: account.mask || "",
+    Type: account.type || "",
+    Subtype: account.subtype || "",
+    InstitutionName: account.institution_name || "",
+    PlaidAccountId: account.plaid_account_id || "",
+    PlaidItemId: account.plaid_item_external_id || "",
+    CurrentBalance: Number(account.current_balance || 0),
+    AvailableBalance: Number(account.available_balance || 0),
+    Currency: account.currency || "USD",
+    Active: Boolean(account.is_active),
+    PlaidItemStatus: account.plaid_item_status || "",
+    CreatedAt: account.created_at || "",
+    UpdatedAt: account.updated_at || "",
+  }));
+}
+
+function normalizeNetWorthSnapshotRows(snapshots = []) {
+  return (snapshots || []).map((snapshot) => ({
+    SnapshotDate: snapshot.snapshot_date || "",
+    AssetsTotal: Number(snapshot.assets_total || 0),
+    LiabilitiesTotal: Number(snapshot.liabilities_total || 0),
+    NetWorth: Number(snapshot.net_worth || 0),
+    Currency: snapshot.currency || "USD",
+    CreatedAt: snapshot.created_at || "",
+    UpdatedAt: snapshot.updated_at || "",
+  }));
 }
 
 export async function exportAllUserData({
@@ -395,6 +441,18 @@ export async function exportAllUserData({
       rows: normalizeSimpleRows(bundle?.netWorth || [], {
         fields: ["type", "name", "amount", "created_at", "updated_at"],
       }),
+    },
+    {
+      name: "Net Worth Snapshots",
+      rows: normalizeNetWorthSnapshotRows(bundle?.netWorthSnapshots || []),
+    },
+    {
+      name: "Linked Items",
+      rows: normalizePlaidItemRows(bundle?.plaidItems || []),
+    },
+    {
+      name: "Linked Accounts",
+      rows: normalizePlaidAccountRows(bundle?.plaidAccounts || []),
     },
     {
       name: "Achievements",

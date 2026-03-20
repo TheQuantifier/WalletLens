@@ -81,6 +81,8 @@ export const applyRulesToRecord = (record, rules, context = {}) => {
       ? "receipt"
       : record?.linkedRecurringId || record?.linked_recurring_id
         ? "recurring"
+        : record?.linkedPlaidAccountId || record?.linked_plaid_account_id
+          ? "plaid"
         : "manual");
 
   const candidate = {

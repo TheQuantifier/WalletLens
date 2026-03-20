@@ -286,6 +286,34 @@ export const records = {
 };
 
 // ======================================================================
+// PLAID MODULE
+// ======================================================================
+export const plaid = {
+  accounts() {
+    return request("/plaid/accounts");
+  },
+
+  createLinkToken() {
+    return request("/plaid/link-token", { method: "POST" });
+  },
+
+  exchangePublicToken({ publicToken, institution } = {}) {
+    return request("/plaid/exchange", {
+      method: "POST",
+      body: JSON.stringify({ publicToken, institution }),
+    });
+  },
+
+  sync() {
+    return request("/plaid/sync", { method: "POST" });
+  },
+
+  removeAccount(id) {
+    return request(`/plaid/accounts/${id}`, { method: "DELETE" });
+  },
+};
+
+// ======================================================================
 // RULES MODULE
 // ======================================================================
 export const rules = {
@@ -351,6 +379,11 @@ export const recurring = {
 export const netWorth = {
   list() {
     return request("/net-worth");
+  },
+
+  overview(days = 365) {
+    const query = new URLSearchParams({ days: String(days) }).toString();
+    return request(`/net-worth/overview?${query}`);
   },
 
   create({ type, name, amount }) {
@@ -856,6 +889,7 @@ export function getUploadType(record) {
 
   if (origin === "receipt") return "Receipt";
   if (origin === "recurring") return "Recurring";
+  if (origin === "plaid") return "Plaid";
   return "Manual";
 }
 
@@ -904,6 +938,7 @@ export const api = {
   activity,
   achievements,
   notifications,
+  plaid,
   appSettings,
   settings,
   admin,

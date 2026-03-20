@@ -5,6 +5,11 @@ let permissionsCache = null;
 let permissionsCacheExpiresAt = 0;
 const CACHE_TTL_MS = 15000;
 
+export function clearAdminPermissionsCache() {
+  permissionsCache = null;
+  permissionsCacheExpiresAt = 0;
+}
+
 async function getEffectivePermissionsMap() {
   const now = Date.now();
   if (permissionsCache && now < permissionsCacheExpiresAt) {

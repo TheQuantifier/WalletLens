@@ -17,6 +17,7 @@ router.param("id", (req, res, next, id) => {
 });
 
 router.get("/", auth, controller.list);
+router.get("/overview", auth, controller.overview);
 router.post("/", auth, controller.create);
 router.put("/:id", auth, controller.update);
 router.delete("/:id", auth, controller.remove);

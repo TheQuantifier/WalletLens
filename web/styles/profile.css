@@ -271,11 +271,32 @@ textarea { resize: vertical; }
   font-weight: 700;
 }
 
+.testing-banner {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.9rem;
+  margin: 0.35rem 0 0.5rem;
+  padding: 0.2rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid #d4a017;
+  background: #fef3c7;
+  color: #8a5a00;
+  font-size: 0.85rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
 /* ===== LINKED ACCOUNTS ===== */
 .linked-list {
   display: grid;
   gap: 0.75rem;
   margin-top: 0.75rem;
+}
+
+.linked-list--scroll {
+  max-height: calc(5 * 4.75rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
 }
 
 .linked-item {
@@ -306,6 +327,87 @@ textarea { resize: vertical; }
   color: var(--primary);
   font-size: 0.8rem;
   font-weight: 600;
+}
+
+.linked-group {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+}
+
+.linked-group__header {
+  display: flex;
+  align-items: stretch;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+}
+
+.linked-group__toggle {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.linked-group__toggle:hover {
+  background: transparent;
+}
+
+.linked-group__summary {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.linked-group__caret {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.linked-group__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  flex: 0 0 auto;
+}
+
+.linked-group__accounts {
+  display: grid;
+  gap: 0.65rem;
+  padding: 0 0.9rem 0.9rem;
+}
+
+.linked-account-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: color-mix(in srgb, var(--card-bg) 88%, var(--bg) 12%);
+}
+
+.linked-account-row .label {
+  font-weight: 700;
+}
+
+.linked-account-row__meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
 }
 
 .bank-grid {
@@ -366,6 +468,13 @@ textarea { resize: vertical; }
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 0.75rem;
   margin-top: 0.75rem;
+}
+
+.achievement-grid--scroll {
+  max-height: calc(5 * 4.75rem + 3rem);
+  overflow-y: auto;
+  padding-right: 0.25rem;
+  align-content: start;
 }
 
 .achievement-card {

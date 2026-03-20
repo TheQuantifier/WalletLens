@@ -6,11 +6,12 @@ import { listReceipts } from "../models/receipt.model.js";
 import { listBudgetSheets } from "../models/budget_sheet.model.js";
 import { listRecurringSchedules } from "../models/recurring.model.js";
 import { listRulesByUser } from "../models/rule.model.js";
-import { listNetWorthItems } from "../models/net_worth.model.js";
+import { listNetWorthItems, listNetWorthSnapshots } from "../models/net_worth.model.js";
 import { listUnlockedAchievementsForUser } from "../models/achievement.model.js";
+import { listActivePlaidAccountsByUser, listActivePlaidItemsByUser } from "../models/plaid_item.model.js";
 
 export const exportAllData = asyncHandler(async (req, res) => {
-  const [profile, notificationSettings, records, receipts, budgetSheets, recurring, rules, netWorth, achievements, activity] =
+  const [profile, notificationSettings, records, receipts, budgetSheets, recurring, rules, netWorth, netWorthSnapshots, plaidItems, plaidAccounts, achievements, activity] =
     await Promise.all([
       findUserById(req.user.id),
       getUserNotificationSettings(req.user.id),
@@ -20,6 +21,9 @@ export const exportAllData = asyncHandler(async (req, res) => {
       listRecurringSchedules(req.user.id, {}),
       listRulesByUser(req.user.id, {}),
       listNetWorthItems(req.user.id),
+      listNetWorthSnapshots(req.user.id, { days: 3650 }),
+      listActivePlaidItemsByUser(req.user.id),
+      listActivePlaidAccountsByUser(req.user.id),
       listUnlockedAchievementsForUser(req.user.id),
       query(
         `
@@ -46,6 +50,9 @@ export const exportAllData = asyncHandler(async (req, res) => {
     recurring,
     rules,
     netWorth,
+    netWorthSnapshots,
+    plaidItems,
+    plaidAccounts,
     achievements,
     activity,
   });

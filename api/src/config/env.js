@@ -41,6 +41,9 @@ const env = {
   googleClientId: process.env.GOOGLE_CLIENT_ID || "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET || "",
   googleRedirectUri: process.env.GOOGLE_REDIRECT_URI || "",
+  plaidClientId: process.env.PLAID_CLIENT_ID || "",
+  plaidSecret: process.env.PLAID_SECRET || "",
+  plaidEnv: process.env.PLAID_ENV || "sandbox",
 
   // CORS
   clientOrigins: (process.env.CORS_ORIGIN || "http://localhost:5500")

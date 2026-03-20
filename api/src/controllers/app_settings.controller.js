@@ -16,6 +16,7 @@ import {
 } from "../services/admin_permissions.service.js";
 import { sanitizeSystemHealthControls } from "../services/system_health_controls.service.js";
 import { clearRuntimeAppSettingsCache } from "../services/app_settings_runtime.service.js";
+import { clearAdminPermissionsCache } from "../middleware/require_admin_permission.js";
 
 export const getPublic = asyncHandler(async (_req, res) => {
   const settings = await getAppSettings();
@@ -323,6 +324,9 @@ export const updateAdmin = asyncHandler(async (req, res) => {
   const catalogRows = await listAchievementsCatalog();
   const achievementsCatalogSanitized = sanitizeAchievementsCatalog(catalogRows);
   clearRuntimeAppSettingsCache();
+  if (hasAdminRolePermissions) {
+    clearAdminPermissionsCache();
+  }
   if (updated) {
     updated.achievements_catalog = achievementsCatalogSanitized;
     updated.admin_role_permissions = sanitizeRolePermissionOverrides(updated.admin_role_permissions);

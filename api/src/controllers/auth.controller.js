@@ -66,7 +66,12 @@ function generateSixDigitCode() {
 
 function isAdminRoleType(role) {
   const normalized = String(role || "").trim().toLowerCase();
-  return normalized === "admin" || normalized === "support_admin" || normalized === "analyst";
+  return (
+    normalized === "admin" ||
+    normalized === "org_admin" ||
+    normalized === "support_admin" ||
+    normalized === "analyst"
+  );
 }
 
 async function createSessionWithPolicy({ userId, userAgent = "", ipAddress = "" }) {

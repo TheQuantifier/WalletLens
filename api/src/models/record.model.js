@@ -25,6 +25,9 @@ export async function createRecord(userId, data) {
     note = "",
     linkedReceiptId = null,
     linkedRecurringId = null,
+    linkedPlaidAccountId = null,
+    plaidTransactionId = null,
+    currency = "USD",
     origin = linkedReceiptId ? "receipt" : linkedRecurringId ? "recurring" : "manual",
   } = data;
 
@@ -37,12 +40,26 @@ export async function createRecord(userId, data) {
   const { rows } = await query(
     `
     INSERT INTO records
-      (user_id, type, amount, category, date, note, linked_receipt_id, origin, linked_recurring_id)
+      (user_id, type, amount, category, date, note, linked_receipt_id, origin, linked_recurring_id,
+       linked_plaid_account_id, plaid_transaction_id, currency)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
     RETURNING *
     `,
-    [userId, type, amount, category, utcNoon.toISOString(), note, linkedReceiptId, origin, linkedRecurringId]
+    [
+      userId,
+      type,
+      amount,
+      category,
+      utcNoon.toISOString(),
+      note,
+      linkedReceiptId,
+      origin,
+      linkedRecurringId,
+      linkedPlaidAccountId,
+      plaidTransactionId,
+      currency || "USD",
+    ]
   );
 
   return rows[0];
@@ -110,6 +127,9 @@ export async function updateRecord(userId, id, changes = {}) {
     note: "note",
     linkedReceiptId: "linked_receipt_id",
     linkedRecurringId: "linked_recurring_id",
+    linkedPlaidAccountId: "linked_plaid_account_id",
+    plaidTransactionId: "plaid_transaction_id",
+    currency: "currency",
     origin: "origin",
   };
 
@@ -181,10 +201,16 @@ export async function listRecordsAdmin({
   type,
   limit = 200,
   offset = 0,
+  roleFilter = [],
+  organizationIdFilter = "",
 } = {}) {
   const where = [];
   const params = [];
   let i = 1;
+
+  const roles = Array.isArray(roleFilter)
+    ? roleFilter.map((role) => String(role || "").trim().toLowerCase()).filter(Boolean)
+    : [];
 
   if (userId) {
     where.push(`user_id = $${i++}`);
@@ -203,6 +229,16 @@ export async function listRecordsAdmin({
     );
     params.push(like);
     i += 1;
+  }
+
+  if (roles.length) {
+    where.push(`lower(users.role) = ANY($${i++}::text[])`);
+    params.push(roles);
+  }
+  const organizationId = String(organizationIdFilter || "").trim();
+  if (organizationId) {
+    where.push(`users.organization_id = $${i++}`);
+    params.push(organizationId);
   }
 
   params.push(limit);
@@ -249,6 +285,9 @@ export async function updateRecordAdmin(id, changes = {}) {
     note: "note",
     linkedReceiptId: "linked_receipt_id",
     linkedRecurringId: "linked_recurring_id",
+    linkedPlaidAccountId: "linked_plaid_account_id",
+    plaidTransactionId: "plaid_transaction_id",
+    currency: "currency",
     origin: "origin",
   };
 
@@ -300,4 +339,116 @@ export async function deleteRecordAdmin(id) {
     [id]
   );
   return rows[0] || null;
+}
+
+export async function createOrUpdatePlaidRecord(userId, data) {
+  const {
+    type,
+    amount,
+    category,
+    date,
+    note = "",
+    linkedPlaidAccountId = null,
+    plaidTransactionId,
+    currency = "USD",
+  } = data || {};
+
+  if (!plaidTransactionId) {
+    throw new Error("plaidTransactionId is required");
+  }
+
+  const dt = date ? new Date(date) : new Date();
+  const utcNoon = new Date(
+    Date.UTC(dt.getUTCFullYear(), dt.getUTCMonth(), dt.getUTCDate(), 12, 0, 0)
+  );
+
+  const { rows: updatedRows } = await query(
+    `
+    UPDATE records
+    SET
+      user_id = $1,
+      type = $2,
+      amount = $3,
+      category = $4,
+      date = $5,
+      note = $6,
+      origin = 'plaid',
+      linked_plaid_account_id = $7,
+      currency = $9,
+      updated_at = now()
+    WHERE plaid_transaction_id = $8
+    RETURNING *
+    `,
+    [
+      userId,
+      type,
+      amount,
+      category,
+      utcNoon.toISOString(),
+      note,
+      linkedPlaidAccountId,
+      plaidTransactionId,
+      currency || "USD",
+    ]
+  );
+
+  if (updatedRows[0]) {
+    return updatedRows[0];
+  }
+
+  const { rows } = await query(
+    `
+    INSERT INTO records
+      (user_id, type, amount, category, date, note, origin, linked_plaid_account_id, plaid_transaction_id, currency)
+    VALUES
+      ($1, $2, $3, $4, $5, $6, 'plaid', $7, $8, $9)
+    RETURNING *
+    `,
+    [
+      userId,
+      type,
+      amount,
+      category,
+      utcNoon.toISOString(),
+      note,
+      linkedPlaidAccountId,
+      plaidTransactionId,
+      currency || "USD",
+    ]
+  );
+
+  return rows[0] || null;
+}
+
+export async function deletePlaidRecordsByTransactionIds(userId, plaidTransactionIds = []) {
+  const ids = Array.isArray(plaidTransactionIds)
+    ? plaidTransactionIds.map((id) => String(id || "").trim()).filter(Boolean)
+    : [];
+  if (!ids.length) return 0;
+
+  const { rowCount } = await query(
+    `
+    DELETE FROM records
+    WHERE user_id = $1
+      AND plaid_transaction_id = ANY($2::text[])
+    `,
+    [userId, ids]
+  );
+
+  return rowCount || 0;
+}
+
+export async function deletePlaidRecordsByAccountId(userId, linkedPlaidAccountId) {
+  if (!linkedPlaidAccountId) return 0;
+
+  const { rowCount } = await query(
+    `
+    DELETE FROM records
+    WHERE user_id = $1
+      AND linked_plaid_account_id = $2
+    `,
+    [userId, linkedPlaidAccountId]
+  );
+
+  return rowCount || 0;
 }

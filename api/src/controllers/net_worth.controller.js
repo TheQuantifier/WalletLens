@@ -7,6 +7,7 @@ import {
   deleteNetWorthItem,
 } from "../models/net_worth.model.js";
 import { evaluateAchievementsForUser } from "../services/achievements.service.js";
+import { captureNetWorthSnapshot, getNetWorthOverview } from "../services/net_worth_snapshot.service.js";
 
 const VALID_TYPES = new Set(["asset", "liability"]);
 
@@ -18,6 +19,12 @@ const parseAmount = (value) => {
 export const list = asyncHandler(async (req, res) => {
   const items = await listNetWorthItems(req.user.id);
   res.json({ items });
+});
+
+export const overview = asyncHandler(async (req, res) => {
+  const days = Number.parseInt(String(req.query.days ?? ""), 10);
+  const overviewData = await getNetWorthOverview(req.user.id, { days });
+  res.json(overviewData);
 });
 
 export const create = asyncHandler(async (req, res) => {
@@ -39,6 +46,7 @@ export const create = asyncHandler(async (req, res) => {
     name: trimmed,
     amount: parsedAmount,
   });
+  await captureNetWorthSnapshot(req.user.id);
   await evaluateAchievementsForUser(req.user.id);
   res.status(201).json({ item });
 });
@@ -68,6 +76,7 @@ export const update = asyncHandler(async (req, res) => {
   if (!item) {
     return res.status(404).json({ message: "Net worth item not found." });
   }
+  await captureNetWorthSnapshot(req.user.id);
   await evaluateAchievementsForUser(req.user.id);
   res.json({ item });
 });
@@ -78,6 +87,7 @@ export const remove = asyncHandler(async (req, res) => {
   if (!item) {
     return res.status(404).json({ message: "Net worth item not found." });
   }
+  await captureNetWorthSnapshot(req.user.id);
   await evaluateAchievementsForUser(req.user.id);
   res.json({ item });
 });

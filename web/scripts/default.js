@@ -873,7 +873,7 @@ async function updateHeaderAuthState() {
 
 function setAdminVisibility(role) {
   const normalizedRole = String(role || "").trim().toLowerCase();
-  const isAdminType = ["admin", "support_admin", "analyst"].includes(normalizedRole);
+  const isAdminType = ["admin", "org_admin", "support_admin", "analyst"].includes(normalizedRole);
   document.querySelectorAll(".admin-only").forEach((el) => {
     el.classList.toggle("is-hidden", !isAdminType);
   });

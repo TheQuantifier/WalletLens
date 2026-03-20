@@ -116,6 +116,9 @@ const els = {
   achievementStatus: document.getElementById("achievementStatus"),
   notificationEditor: document.getElementById("notificationEditor"),
   notificationTypeInput: document.getElementById("notificationTypeInput"),
+  notificationAudienceInput: document.getElementById("notificationAudienceInput"),
+  notificationOrganizationWrap: document.getElementById("notificationOrganizationWrap"),
+  notificationOrganizationIdInput: document.getElementById("notificationOrganizationIdInput"),
   publishNotificationBtn: document.getElementById("publishNotificationBtn"),
   notificationHistoryList: document.getElementById("notificationHistoryList"),
   notificationAdminStatus: document.getElementById("notificationAdminStatus"),
@@ -128,6 +131,7 @@ const els = {
   userEmail: document.getElementById("adminUserEmail"),
   userUsername: document.getElementById("adminUserUsername"),
   userRole: document.getElementById("adminUserRole"),
+  userOrganizationId: document.getElementById("adminUserOrganizationId"),
   userStatus: document.getElementById("adminUserStatus"),
 
   recordModal: document.getElementById("adminRecordModal"),
@@ -177,6 +181,8 @@ const state = {
 };
 
 const ROLE_PERMISSIONS = {
+  user: new Set([]),
+  org_user: new Set([]),
   admin: new Set([
     "users.read",
     "users.write",
@@ -191,6 +197,15 @@ const ROLE_PERMISSIONS = {
     "audit.read",
     "health.read",
     "health.write",
+  ]),
+  org_admin: new Set([
+    "users.read",
+    "users.write",
+    "notifications.read",
+    "notifications.write",
+    "support.read",
+    "support.write",
+    "audit.read",
   ]),
   support_admin: new Set([
     "users.read",
@@ -225,7 +240,8 @@ const PERMISSIONS_GRID_ORDER = [
   "health.read",
   "health.write",
 ];
-const ADMIN_ROLES_FOR_GRID = ["user", "analyst", "support_admin"];
+const FIXED_PERMISSION_ROLES = new Set(["admin"]);
+const ADMIN_ROLES_FOR_GRID = ["user", "org_user", "analyst", "support_admin", "org_admin", "admin"];
 
 const ACHIEVEMENT_METRICS = new Set([
   "records_total",
@@ -290,6 +306,10 @@ function hasPermission(permission) {
   return state.permissions.has(permission);
 }
 
+function isOrgAdminCurrentUser() {
+  return String(state.currentRole || "").trim().toLowerCase() === "org_admin";
+}
+
 function setElementVisible(el, visible) {
   if (!el) return;
   el.classList.toggle("is-hidden", !visible);
@@ -329,6 +349,65 @@ function setReadOnlyBadge(panel, requiredRole, show) {
 
   if (!existing) {
     titleAnchor.appendChild(badge);
+  }
+}
+
+function syncNotificationScopeControls() {
+  const orgAdmin = isOrgAdminCurrentUser();
+  if (els.notificationAudienceInput) {
+    if (orgAdmin) {
+      els.notificationAudienceInput.value = "organization";
+    }
+    els.notificationAudienceInput.disabled = orgAdmin || !hasPermission("notifications.write");
+  }
+  const selectedAudience = orgAdmin
+    ? "organization"
+    : String(els.notificationAudienceInput?.value || "all").trim().toLowerCase();
+  const showOrganizationInput = selectedAudience === "organization";
+  setElementVisible(els.notificationOrganizationWrap, showOrganizationInput);
+  if (els.notificationOrganizationIdInput) {
+    els.notificationOrganizationIdInput.disabled = orgAdmin || !showOrganizationInput || !hasPermission("notifications.write");
+    if (orgAdmin) {
+      els.notificationOrganizationIdInput.value =
+        state.currentUser?.organization_id || state.currentUser?.organizationId || "";
+    }
+    if (!showOrganizationInput && !orgAdmin) {
+      els.notificationOrganizationIdInput.value = "";
+    }
+  }
+}
+
+function resetNotificationEditor() {
+  if (els.notificationEditor) {
+    els.notificationEditor.innerHTML = "";
+  }
+  if (els.notificationTypeInput) {
+    els.notificationTypeInput.value = "general";
+  }
+  if (els.notificationAudienceInput) {
+    els.notificationAudienceInput.value = isOrgAdminCurrentUser() ? "organization" : "all";
+  }
+  if (els.notificationOrganizationIdInput) {
+    els.notificationOrganizationIdInput.value = isOrgAdminCurrentUser()
+      ? state.currentUser?.organization_id || state.currentUser?.organizationId || ""
+      : "";
+  }
+  state.editingNotificationId = "";
+  syncNotificationScopeControls();
+}
+
+function applyScopedUserRoleOptions() {
+  if (!els.userRole) return;
+  const isOrgAdmin = state.currentRole === "org_admin";
+  Array.from(els.userRole.options || []).forEach((option) => {
+    const value = String(option.value || "").trim().toLowerCase();
+    option.hidden = isOrgAdmin && value !== "org_user";
+  });
+  if (isOrgAdmin) {
+    els.userRole.value = "org_user";
+  }
+  if (els.userOrganizationId) {
+    els.userOrganizationId.disabled = isOrgAdmin || !hasPermission("users.write");
   }
 }
 
@@ -375,6 +454,10 @@ function applyPermissionVisibility() {
     if (els.publishNotificationBtn) els.publishNotificationBtn.disabled = true;
     setControlsDisabled(document.querySelector(".admin-notification-toolbar"), true);
     if (els.notificationEditor) els.notificationEditor.setAttribute("contenteditable", "false");
+  } else {
+    if (els.publishNotificationBtn) els.publishNotificationBtn.disabled = false;
+    setControlsDisabled(document.querySelector(".admin-notification-toolbar"), false);
+    if (els.notificationEditor) els.notificationEditor.setAttribute("contenteditable", "true");
   }
 
   if (!canSupportWrite) {
@@ -396,6 +479,8 @@ function applyPermissionVisibility() {
   setReadOnlyBadge(els.notificationsPanel, "support_admin", canNotificationsRead && !canNotificationsWrite);
   setReadOnlyBadge(els.supportPanel, "support_admin", canSupportRead && !canSupportWrite);
   setReadOnlyBadge(els.systemHealthPanel, "admin", canHealthRead && !canHealthWrite);
+  applyScopedUserRoleOptions();
+  syncNotificationScopeControls();
 }
 
 function isPermissionError(err) {
@@ -427,7 +512,7 @@ function bindModalClose() {
 async function ensureAdmin() {
   try {
     const { user } = await api.auth.me();
-    if (!["admin", "support_admin", "analyst"].includes(String(user?.role || ""))) {
+    if (!["admin", "org_admin", "support_admin", "analyst"].includes(String(user?.role || ""))) {
       window.location.href = "home.html";
       return false;
     }
@@ -649,6 +734,7 @@ function sanitizeAdminRolePermissionOverrides(input) {
   const allowedPermissions = new Set(PERMISSIONS_GRID_ORDER);
   const next = {};
   ADMIN_ROLES_FOR_GRID.forEach((role) => {
+    if (FIXED_PERMISSION_ROLES.has(role)) return;
     const raw = input[role];
     if (!Array.isArray(raw)) return;
     next[role] = [...new Set(
@@ -663,6 +749,7 @@ function sanitizeAdminRolePermissionOverrides(input) {
 function getEffectiveRolePermissionSet(role) {
   const base = ROLE_PERMISSIONS[role] ? [...ROLE_PERMISSIONS[role]] : [];
   const override = state.adminRolePermissions?.[role];
+  if (FIXED_PERMISSION_ROLES.has(role)) return new Set(base);
   if (!Array.isArray(override)) return new Set(base);
   return new Set(override);
 }
@@ -684,13 +771,21 @@ function renderPermissionsMatrix() {
   els.permissionsTbody.innerHTML = ADMIN_ROLES_FOR_GRID
     .map((role) => {
       const allowed = getEffectiveRolePermissionSet(role);
+      const isFixedRole = FIXED_PERMISSION_ROLES.has(role);
       const cells = PERMISSIONS_GRID_ORDER
         .map((permission) => {
           const checked = allowed.has(permission) ? "checked" : "";
-          return `<td class="admin-permission-cell"><input type="checkbox" data-role="${escapeHtml(role)}" data-permission="${escapeHtml(permission)}" ${checked} ${state.savingPermissions ? "disabled" : ""} aria-label="${escapeHtml(role)} ${escapeHtml(permission)}" /></td>`;
+          const disabled = state.savingPermissions || isFixedRole ? "disabled" : "";
+          return `<td class="admin-permission-cell"><input type="checkbox" data-role="${escapeHtml(role)}" data-permission="${escapeHtml(permission)}" ${checked} ${disabled} aria-label="${escapeHtml(role)} ${escapeHtml(permission)}" /></td>`;
         })
         .join("");
-      return `<tr><th scope="row">${escapeHtml(role)}</th>${cells}</tr>`;
+      const roleInfo = role === "org_admin"
+        ? ` <span class="admin-inline-info-popover"><span class="admin-inline-info" tabindex="0" aria-label="Org admin scope information">i</span><span class="admin-inline-info-tooltip" role="tooltip">Org admins can only control members in their own organization and no one else.</span></span>`
+        : "";
+      const roleLabel = isFixedRole
+        ? `${escapeHtml(role)} <span class="subtle">(fixed)</span>${roleInfo}`
+        : `${escapeHtml(role)}${roleInfo}`;
+      return `<tr><th scope="row">${roleLabel}</th>${cells}</tr>`;
     })
     .join("");
 }
@@ -1121,6 +1216,11 @@ function renderNotificationHistory() {
       const createdAt = escapeHtml(formatDateTime(item.created_at));
       const type = escapeHtml(String(item.notification_type || "general"));
       const isActive = Boolean(item.is_active);
+      const audience = String(item.audience || "all").trim().toLowerCase();
+      const organizationId = escapeHtml(String(item.organization_id || ""));
+      const scopeLabel = audience === "organization"
+        ? `organization${organizationId ? ` (${organizationId})` : ""}`
+        : "all users";
       return `
         <article class="admin-notification-item">
           <div class="admin-notification-meta">${createdAt} • ${type} • ${isActive ? "active" : "inactive"} • by ${creator}</div>
@@ -1162,12 +1262,24 @@ async function publishNotificationFromEditor() {
   const html = String(els.notificationEditor?.innerHTML || "").trim();
   const text = extractNotificationTextFromHtml(html);
   const notificationType = String(els.notificationTypeInput?.value || "general").trim().toLowerCase();
+  const audience = isOrgAdminCurrentUser()
+    ? "organization"
+    : String(els.notificationAudienceInput?.value || "all").trim().toLowerCase();
+  const organizationId = String(els.notificationOrganizationIdInput?.value || "").trim();
   if (!text) {
     setStatus(els.notificationAdminStatus, "Notification text is required.", "error");
     return;
   }
   if (!["security", "general", "updates"].includes(notificationType)) {
     setStatus(els.notificationAdminStatus, "Notification type is invalid.", "error");
+    return;
+  }
+  if (!["all", "organization"].includes(audience)) {
+    setStatus(els.notificationAdminStatus, "Notification audience is invalid.", "error");
+    return;
+  }
+  if (audience === "organization" && !organizationId && !isOrgAdminCurrentUser()) {
+    setStatus(els.notificationAdminStatus, "Organization ID is required for organization notifications.", "error");
     return;
   }
 
@@ -1181,17 +1293,18 @@ async function publishNotificationFromEditor() {
       await api.admin.updateNotification(state.editingNotificationId, {
         messageHtml: html,
         notificationType,
+        audience,
+        organizationId,
       });
     } else {
-      await api.admin.createNotification({ messageHtml: html, notificationType });
+      await api.admin.createNotification({
+        messageHtml: html,
+        notificationType,
+        audience,
+        organizationId,
+      });
     }
-    if (els.notificationEditor) {
-      els.notificationEditor.innerHTML = "";
-    }
-    if (els.notificationTypeInput) {
-      els.notificationTypeInput.value = "general";
-    }
-    state.editingNotificationId = "";
+    resetNotificationEditor();
     await loadNotificationHistory();
     setStatus(els.notificationAdminStatus, isEdit ? "Notification updated." : "Notification published.", "ok");
   } catch (err) {
@@ -1810,6 +1923,10 @@ function openUserModal(user) {
   els.userFullName.value = user.full_name || user.fullName || "";
   els.userEmail.value = user.email || "";
   els.userUsername.value = user.username || "";
+  if (els.userOrganizationId) {
+    els.userOrganizationId.value = user.organization_id || user.organizationId || "";
+  }
+  applyScopedUserRoleOptions();
   els.userRole.value = user.role || "user";
   setStatus(els.userStatus, "");
   openModal(els.userModal);
@@ -1831,6 +1948,7 @@ async function saveUser(event) {
       email: els.userEmail.value,
       username: els.userUsername.value,
       role: els.userRole.value,
+      organizationId: els.userOrganizationId?.value || "",
     });
     setStatus(els.userStatus, "User updated.", "ok");
     await Promise.all([loadUsers(), loadUserOptions(), loadStats()]);
@@ -2394,6 +2512,9 @@ function bindEvents() {
   if (els.publishNotificationBtn) {
     els.publishNotificationBtn.addEventListener("click", publishNotificationFromEditor);
   }
+  if (els.notificationAudienceInput) {
+    els.notificationAudienceInput.addEventListener("change", syncNotificationScopeControls);
+  }
   document.querySelectorAll("button[data-notification-cmd]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const cmd = String(btn.dataset.notificationCmd || "").trim();
@@ -2414,6 +2535,7 @@ function bindEvents() {
     const role = String(checkbox.dataset.role || "").trim();
     const permission = String(checkbox.dataset.permission || "").trim();
     if (!ADMIN_ROLES_FOR_GRID.includes(role)) return;
+    if (FIXED_PERMISSION_ROLES.has(role)) return;
     if (!PERMISSIONS_GRID_ORDER.includes(permission)) return;
 
     const current = getEffectiveRolePermissionSet(role);
@@ -2487,7 +2609,14 @@ function bindEvents() {
       if (els.notificationTypeInput) {
         els.notificationTypeInput.value = String(item.notification_type || "general");
       }
+      if (els.notificationAudienceInput) {
+        els.notificationAudienceInput.value = String(item.audience || "all").trim().toLowerCase() || "all";
+      }
+      if (els.notificationOrganizationIdInput) {
+        els.notificationOrganizationIdInput.value = String(item.organization_id || "").trim();
+      }
       state.editingNotificationId = String(item.id || "");
+      syncNotificationScopeControls();
       setStatus(els.notificationAdminStatus, "Editing existing notification. Click publish to update.");
       setNotificationsPanelCollapsed(false);
     }
@@ -2576,6 +2705,7 @@ async function init() {
   setStatus(els.notificationAdminStatus, "");
   setStatus(els.auditStatus, "");
   setStatus(els.supportStatusMsg, "");
+  resetNotificationEditor();
   setStatus(els.healthStatus, "");
   setStatus(els.healthDisconnectStatus, "");
   setStatus(els.permissionsStatus, "");

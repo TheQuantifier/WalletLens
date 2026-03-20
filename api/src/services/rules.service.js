@@ -7,7 +7,7 @@ const AMOUNT_OPS = new Set(["between", "gte", "lte", "gt", "lt"]);
 const ACTION_TYPES = new Set(["setCategory", "appendNote", "setType", "setNote"]);
 const APPLY_MODES = new Set(["first", "all"]);
 const RECORD_TYPES = new Set(["income", "expense"]);
-const ORIGINS = new Set(["manual", "receipt", "recurring"]);
+const ORIGINS = new Set(["manual", "receipt", "recurring", "plaid"]);
 
 const normalizeText = (value) => String(value || "").trim();
 const normalizeTextLower = (value) => normalizeText(value).toLowerCase();
@@ -151,7 +151,7 @@ function normalizeConditions(input) {
       return { ok: false, message: "type condition must be income or expense." };
     }
     if (field === "origin" && !ORIGINS.has(value)) {
-      return { ok: false, message: "origin condition must be manual, receipt, or recurring." };
+      return { ok: false, message: "origin condition must be manual, receipt, recurring, or plaid." };
     }
 
     conditions.push({ field, op, value });
@@ -244,6 +244,8 @@ export function applyRulesToRecord(record, rules, context = {}) {
       ? "receipt"
       : base.linkedRecurringId || base.linked_recurring_id
         ? "recurring"
+        : base.linkedPlaidAccountId || base.linked_plaid_account_id
+          ? "plaid"
         : "manual");
 
   const candidate = {
@@ -341,6 +343,8 @@ export async function bulkApplyRulesForUser(userId) {
           ? "receipt"
           : record.linked_recurring_id
             ? "recurring"
+            : record.linked_plaid_account_id
+              ? "plaid"
             : "manual"),
     });
     const changes = {};

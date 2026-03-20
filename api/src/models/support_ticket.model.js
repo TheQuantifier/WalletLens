@@ -31,12 +31,17 @@ export async function listSupportTickets({
   queryText = "",
   limit = 100,
   offset = 0,
+  roleFilter = [],
+  organizationIdFilter = "",
 } = {}) {
   const safeLimit = Math.max(1, Math.min(500, Number(limit) || 100));
   const safeOffset = Math.max(0, Number(offset) || 0);
   const params = [];
   const where = [];
   let i = 1;
+  const roles = Array.isArray(roleFilter)
+    ? roleFilter.map((role) => String(role || "").trim().toLowerCase()).filter(Boolean)
+    : [];
 
   if (status) {
     where.push(`t.status = $${i++}`);
@@ -52,6 +57,15 @@ export async function listSupportTickets({
     params.push(`%${queryText}%`);
     i += 1;
   }
+  if (roles.length) {
+    where.push(`lower(coalesce(u.role, '')) = ANY($${i++}::text[])`);
+    params.push(roles);
+  }
+  const organizationId = String(organizationIdFilter || "").trim();
+  if (organizationId) {
+    where.push(`coalesce(u.organization_id, '') = $${i++}`);
+    params.push(organizationId);
+  }
 
   params.push(safeLimit, safeOffset);
   const { rows } = await query(
@@ -59,7 +73,8 @@ export async function listSupportTickets({
     SELECT
       t.*,
       u.username as user_username,
-      u.full_name as user_full_name
+      u.full_name as user_full_name,
+      u.role as user_role
     FROM support_tickets t
     LEFT JOIN users u ON u.id = t.user_id
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}

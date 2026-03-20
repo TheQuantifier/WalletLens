@@ -12,6 +12,27 @@ import { sendEmail } from "../services/email.service.js";
 import { logActivity } from "../services/activity.service.js";
 import { getRuntimeAppSettings } from "../services/app_settings_runtime.service.js";
 
+const ORGANIZATION_AUDIENCE = "organization";
+const ALL_AUDIENCE = "all";
+
+function isOrgAdminRole(role) {
+  return String(role || "").trim().toLowerCase() === "org_admin";
+}
+
+function getActorOrganizationId(req) {
+  return String(req.user?.organization_id || req.user?.organizationId || "").trim();
+}
+
+function normalizeOrganizationId(rawOrganizationId) {
+  const value = String(rawOrganizationId || "").trim();
+  return value || "";
+}
+
+function normalizeNotificationAudience(rawAudience) {
+  const value = String(rawAudience || ALL_AUDIENCE).trim().toLowerCase();
+  return value === ORGANIZATION_AUDIENCE ? ORGANIZATION_AUDIENCE : ALL_AUDIENCE;
+}
+
 const ALLOWED_NOTIFICATION_TAGS = new Set([
   "p",
   "br",
@@ -138,11 +159,22 @@ export const listAdmin = asyncHandler(async (req, res) => {
   const type = normalizeNotificationType(rawType);
   const activeRaw = String(req.query?.active || "").trim().toLowerCase();
   const isActive = activeRaw === "true" ? true : activeRaw === "false" ? false : null;
+  const organizationId = getActorOrganizationId(req);
+  if (isOrgAdminRole(req.user?.role) && !organizationId) {
+    return res.json({ notifications: [] });
+  }
+  const audience = isOrgAdminRole(req.user?.role)
+    ? ORGANIZATION_AUDIENCE
+    : req.query?.audience !== undefined
+      ? normalizeNotificationAudience(req.query?.audience)
+      : "";
 
   const notifications = await listNotificationHistory({
     limit: 200,
     notificationType: type || "",
     isActive,
+    audience,
+    organizationId: isOrgAdminRole(req.user?.role) ? organizationId : "",
   });
   res.json({ notifications });
 });
@@ -160,11 +192,26 @@ export const createAdmin = asyncHandler(async (req, res) => {
       .status(400)
       .json({ message: "notificationType must be one of: security, general, updates" });
   }
+  const organizationId = getActorOrganizationId(req);
+  if (isOrgAdminRole(req.user?.role) && !organizationId) {
+    return res.status(403).json({ message: "Org-admin access requires an organization ID." });
+  }
+  const audience = isOrgAdminRole(req.user?.role)
+    ? ORGANIZATION_AUDIENCE
+    : normalizeNotificationAudience(req.body?.audience);
+  const targetOrganizationId = isOrgAdminRole(req.user?.role)
+    ? organizationId
+    : normalizeOrganizationId(req.body?.organizationId);
+  if (audience === ORGANIZATION_AUDIENCE && !targetOrganizationId) {
+    return res.status(400).json({ message: "organizationId is required for organization notifications." });
+  }
 
   const notification = await createNotification({
     messageHtml: html,
     messageText: text,
     notificationType,
+    audience,
+    organizationId: audience === ORGANIZATION_AUDIENCE ? targetOrganizationId : null,
     createdBy: req.user.id,
   });
   res.status(201).json({
@@ -176,11 +223,27 @@ export const createAdmin = asyncHandler(async (req, res) => {
 export const updateAdmin = asyncHandler(async (req, res) => {
   const id = String(req.params.id || "").trim();
   if (!id) return res.status(400).json({ message: "Notification id is required" });
+  const existing = await getNotificationById(id);
+  if (!existing) {
+    return res.status(404).json({ message: "Notification not found" });
+  }
+  const actorOrganizationId = getActorOrganizationId(req);
+  if (
+    isOrgAdminRole(req.user?.role) &&
+    (
+      existing.audience !== ORGANIZATION_AUDIENCE ||
+      String(existing.organization_id || "").trim() !== actorOrganizationId
+    )
+  ) {
+    return res.status(403).json({ message: "Org-admin can only manage organization notifications for the same organization." });
+  }
 
   const hasHtml = req.body?.messageHtml !== undefined;
   const hasType = req.body?.notificationType !== undefined;
   const hasActive = req.body?.isActive !== undefined;
-  if (!hasHtml && !hasType && !hasActive) {
+  const hasAudience = req.body?.audience !== undefined;
+  const hasOrganizationId = req.body?.organizationId !== undefined;
+  if (!hasHtml && !hasType && !hasActive && !hasAudience && !hasOrganizationId) {
     return res.status(400).json({ message: "No notification updates provided" });
   }
 
@@ -203,6 +266,24 @@ export const updateAdmin = asyncHandler(async (req, res) => {
         .json({ message: "notificationType must be one of: security, general, updates" });
     }
   }
+  let audience = null;
+  if (hasAudience) {
+    audience = isOrgAdminRole(req.user?.role)
+      ? ORGANIZATION_AUDIENCE
+      : normalizeNotificationAudience(req.body?.audience);
+  }
+  const nextAudience = audience || String(existing.audience || ALL_AUDIENCE).trim().toLowerCase();
+  let nextOrganizationId = null;
+  if (nextAudience === ORGANIZATION_AUDIENCE) {
+    nextOrganizationId = isOrgAdminRole(req.user?.role)
+      ? actorOrganizationId
+      : normalizeOrganizationId(
+          hasOrganizationId ? req.body?.organizationId : existing.organization_id
+        );
+    if (!nextOrganizationId) {
+      return res.status(400).json({ message: "organizationId is required for organization notifications." });
+    }
+  }
 
   let isActive = null;
   if (hasActive) {
@@ -213,6 +294,8 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     messageHtml: html,
     messageText: text,
     notificationType,
+    audience,
+    organizationId: nextAudience === ORGANIZATION_AUDIENCE ? nextOrganizationId : null,
     isActive,
   });
   if (!notification) {
@@ -230,6 +313,16 @@ export const resendAdmin = asyncHandler(async (req, res) => {
   if (!notification) {
     return res.status(404).json({ message: "Notification not found" });
   }
+  const actorOrganizationId = getActorOrganizationId(req);
+  if (
+    isOrgAdminRole(req.user?.role) &&
+    (
+      notification.audience !== ORGANIZATION_AUDIENCE ||
+      String(notification.organization_id || "").trim() !== actorOrganizationId
+    )
+  ) {
+    return res.status(403).json({ message: "Org-admin can only resend organization notifications for the same organization." });
+  }
   if (!notification.is_active) {
     return res.status(400).json({ message: "Cannot resend an inactive notification" });
   }
@@ -245,7 +338,12 @@ export const resendAdmin = asyncHandler(async (req, res) => {
     return res.status(409).json({ message: "Non-security email delivery is paused in app settings." });
   }
 
-  const recipients = await listUsersWithNotificationEmailEnabled();
+  const recipients = await listUsersWithNotificationEmailEnabled({
+    roleFilter: notification.audience === ORGANIZATION_AUDIENCE ? ["org_user"] : [],
+    organizationIdFilter: notification.audience === ORGANIZATION_AUDIENCE
+      ? String(notification.organization_id || "").trim()
+      : "",
+  });
   const subject = notification.notification_type === "security"
     ? "<AppName> Security Notification"
     : "<AppName> Notification";

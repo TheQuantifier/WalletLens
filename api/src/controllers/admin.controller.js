@@ -39,6 +39,110 @@ import {
   setDatabaseEmergencyDeactivated,
 } from "../services/system_health_runtime.service.js";
 
+const ORG_USER_ROLE = "org_user";
+const ORG_ADMIN_ROLE = "org_admin";
+
+function isOrgAdminRole(role) {
+  return String(role || "").trim().toLowerCase() === ORG_ADMIN_ROLE;
+}
+
+function isOrgUserRole(role) {
+  return String(role || "").trim().toLowerCase() === ORG_USER_ROLE;
+}
+
+function isOrganizationScopedRole(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  return normalized === ORG_USER_ROLE || normalized === ORG_ADMIN_ROLE;
+}
+
+function getActorOrganizationId(req) {
+  return String(req.user?.organization_id || req.user?.organizationId || "").trim();
+}
+
+function getScopedUserRoleFilter(req) {
+  return isOrgAdminRole(req.user?.role) ? [ORG_USER_ROLE] : [];
+}
+
+function getScopedOrganizationIdFilter(req) {
+  return isOrgAdminRole(req.user?.role) ? getActorOrganizationId(req) : "";
+}
+
+async function assertOrgScopedUserAccess(req, userId) {
+  if (!isOrgAdminRole(req.user?.role)) {
+    return { allowed: true, user: null };
+  }
+
+  const actorOrganizationId = getActorOrganizationId(req);
+  if (!actorOrganizationId) {
+    return {
+      allowed: false,
+      status: 403,
+      message: "Org-admin access requires an organization ID.",
+    };
+  }
+
+  const user = await findUserById(userId);
+  if (!user) {
+    return { allowed: false, status: 404, message: "User not found" };
+  }
+
+  if (!isOrgUserRole(user.role) || String(user.organization_id || "").trim() !== actorOrganizationId) {
+    return {
+      allowed: false,
+      status: 403,
+      message: "Org-admin access is limited to org users in the same organization.",
+    };
+  }
+
+  return { allowed: true, user };
+}
+
+async function assertOrgScopedSupportTicketAccess(req, ticketId) {
+  if (!isOrgAdminRole(req.user?.role)) {
+    return { allowed: true };
+  }
+
+  const actorOrganizationId = getActorOrganizationId(req);
+  if (!actorOrganizationId) {
+    return {
+      allowed: false,
+      status: 403,
+      message: "Org-admin access requires an organization ID.",
+    };
+  }
+
+  const { rows } = await query(
+    `
+    SELECT
+      t.id,
+      t.user_id,
+      u.role as user_role,
+      u.organization_id
+    FROM support_tickets t
+    LEFT JOIN users u ON u.id = t.user_id
+    WHERE t.id = $1
+    LIMIT 1
+    `,
+    [ticketId]
+  );
+  const ticket = rows[0] || null;
+  if (!ticket) {
+    return { allowed: false, status: 404, message: "Ticket not found" };
+  }
+  if (
+    !ticket.user_id ||
+    !isOrgUserRole(ticket.user_role) ||
+    String(ticket.organization_id || "").trim() !== actorOrganizationId
+  ) {
+    return {
+      allowed: false,
+      status: 403,
+      message: "Org-admin access is limited to support tickets from org users in the same organization.",
+    };
+  }
+  return { allowed: true, ticket };
+}
+
 const SYSTEM_HEALTH_SERVICES = [
   {
     id: "database_connection",
@@ -332,12 +436,33 @@ export const listUsersAdmin = asyncHandler(async (req, res) => {
   const limit = Math.min(Number(req.query.limit) || 50, 200);
   const offset = Math.max(Number(req.query.offset) || 0, 0);
   const queryText = String(req.query.q || "").trim();
+  const roleFilter = getScopedUserRoleFilter(req);
+  const organizationIdFilter = getScopedOrganizationIdFilter(req);
 
-  const { users, total } = await listUsers({ limit, offset, queryText });
+  const { users, total } = await listUsers({
+    limit,
+    offset,
+    queryText,
+    roleFilter,
+    organizationIdFilter,
+  });
   res.json({ users, total });
 });
 
 export const listUserOptionsAdmin = asyncHandler(async (_req, res) => {
+  const params = [];
+  const where = [];
+  let i = 1;
+  if (isOrgAdminRole(_req.user?.role)) {
+    const actorOrganizationId = getActorOrganizationId(_req);
+    if (!actorOrganizationId) {
+      return res.json({ users: [] });
+    }
+    where.push(`lower(role) = $${i++}`);
+    params.push(ORG_USER_ROLE);
+    where.push(`organization_id = $${i++}`);
+    params.push(actorOrganizationId);
+  }
   const { rows } = await query(
     `
     SELECT
@@ -347,20 +472,28 @@ export const listUserOptionsAdmin = asyncHandler(async (_req, res) => {
       full_name,
       COALESCE(NULLIF(trim(full_name), ''), NULLIF(trim(username), ''), email) AS display_name
     FROM users
+    ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY lower(COALESCE(NULLIF(trim(full_name), ''), NULLIF(trim(username), ''), email)) ASC
-    `
+    `,
+    params
   );
   res.json({ users: rows });
 });
 
 export const getUserAdmin = asyncHandler(async (req, res) => {
-  const user = await findUserById(req.params.id);
+  const access = await assertOrgScopedUserAccess(req, req.params.id);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
+  const user = access.user || await findUserById(req.params.id);
   if (!user) return res.status(404).json({ message: "User not found" });
   res.json({ user });
 });
 
 export const updateUserAdmin = asyncHandler(async (req, res) => {
   const userId = req.params.id;
+  const access = await assertOrgScopedUserAccess(req, userId);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
+  const currentUser = access.user || await findUserById(userId);
+  if (!currentUser) return res.status(404).json({ message: "User not found" });
   const updates = {};
 
   const allowedFields = [
@@ -369,6 +502,7 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
     "fullName",
     "location",
     "role",
+    "organizationId",
     "phoneNumber",
     "bio",
     "avatarUrl",
@@ -407,9 +541,44 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
 
   if (
     updates.role !== undefined &&
-    !["user", "admin", "support_admin", "analyst"].includes(updates.role)
+    !["user", "org_user", "admin", "org_admin", "support_admin", "analyst"].includes(updates.role)
   ) {
     return res.status(400).json({ message: "Invalid role" });
+  }
+
+  if (isOrgAdminRole(req.user?.role) && updates.role !== undefined && updates.role !== ORG_USER_ROLE) {
+    return res.status(403).json({
+      message: "Org-admin can only manage users with role org_user.",
+    });
+  }
+  if (isOrgAdminRole(req.user?.role)) {
+    const actorOrganizationId = getActorOrganizationId(req);
+    if (!actorOrganizationId) {
+      return res.status(403).json({ message: "Org-admin access requires an organization ID." });
+    }
+    if (updates.organizationId !== undefined && String(updates.organizationId || "").trim() !== actorOrganizationId) {
+      return res.status(403).json({
+        message: "Org-admin can only manage users in the same organization.",
+      });
+    }
+    updates.organizationId = actorOrganizationId;
+  }
+
+  const effectiveRole = String(updates.role ?? currentUser.role ?? "").trim().toLowerCase();
+  const effectiveOrganizationId = String(
+    updates.organizationId !== undefined
+      ? updates.organizationId
+      : currentUser.organization_id ?? currentUser.organizationId ?? ""
+  ).trim();
+
+  if (isOrganizationScopedRole(effectiveRole) && !effectiveOrganizationId) {
+    return res.status(400).json({
+      message: "organizationId is required for org_user and org_admin roles.",
+    });
+  }
+
+  if (!isOrganizationScopedRole(effectiveRole) && (updates.role !== undefined || updates.organizationId !== undefined)) {
+    updates.organizationId = null;
   }
 
   const updated = await updateUserById(userId, updates);
@@ -467,14 +636,31 @@ export const listRecordsAdminController = asyncHandler(async (req, res) => {
   const userId = req.query.userId ? String(req.query.userId) : undefined;
   const queryText = req.query.q ? String(req.query.q).trim() : undefined;
   const type = req.query.type ? String(req.query.type) : undefined;
+  const roleFilter = getScopedUserRoleFilter(req);
+  const organizationIdFilter = getScopedOrganizationIdFilter(req);
 
-  const records = await listRecordsAdmin({ userId, queryText, type, limit, offset });
+  if (userId) {
+    const access = await assertOrgScopedUserAccess(req, userId);
+    if (!access.allowed) return res.status(access.status).json({ message: access.message });
+  }
+
+  const records = await listRecordsAdmin({
+    userId,
+    queryText,
+    type,
+    limit,
+    offset,
+    roleFilter,
+    organizationIdFilter,
+  });
   res.json({ records });
 });
 
 export const getRecordAdmin = asyncHandler(async (req, res) => {
   const record = await getRecordByIdAdmin(req.params.id);
   if (!record) return res.status(404).json({ message: "Record not found" });
+  const access = await assertOrgScopedUserAccess(req, record.user_id);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
   res.json({ record });
 });
 
@@ -483,6 +669,8 @@ export const updateRecordAdminController = asyncHandler(async (req, res) => {
 
   const existing = await getRecordByIdAdmin(req.params.id);
   if (!existing) return res.status(404).json({ message: "Record not found" });
+  const access = await assertOrgScopedUserAccess(req, existing.user_id);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
 
   if (type !== undefined && !["income", "expense"].includes(type)) {
     return res.status(400).json({ message: "Invalid type" });
@@ -524,6 +712,8 @@ export const deleteRecordAdminController = asyncHandler(async (req, res) => {
   const deleteReceiptFlag = req.query.deleteReceipt === "true";
   const record = await getRecordByIdAdmin(req.params.id);
   if (!record) return res.status(404).json({ message: "Record not found" });
+  const access = await assertOrgScopedUserAccess(req, record.user_id);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
 
   const linkedReceiptId = record.linked_receipt_id;
   if (linkedReceiptId) {
@@ -554,13 +744,38 @@ export const deleteRecordAdminController = asyncHandler(async (req, res) => {
 });
 
 export const getAdminStatsController = asyncHandler(async (_req, res) => {
+  const organizationId = getScopedOrganizationIdFilter(_req);
+  const scopedToOrganization = isOrgAdminRole(_req.user?.role) && organizationId;
+  if (isOrgAdminRole(_req.user?.role) && !organizationId) {
+    return res.json({ stats: { total_users: 0, total_records: 0, total_receipts: 0 } });
+  }
   const { rows } = await query(
-    `
-    SELECT
-      (SELECT COUNT(*)::int FROM users) AS total_users,
-      (SELECT COUNT(*)::int FROM records) AS total_records,
-      (SELECT COUNT(*)::int FROM receipts) AS total_receipts
-    `
+    scopedToOrganization
+      ? `
+        SELECT
+          (SELECT COUNT(*)::int FROM users WHERE lower(role) = 'org_user' AND organization_id = $1) AS total_users,
+          (
+            SELECT COUNT(*)::int
+            FROM records r
+            JOIN users u ON u.id = r.user_id
+            WHERE lower(u.role) = 'org_user'
+              AND u.organization_id = $1
+          ) AS total_records,
+          (
+            SELECT COUNT(*)::int
+            FROM receipts r
+            JOIN users u ON u.id = r.user_id
+            WHERE lower(u.role) = 'org_user'
+              AND u.organization_id = $1
+          ) AS total_receipts
+        `
+      : `
+        SELECT
+          (SELECT COUNT(*)::int FROM users) AS total_users,
+          (SELECT COUNT(*)::int FROM records) AS total_records,
+          (SELECT COUNT(*)::int FROM receipts) AS total_receipts
+        `,
+    scopedToOrganization ? [organizationId] : []
   );
   res.json({ stats: rows[0] || { total_users: 0, total_records: 0, total_receipts: 0 } });
 });
@@ -590,6 +805,8 @@ export const listReceiptsAdminController = asyncHandler(async (req, res) => {
   if (!userId) {
     return res.status(400).json({ message: "userId is required" });
   }
+  const access = await assertOrgScopedUserAccess(req, userId);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
 
   const { rows } = await query(
     `
@@ -618,6 +835,8 @@ export const listBudgetSheetsAdminController = asyncHandler(async (req, res) => 
   if (!userId) {
     return res.status(400).json({ message: "userId is required" });
   }
+  const access = await assertOrgScopedUserAccess(req, userId);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
 
   const where = ["user_id = $1"];
   const values = [userId];
@@ -675,9 +894,18 @@ export const listAuditLogAdmin = asyncHandler(async (req, res) => {
     i += 1;
   }
   if (scope === "admins") {
-    where.push(`u.role IN ('admin', 'support_admin', 'analyst')`);
+    where.push(`u.role IN ('admin', 'org_admin', 'support_admin', 'analyst')`);
   } else if (scope === "users") {
-    where.push(`u.role = 'user'`);
+    where.push(`u.role IN ('user', 'org_user')`);
+  }
+  if (isOrgAdminRole(req.user?.role)) {
+    const actorOrganizationId = getActorOrganizationId(req);
+    if (!actorOrganizationId) {
+      return res.json({ auditLog: [] });
+    }
+    where.push(`u.role = 'org_user'`);
+    where.push(`u.organization_id = $${i++}`);
+    params.push(actorOrganizationId);
   }
   params.push(limit);
 
@@ -722,6 +950,8 @@ export const listSupportTicketsAdmin = asyncHandler(async (req, res) => {
     queryText: q,
     limit,
     offset,
+    roleFilter: getScopedUserRoleFilter(req),
+    organizationIdFilter: getScopedOrganizationIdFilter(req),
   });
   res.json({ tickets });
 });
@@ -729,6 +959,8 @@ export const listSupportTicketsAdmin = asyncHandler(async (req, res) => {
 export const updateSupportTicketAdmin = asyncHandler(async (req, res) => {
   const id = String(req.params.id || "").trim();
   if (!id) return res.status(400).json({ message: "Ticket id is required" });
+  const access = await assertOrgScopedSupportTicketAccess(req, id);
+  if (!access.allowed) return res.status(access.status).json({ message: access.message });
 
   const hasStatus = req.body?.status !== undefined;
   const hasAdminNote = req.body?.adminNote !== undefined;

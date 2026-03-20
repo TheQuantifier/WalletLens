@@ -178,38 +178,40 @@
           <div>
             <div class="section-headline stack">
               <h2>Linked Accounts</h2>
-              <span class="section-soon">(Coming soon)</span>
             </div>
-            <p class="subtle">Connect your bank to sync balances and transactions.</p>
+            <p class="testing-banner" role="status">In Testing Phase - Coming Soon</p>
+            <p class="subtle">Connect Plaid sandbox accounts to sync balances and transactions into Records.</p>
           </div>
-          <button class="btn btn--primary" id="linkAccountBtn" type="button">Link Account</button>
+          <button class="btn btn--primary" id="linkAccountBtn" type="button">Connect Account</button>
+          <button class="btn" id="syncAccountsBtn" type="button">Sync Transactions</button>
         </div>
 
-        <div id="linkedAccountsList" class="linked-list">
+        <div id="linkedAccountsList" class="linked-list linked-list--scroll">
           <div class="linked-item">
             <div>
               <p class="label">No accounts linked yet</p>
-              <p class="subtle">Connect a bank or card to sync balances.</p>
+              <p class="subtle">Connect a Plaid sandbox institution to start importing transactions.</p>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- LINK ACCOUNT MODAL -->
-      <div id="linkAccountModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="linkAccountTitle">
-        <div class="modal-backdrop" data-close="link-account"></div>
+      <!-- UNLINK ACCOUNT MODAL -->
+      <div id="unlinkAccountModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="unlinkAccountTitle">
+        <div class="modal-backdrop" data-close="unlink-account"></div>
         <div class="modal-content card">
           <div class="modal-header">
-            <h2 id="linkAccountTitle">Link a Bank Account</h2>
-            <button class="btn btn--link" id="closeLinkAccountModal" type="button">Close</button>
+            <h2 id="unlinkAccountTitle">Remove Linked Account</h2>
+            <button class="btn btn--link" id="closeUnlinkAccountModal" type="button">Close</button>
           </div>
-          <p class="subtle">Choose a bank to start linking. (Backend connection coming soon.)</p>
+          <p class="subtle" id="unlinkAccountText">Do you want to export this account's history before unlinking it?</p>
 
-          <div class="bank-grid" id="bankGrid" role="listbox" aria-label="Bank options"></div>
+          <p class="subtle">Unlinking removes imported transactions and linked balance data for this account from the app.</p>
 
           <div class="modal-actions">
-            <button class="btn" id="cancelLinkAccount" type="button">Cancel</button>
-            <button class="btn btn--primary" id="confirmLinkAccount" type="button">Link Selected</button>
+            <button class="btn" id="cancelUnlinkAccount" type="button">Cancel</button>
+            <button class="btn" id="unlinkWithoutExportBtn" type="button">Unlink Without Export</button>
+            <button class="btn btn--primary" id="exportAndUnlinkBtn" type="button">Export and Unlink</button>
           </div>
         </div>
       </div>
@@ -220,7 +222,7 @@
           <h2>Achievements</h2>
         </div>
         <p id="achievementStatus" class="subtle">Loading achievements...</p>
-        <div class="achievement-grid" id="achievementGrid">
+        <div class="achievement-grid achievement-grid--scroll" id="achievementGrid">
         </div>
       </section>
 
@@ -261,6 +263,7 @@
 
 
   <script src="scripts/default.js" type="module"></script>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
   <script src="scripts/profile.js" type="module"></script>
 </body>
 </html>

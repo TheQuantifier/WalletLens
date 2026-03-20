@@ -493,6 +493,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // Support both camelCase and snake_case for linked receipt id
   const getLinkedReceiptId = (r) => r?.linkedReceiptId ?? r?.linked_receipt_id ?? "";
   const getLinkedRecurringId = (r) => r?.linkedRecurringId ?? r?.linked_recurring_id ?? "";
+  const getLinkedPlaidAccountId = (r) => r?.linkedPlaidAccountId ?? r?.linked_plaid_account_id ?? "";
   const getRecordOrigin = (record) =>
     String(
       record?.origin ||
@@ -500,6 +501,8 @@ document.addEventListener("DOMContentLoaded", () => {
           ? "receipt"
           : getLinkedRecurringId(record)
             ? "recurring"
+            : getLinkedPlaidAccountId(record)
+              ? "plaid"
             : "manual")
     ).toLowerCase();
   const getReceiptTaxAmount = (receipt) =>
@@ -684,6 +687,9 @@ document.addEventListener("DOMContentLoaded", () => {
     } else if (origin === "recurring") {
       span.className = "badge badge-recurring";
       span.textContent = "Recurring";
+    } else if (origin === "plaid") {
+      span.className = "badge badge-recurring";
+      span.textContent = "Plaid";
     } else {
       span.className = "badge badge-manual";
       span.textContent = "Manual";
@@ -1010,6 +1016,11 @@ document.addEventListener("DOMContentLoaded", () => {
     incomeTbody.appendChild(loadingRow());
 
     try {
+      try {
+        await api.plaid.sync();
+      } catch {
+        // Plaid sync is best-effort on page load.
+      }
       allRecordsCache = await api.records.getAll();
       populateFilterCategorySelects(allRecordsCache);
       renderAll();
