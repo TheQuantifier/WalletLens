@@ -276,10 +276,10 @@
   <div class="modal hidden" id="passwordModal" aria-hidden="true">
     <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="passwordModalTitle">
       <h2 id="passwordModalTitle">Change Password</h2>
-      <p class="subtle">Use a strong unique password for better security.</p>
+      <p class="subtle" id="passwordModalSubtitle">Use a strong unique password for better security.</p>
 
       <form id="passwordForm" class="form-grid">
-        <label class="span-2">
+        <label class="span-2" id="currentPasswordRow">
           <span class="label">Current Password</span>
           <input id="currentPassword" type="password" autocomplete="current-password" required />
         </label>
@@ -307,7 +307,7 @@
 
         <div class="modal-actions span-2">
           <button type="button" class="btn" id="closePasswordModal">Cancel</button>
-          <button type="submit" class="btn btn--primary">Update Password</button>
+          <button type="submit" class="btn btn--primary" id="submitPasswordBtn">Update Password</button>
         </div>
       </form>
 

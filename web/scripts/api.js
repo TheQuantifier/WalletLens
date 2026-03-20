@@ -124,6 +124,22 @@ export const auth = {
     return data;
   },
 
+  requestPasswordResetLogin(identifier) {
+    return request("/auth/forgot-password", {
+      method: "POST",
+      body: JSON.stringify({ identifier }),
+    });
+  },
+
+  async verifyPasswordResetLogin(code, twoFactorToken) {
+    const data = await request("/auth/forgot-password/verify", {
+      method: "POST",
+      body: JSON.stringify({ code, twoFactorToken }),
+    });
+    if (data?.token) setAuthToken(data.token);
+    return data;
+  },
+
   async logout() {
     try {
       return await request("/auth/logout", { method: "POST" });
@@ -178,10 +194,10 @@ export const auth = {
     });
   },
 
-  async changePassword(currentPassword, newPassword, twoFaCode) {
+  async changePassword(currentPassword, newPassword, twoFaCode, passwordResetToken) {
     const data = await request("/auth/change-password", {
       method: "POST",
-      body: JSON.stringify({ currentPassword, newPassword, twoFaCode }),
+      body: JSON.stringify({ currentPassword, newPassword, twoFaCode, passwordResetToken }),
     });
     if (data?.token) setAuthToken(data.token);
     return data;

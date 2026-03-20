@@ -63,7 +63,10 @@ import {
     passwordModal: $("#passwordModal"),
     passwordForm: $("#passwordForm"),
     closePasswordModal: $("#closePasswordModal"),
+    submitPasswordBtn: $("#submitPasswordBtn"),
+    passwordModalSubtitle: $("#passwordModalSubtitle"),
     passwordStatus: $("#passwordStatus"),
+    currentPasswordRow: $("#currentPasswordRow"),
     currentPassword: $("#currentPassword"),
     newPassword: $("#newPassword"),
     confirmPassword: $("#confirmPassword"),
@@ -78,6 +81,7 @@ import {
   const state = {
     twoFaEnabled: false,
     googleEnabled: false,
+    passwordResetMode: false,
   };
 
   // ===============================
@@ -764,11 +768,31 @@ import {
     if (els.confirmPassword) els.confirmPassword.value = "";
     if (els.passwordTwoFaCode) els.passwordTwoFaCode.value = "";
 
-    if (els.passwordTwoFaRow) {
-      els.passwordTwoFaRow.classList.toggle("is-hidden", !state.twoFaEnabled);
+    if (els.currentPasswordRow) {
+      els.currentPasswordRow.classList.toggle("is-hidden", state.passwordResetMode);
+    }
+    if (els.currentPassword) {
+      els.currentPassword.required = !state.passwordResetMode;
+    }
+    if (els.passwordModalSubtitle) {
+      els.passwordModalSubtitle.textContent = state.passwordResetMode
+        ? "You signed in with a verification code. Set a new password to finish recovering your account."
+        : "Use a strong unique password for better security.";
+    }
+    if (els.submitPasswordBtn) {
+      els.submitPasswordBtn.textContent = state.passwordResetMode
+        ? "Set New Password"
+        : "Update Password";
     }
 
-    if (state.twoFaEnabled) {
+    if (els.passwordTwoFaRow) {
+      els.passwordTwoFaRow.classList.toggle(
+        "is-hidden",
+        !state.twoFaEnabled || state.passwordResetMode
+      );
+    }
+
+    if (state.twoFaEnabled && !state.passwordResetMode) {
       try {
         await api.auth.requestTwoFaPasswordChange();
         showStatus(els.passwordStatus, "2FA code sent to your email.");
@@ -781,7 +805,11 @@ import {
       }
     }
     showModal(els.passwordModal);
-    els.currentPassword?.focus?.();
+    if (state.passwordResetMode) {
+      els.newPassword?.focus?.();
+    } else {
+      els.currentPassword?.focus?.();
+    }
   };
 
   const closePasswordModal = () => hideModal(els.passwordModal);
@@ -792,8 +820,9 @@ import {
     const newPassword = (els.newPassword?.value || "").trim();
     const confirmPassword = (els.confirmPassword?.value || "").trim();
     const twoFaCode = (els.passwordTwoFaCode?.value || "").trim();
+    const passwordResetToken = sessionStorage.getItem("passwordResetToken") || "";
 
-    if (!currentPassword || !newPassword || !confirmPassword) {
+    if ((!state.passwordResetMode && !currentPassword) || !newPassword || !confirmPassword) {
       showStatus(els.passwordStatus, "Fill out all fields.", "error");
       return;
     }
@@ -803,7 +832,7 @@ import {
       return;
     }
 
-    if (state.twoFaEnabled && !twoFaCode) {
+    if (state.twoFaEnabled && !state.passwordResetMode && !twoFaCode) {
       showStatus(els.passwordStatus, "Enter the 2FA code from your email.", "error");
       return;
     }
@@ -813,7 +842,20 @@ import {
     }
 
     try {
-      await api.auth.changePassword(currentPassword, newPassword, twoFaCode);
+      await api.auth.changePassword(
+        currentPassword,
+        newPassword,
+        twoFaCode,
+        state.passwordResetMode ? passwordResetToken : ""
+      );
+      if (state.passwordResetMode) {
+        sessionStorage.removeItem("passwordResetToken");
+        sessionStorage.removeItem("forcePasswordReset");
+        state.passwordResetMode = false;
+        const url = new URL(window.location.href);
+        url.searchParams.delete("passwordReset");
+        window.history.replaceState({}, document.title, url.toString());
+      }
       showStatus(els.passwordStatus, "Password updated.", "ok");
       clearStatusSoon(els.passwordStatus, 1500);
       window.setTimeout(() => closePasswordModal(), 700);
@@ -915,6 +957,9 @@ import {
   // ===============================
   document.addEventListener("DOMContentLoaded", async () => {
     const redirectResult = api.auth.consumeGoogleRedirect();
+    state.passwordResetMode =
+      sessionStorage.getItem("forcePasswordReset") === "true" ||
+      new URL(window.location.href).searchParams.get("passwordReset") === "1";
     ensureFirstRunDefaults();
     initTheme();
     await loadCurrencyOptions();
@@ -934,6 +979,15 @@ import {
     } else if (redirectResult?.error) {
       showStatus(els.status, redirectResult.error, "error");
       clearStatusSoon(els.status, 3200);
+    }
+
+    if (state.passwordResetMode) {
+      openPasswordModal();
+      showStatus(
+        els.passwordStatus,
+        "Enter a new password to complete account recovery.",
+        "ok"
+      );
     }
   });
 })();

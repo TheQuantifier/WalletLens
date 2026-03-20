@@ -167,6 +167,27 @@ body.landing-light {
   align-self: center;
 }
 
+.nf-text-btn {
+  align-self: center;
+  width: auto;
+  border: 0;
+  background: transparent;
+  color: var(--primary);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.15rem 0.25rem 0;
+}
+
+.nf-text-btn:hover {
+  text-decoration: underline;
+}
+
+.nf-text-btn:disabled {
+  opacity: 0.7;
+  cursor: wait;
+}
+
 /* =========================================================
    ABOUT SECTION
    ========================================================= */
@@ -501,7 +522,7 @@ body.landing-light {
   padding-right: 2.75rem;
 }
 
-.auth-form .password-toggle {
+.password-field .password-toggle {
   position: absolute;
   right: 0.65rem;
   top: 50%;
@@ -516,12 +537,12 @@ body.landing-light {
   box-shadow: none;
 }
 
-.auth-form .password-toggle:hover {
+.password-field .password-toggle:hover {
   color: var(--text);
   background: rgba(15,23,42,0.06);
 }
 
-.auth-form .password-toggle:focus-visible {
+.password-field .password-toggle:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }

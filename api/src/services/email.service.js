@@ -54,9 +54,11 @@ export async function sendEmail({ to, subject, text, replyTo, from }) {
     throw error;
   }
 
-  const needsAppName = [subject, text, replyTo, from].some(
+  const needsAppName =
+    !from ||
+    [subject, text, replyTo, from].some(
     (value) => typeof value === "string" && value.includes(APP_NAME_PLACEHOLDER)
-  );
+    );
 
   let appName = null;
   if (needsAppName) {
@@ -87,6 +89,7 @@ export async function sendEmail({ to, subject, text, replyTo, from }) {
       text: resolvedText,
       replyTo: resolvedReplyTo,
       from: resolvedFrom,
+      appName,
     });
     return;
   }
@@ -114,8 +117,8 @@ export async function sendEmail({ to, subject, text, replyTo, from }) {
   }
 }
 
-function parseSender(fromValue) {
-  const defaultName = "<AppName> Support";
+function parseSender(fromValue, appName = APP_NAME_PLACEHOLDER) {
+  const defaultName = `${appName} Support`;
   if (!fromValue) return { name: defaultName, email: "no-reply@wisewallet.local" };
 
   const match = String(fromValue).match(/^\s*\"?([^"]*)\"?\s*<([^>]+)>\s*$/);
@@ -128,10 +131,10 @@ function parseSender(fromValue) {
   return { name: defaultName, email: String(fromValue).trim() };
 }
 
-async function sendViaBrevoApi({ to, subject, text, replyTo, from }) {
+async function sendViaBrevoApi({ to, subject, text, replyTo, from, appName }) {
   const apiKey = process.env.BREVO_API_KEY;
   const apiUrl = process.env.BREVO_API_URL || "https://api.brevo.com/v3/smtp/email";
-  const sender = parseSender(from);
+  const sender = parseSender(from, appName || APP_NAME_PLACEHOLDER);
 
   const payload = {
     sender,

@@ -52,6 +52,10 @@ function createTwoFaToken(id, purpose) {
   return jwt.sign({ id, purpose }, env.jwtSecret, { expiresIn: "10m" });
 }
 
+function createPasswordResetToken(id) {
+  return jwt.sign({ id, purpose: "password_reset" }, env.jwtSecret, { expiresIn: "15m" });
+}
+
 function hashCode(code) {
   return crypto
     .createHmac("sha256", env.jwtSecret)
@@ -62,6 +66,31 @@ function hashCode(code) {
 function generateSixDigitCode() {
   const n = Math.floor(Math.random() * 1000000);
   return String(n).padStart(6, "0");
+}
+
+async function sendCodeEmail({ to, subject, text }) {
+  if (!to) return;
+  await sendEmail({ to, subject, text });
+}
+
+async function issueLoginCode({ userId, email, purpose, subject, text }) {
+  const code = generateSixDigitCode();
+  const codeHash = hashCode(code);
+  const expiresAt = new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000);
+
+  await clearTwoFaCodes(userId, purpose);
+  await createTwoFaCode({
+    userId,
+    purpose,
+    codeHash,
+    expiresAt,
+  });
+
+  await sendCodeEmail({
+    to: email,
+    subject,
+    text: text(code),
+  });
 }
 
 function isAdminRoleType(role) {
@@ -631,22 +660,12 @@ export const login = asyncHandler(async (req, res) => {
       }
     }
 
-    const code = generateSixDigitCode();
-    const codeHash = hashCode(code);
-    const expiresAt = new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000);
-
-    await clearTwoFaCodes(user.id, "login");
-    await createTwoFaCode({
+    await issueLoginCode({
       userId: user.id,
+      email: user.email,
       purpose: "login",
-      codeHash,
-      expiresAt,
-    });
-
-    await sendEmail({
-      to: user.email,
       subject: "Your <AppName> login code",
-      text: `Your login code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+      text: (code) => `Your login code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
     });
 
     const twoFaToken = createTwoFaToken(user.id, "login");
@@ -672,6 +691,100 @@ export const login = asyncHandler(async (req, res) => {
     req,
   });
   res.json({ user: safeUser, token });
+});
+
+/* =====================================================
+   FORGOT PASSWORD: REQUEST EMAIL CODE
+===================================================== */
+export const requestPasswordResetLogin = asyncHandler(async (req, res) => {
+  const identifier = String(req.body?.identifier || "").trim();
+  if (!identifier) {
+    return res.status(400).json({ message: "Email or username is required" });
+  }
+
+  const user = await findUserAuthByIdentifier(identifier);
+  const genericMessage =
+    "If that account exists and supports password login, a verification code has been emailed.";
+
+  if (!user?.id || !user?.password_hash || !user?.email) {
+    return res.json({ message: genericMessage });
+  }
+
+  await issueLoginCode({
+    userId: user.id,
+    email: user.email,
+    purpose: "password_reset_login",
+    subject: "Your <AppName> password reset code",
+    text: (code) =>
+      `Your password reset code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+  });
+
+  const resetLoginToken = createTwoFaToken(user.id, "password_reset_login");
+  res.json({
+    message: genericMessage,
+    requiresResetCode: true,
+    twoFactorToken: resetLoginToken,
+  });
+});
+
+/* =====================================================
+   FORGOT PASSWORD: VERIFY CODE + LOGIN
+===================================================== */
+export const verifyPasswordResetLogin = asyncHandler(async (req, res) => {
+  const { code, twoFactorToken } = req.body;
+  if (!code || !twoFactorToken) {
+    return res.status(400).json({ message: "Code and token are required" });
+  }
+
+  let payload;
+  try {
+    payload = jwt.verify(twoFactorToken, env.jwtSecret);
+  } catch {
+    return res.status(401).json({ message: "Invalid or expired token" });
+  }
+
+  if (payload?.purpose !== "password_reset_login") {
+    return res.status(401).json({ message: "Invalid token purpose" });
+  }
+
+  const codeHash = hashCode(code);
+  const match = await findValidTwoFaCode({
+    userId: payload.id,
+    purpose: "password_reset_login",
+    codeHash,
+  });
+
+  if (!match) {
+    return res.status(401).json({ message: "Invalid or expired code" });
+  }
+
+  await deleteTwoFaCodeById(match.id);
+
+  const safeUser = await findUserById(payload.id);
+  const { session } = await createSessionWithPolicy({
+    userId: payload.id,
+    userAgent: req.get("user-agent") || "",
+    ipAddress: getRequestIp(req),
+  });
+  const token = createToken(payload.id, session.id);
+  const passwordResetToken = createPasswordResetToken(payload.id);
+  setTokenCookie(res, token);
+
+  await logActivity({
+    userId: payload.id,
+    action: "login",
+    entityType: "session",
+    entityId: session.id,
+    metadata: { method: "password_reset_code" },
+    req,
+  });
+
+  res.json({
+    user: safeUser,
+    token,
+    passwordResetRequired: true,
+    passwordResetToken,
+  });
 });
 
 /* =====================================================
@@ -792,11 +905,7 @@ export const updateMe = asyncHandler(async (req, res) => {
 ===================================================== */
 export const changePassword = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { currentPassword, newPassword, twoFaCode } = req.body;
-
-  if (!currentPassword || !newPassword) {
-    return res.status(400).json({ message: "Current and new password are required" });
-  }
+  const { currentPassword, newPassword, twoFaCode, passwordResetToken } = req.body;
 
   if (typeof newPassword !== "string" || newPassword.length < 8) {
     return res.status(400).json({ message: "New password must be at least 8 characters long" });
@@ -810,7 +919,26 @@ export const changePassword = asyncHandler(async (req, res) => {
     });
   }
 
-  if (user.two_fa_enabled) {
+  let usingPasswordResetToken = false;
+  if (passwordResetToken) {
+    let payload;
+    try {
+      payload = jwt.verify(passwordResetToken, env.jwtSecret);
+    } catch {
+      return res.status(401).json({ message: "Invalid or expired password reset token" });
+    }
+
+    if (payload?.purpose !== "password_reset" || payload?.id !== userId) {
+      return res.status(401).json({ message: "Invalid password reset token" });
+    }
+    usingPasswordResetToken = true;
+  }
+
+  if (!usingPasswordResetToken && !currentPassword) {
+    return res.status(400).json({ message: "Current password is required" });
+  }
+
+  if (user.two_fa_enabled && !usingPasswordResetToken) {
     if (!twoFaCode) {
       return res.status(400).json({ message: "Two-factor code is required" });
     }
@@ -829,9 +957,11 @@ export const changePassword = asyncHandler(async (req, res) => {
     await deleteTwoFaCodeById(match.id);
   }
 
-  const isMatch = await bcrypt.compare(String(currentPassword), user.password_hash);
-  if (!isMatch) {
-    return res.status(401).json({ message: "Current password is incorrect" });
+  if (!usingPasswordResetToken) {
+    const isMatch = await bcrypt.compare(String(currentPassword), user.password_hash);
+    if (!isMatch) {
+      return res.status(401).json({ message: "Current password is incorrect" });
+    }
   }
 
   const salt = await bcrypt.genSalt(12);
@@ -876,22 +1006,13 @@ export const requestTwoFaPasswordChange = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Two-factor authentication is not enabled" });
   }
 
-  const code = generateSixDigitCode();
-  const codeHash = hashCode(code);
-  const expiresAt = new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000);
-
-  await clearTwoFaCodes(user.id, "password_change");
-  await createTwoFaCode({
+  await issueLoginCode({
     userId: user.id,
+    email: user.email,
     purpose: "password_change",
-    codeHash,
-    expiresAt,
-  });
-
-  await sendEmail({
-    to: user.email,
     subject: "Your <AppName> password change code",
-    text: `Your password change code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+    text: (code) =>
+      `Your password change code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
   });
 
   res.json({ message: "Verification code sent" });
@@ -908,22 +1029,12 @@ export const requestTwoFaEnable = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Two-factor authentication is already enabled" });
   }
 
-  const code = generateSixDigitCode();
-  const codeHash = hashCode(code);
-  const expiresAt = new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000);
-
-  await clearTwoFaCodes(user.id, "enable");
-  await createTwoFaCode({
+  await issueLoginCode({
     userId: user.id,
+    email: user.email,
     purpose: "enable",
-    codeHash,
-    expiresAt,
-  });
-
-  await sendEmail({
-    to: user.email,
     subject: "Your <AppName> verification code",
-    text: `Your verification code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+    text: (code) => `Your verification code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
   });
 
   res.json({ message: "Verification code sent" });

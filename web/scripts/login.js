@@ -11,6 +11,9 @@ document.addEventListener("DOMContentLoaded", () => {
   const twoFactorWrap = document.getElementById("twoFactorWrap");
   const twoFactorCode = document.getElementById("twoFactorCode");
   const verifyTwoFactorBtn = document.getElementById("verifyTwoFactorBtn");
+  const twoFactorPrompt = document.getElementById("twoFactorPrompt");
+  const forgotPasswordBtn = document.getElementById("forgotPasswordBtn");
+  const passwordToggles = document.querySelectorAll(".password-toggle");
   const googleLoginBtn = document.getElementById("googleLoginBtn");
   const contactModal = document.getElementById("contactModal");
   const contactForm = document.getElementById("authContactForm");
@@ -41,6 +44,8 @@ document.addEventListener("DOMContentLoaded", () => {
     errorEl.textContent = googleRedirect.error;
   }
 
+  let verificationMode = "login";
+
   const showTwoFactor = (token) => {
     if (!twoFactorWrap) return;
     sessionStorage.setItem("twoFactorToken", token || "");
@@ -54,6 +59,30 @@ document.addEventListener("DOMContentLoaded", () => {
     twoFactorWrap.classList.add("is-hidden");
     if (twoFactorCode) twoFactorCode.value = "";
   };
+
+  const setVerificationMode = (mode) => {
+    verificationMode = mode === "reset" ? "reset" : "login";
+    if (twoFactorPrompt) {
+      twoFactorPrompt.textContent =
+        verificationMode === "reset"
+          ? "Enter the password reset code sent to your email. You will be signed in and redirected to change your password."
+          : "Enter the code sent to your email.";
+    }
+  };
+
+  passwordToggles.forEach((toggle) => {
+    toggle.addEventListener("click", () => {
+      const targetId = toggle.getAttribute("data-target");
+      const target = targetId ? document.getElementById(targetId) : null;
+      if (!target) return;
+      const showing = target.type === "password";
+      target.type = showing ? "text" : "password";
+      toggle.classList.toggle("is-active", showing);
+      toggle.setAttribute("aria-pressed", showing ? "true" : "false");
+      toggle.setAttribute("aria-label", showing ? "Hide password" : "Show password");
+      target.focus();
+    });
+  });
 
   form.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -72,6 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await api.auth.login(identifier, password);
 
       if (result?.requires2fa) {
+        setVerificationMode("login");
         showTwoFactor(result.twoFactorToken);
         errorEl.textContent = "Enter the verification code sent to your email.";
         return;
@@ -83,6 +113,36 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("Login error:", err);
       errorEl.textContent = err.message || "Login failed.";
+    }
+  });
+
+  forgotPasswordBtn?.addEventListener("click", async () => {
+    errorEl.textContent = "";
+    const identifier = document.getElementById("email")?.value.trim();
+
+    if (!identifier) {
+      errorEl.textContent = "Enter your email or username first.";
+      return;
+    }
+
+    forgotPasswordBtn.disabled = true;
+    forgotPasswordBtn.textContent = "Sending code...";
+
+    try {
+      const result = await api.auth.requestPasswordResetLogin(identifier);
+      setVerificationMode("reset");
+      if (result?.twoFactorToken) {
+        showTwoFactor(result.twoFactorToken);
+      }
+      errorEl.textContent =
+        result?.message ||
+        "If that account exists and supports password login, a verification code has been emailed.";
+    } catch (err) {
+      console.error("Forgot password error:", err);
+      errorEl.textContent = err.message || "Unable to send reset code.";
+    } finally {
+      forgotPasswordBtn.disabled = false;
+      forgotPasswordBtn.textContent = "Forgot password?";
     }
   });
 
@@ -104,11 +164,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     try {
-      const result = await api.auth.verifyTwoFaLogin(code, token);
+      const result =
+        verificationMode === "reset"
+          ? await api.auth.verifyPasswordResetLogin(code, token)
+          : await api.auth.verifyTwoFaLogin(code, token);
       if (result?.token) {
         sessionStorage.removeItem("twoFactorToken");
       }
       hideTwoFactor();
+      if (verificationMode === "reset" && result?.passwordResetRequired) {
+        sessionStorage.setItem("passwordResetToken", result.passwordResetToken || "");
+        sessionStorage.setItem("forcePasswordReset", "true");
+        window.location.href = "settings.html?passwordReset=1";
+        return;
+      }
       window.location.href = "home.html";
     } catch (err) {
       console.error("2FA verify error:", err);

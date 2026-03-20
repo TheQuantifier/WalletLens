@@ -66,15 +66,36 @@
             aria-label="Email or username"
             required
           />
-          <input
-            type="password"
-            id="password"
-            class="nf-input"
-            placeholder="Password"
-            aria-label="Password"
-            required
-          />
+          <div class="password-field">
+            <input
+              type="password"
+              id="password"
+              class="nf-input"
+              placeholder="Password"
+              aria-label="Password"
+              required
+            />
+            <button
+              type="button"
+              class="password-toggle"
+              data-target="password"
+              aria-label="Show password"
+              aria-pressed="false"
+            >
+              <svg class="password-toggle-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                <path
+                  class="eye"
+                  d="M12 5c5.5 0 9.5 4.5 10 6.1-.5 1.6-4.5 6.9-10 6.9S2.5 12.7 2 11.1C2.5 9.5 6.5 5 12 5zm0 2C8 7 4.8 9.9 4.1 11.1 4.8 12.4 8 15 12 15s7.2-2.6 7.9-3.9C19.2 9.9 16 7 12 7zm0 1.5A2.5 2.5 0 1 1 9.5 11 2.5 2.5 0 0 1 12 8.5z"
+                />
+                <path
+                  class="eye-off"
+                  d="M4.2 4.2a1 1 0 0 1 1.4 0l14.2 14.2a1 1 0 0 1-1.4 1.4l-2.4-2.4A10.8 10.8 0 0 1 12 19c-5.5 0-9.5-4.5-10-6.1.3-1 1.9-3.4 4.4-5.1L4.2 5.6a1 1 0 0 1 0-1.4zm4.3 4.3 1.9 1.9a2.5 2.5 0 0 0 3.2 3.2l1.9 1.9A6 6 0 0 1 8.5 8.5zm3.5-3.4A10.7 10.7 0 0 1 22 11.1c-.3 1-1.9 3.4-4.4 5.1l-1.5-1.5c1.9-1.1 3.4-2.6 3.9-3.6-.7-1.2-3.9-4.1-7.9-4.1-.9 0-1.8.1-2.6.4l-1.5-1.5c1-.3 2.1-.6 3.3-.6z"
+                />
+              </svg>
+            </button>
+          </div>
           <button type="submit" class="nf-btn">Login</button>
+          <button type="button" id="forgotPasswordBtn" class="nf-text-btn">Forgot password?</button>
 
           <div class="auth-alt">
             <p class="auth-alt-label">Or Login with</p>
@@ -90,7 +111,7 @@
           </div>
 
           <div id="twoFactorWrap" class="two-factor-wrap is-hidden">
-            <p class="subtle">Enter the code sent to your email.</p>
+            <p id="twoFactorPrompt" class="subtle">Enter the code sent to your email.</p>
             <input
               type="text"
               id="twoFactorCode"

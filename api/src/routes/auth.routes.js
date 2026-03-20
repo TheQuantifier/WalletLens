@@ -23,6 +23,8 @@ router.post("/register", registerLimiter, controller.register);
 // Login expects: { identifier, password }
 // Controller supports username OR email
 router.post("/login", loginLimiter, controller.login);
+router.post("/forgot-password", loginLimiter, controller.requestPasswordResetLogin);
+router.post("/forgot-password/verify", twoFaLimiter, controller.verifyPasswordResetLogin);
 
 // 2FA login verify
 router.post("/2fa/verify-login", twoFaLimiter, controller.verifyTwoFaLogin);
