@@ -1,7 +1,5 @@
 import { api } from "./api.js";
 
-console.log("Help page loaded.");
-
 const form = document.getElementById("supportForm");
 const subjectInput = document.getElementById("supportSubject");
 const messageInput = document.getElementById("supportMessage");

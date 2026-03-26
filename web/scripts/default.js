@@ -138,6 +138,7 @@ function loadHeaderAndFooter() {
     if (headerEl.innerHTML !== cachedHeader) {
       headerEl.innerHTML = cachedHeader;
     }
+    setLogoLinkDestination("index.html");
     setActiveNavLink();
     initMobileNavMenu();
     initAccountMenu();
