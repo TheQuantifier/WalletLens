@@ -33,47 +33,49 @@
 
 
   <main class="main main--upload">
-    <section class="upload-hero">
-      <h1>Upload Receipts</h1>
-      <p class="subtle">Drop PDFs or images to scan receipts. You can choose to save files or scan-only.</p>
-    </section>
+    <div class="upload-primary">
+      <section class="upload-hero">
+        <h1>Upload Receipts</h1>
+        <p class="subtle">Drop PDFs or images to scan receipts. You can choose to save files or scan-only.</p>
+      </section>
 
-    <section class="uploader card">
-      <label for="fileInput" class="file-label">Choose files</label>
+      <section class="uploader card">
+        <label for="fileInput" class="file-label">Choose files</label>
 
-      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Upload dropzone">
-        <div class="dz-inner">
-          <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6M7 10l5-6 5 6M12 4v12"
-              fill="none" stroke="currentColor" stroke-width="2" />
-          </svg>
+        <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Upload dropzone">
+          <div class="dz-inner">
+            <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6M7 10l5-6 5 6M12 4v12"
+                fill="none" stroke="currentColor" stroke-width="2" />
+            </svg>
 
-          <div class="dz-text">
-            <strong>Click to select</strong>
-            or drag & drop files here
+            <div class="dz-text">
+              <strong>Click to select</strong>
+              or drag & drop files here
+            </div>
           </div>
+
+          <input id="fileInput" class="dz-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,.tif,.tiff,.bmp,.webp" multiple />
         </div>
 
-        <input id="fileInput" class="dz-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,.tif,.tiff,.bmp,.webp" multiple />
-      </div>
+        <ul class="tips">
+          <li>Accepted: PDF, PNG, JPG, HEIC/HEIF, TIFF, BMP, WEBP (up to 50MB)</li>
+          <li>Scan-only skips file storage; Save stores the file for later download.</li>
+        </ul>
 
-      <ul class="tips">
-        <li>Accepted: PDF, PNG, JPG, HEIC/HEIF, TIFF, BMP, WEBP (up to 50MB)</li>
-        <li>Scan-only skips file storage; Save stores the file for later download.</li>
-      </ul>
+        <div class="file-list-wrap">
+          <div class="file-list-title">Pending files</div>
+          <div id="fileList" class="file-list"></div>
+        </div>
 
-      <div class="file-list-wrap">
-        <div class="file-list-title">Pending files</div>
-        <div id="fileList" class="file-list"></div>
-      </div>
+        <div class="actions">
+          <button id="clearBtn" class="btn" type="button">Clear</button>
+          <button id="uploadBtn" class="btn btn--primary" type="button" disabled>Upload</button>
+        </div>
 
-      <div class="actions">
-        <button id="clearBtn" class="btn" type="button">Clear</button>
-        <button id="uploadBtn" class="btn btn--primary" type="button" disabled>Upload</button>
-      </div>
-
-      <p id="statusMsg" class="status-banner subtle is-hidden" role="status" aria-live="polite"></p>
-    </section>
+        <p id="statusMsg" class="status-banner subtle is-hidden" role="status" aria-live="polite"></p>
+      </section>
+    </div>
 
     <section class="recent card">
       <h2>Recent uploads</h2>
@@ -169,5 +171,4 @@
   <script src="scripts/upload.js" type="module" defer></script>
 </body>
 </html>
-
 

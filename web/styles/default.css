@@ -1314,3 +1314,155 @@ textarea:focus-visible {
     bottom: 68px;
   }
 }
+
+/* ===============================================
+  APP TOUR
+  =============================================== */
+
+.app-tour-target {
+  position: relative;
+  z-index: 10001;
+  box-shadow:
+    0 0 0 4px rgba(255, 255, 255, 0.9),
+    0 26px 50px rgba(0, 0, 0, 0.35);
+  border-radius: 12px;
+  filter: brightness(1.18) saturate(1.08);
+  transition: filter 160ms ease, box-shadow 160ms ease;
+}
+
+.app-tour-spotlight {
+  position: fixed;
+  z-index: 9998;
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px rgba(8, 12, 18, 0.62);
+  transition: top 160ms ease, left 160ms ease, width 160ms ease, height 160ms ease;
+  pointer-events: none;
+}
+
+.app-tour-welcome-overlay {
+  position: fixed;
+  inset: 0;
+  background: radial-gradient(circle at 20% 10%, rgba(56, 189, 248, 0.15), transparent 55%),
+    rgba(8, 12, 18, 0.6);
+  z-index: 10020;
+}
+
+.app-tour-welcome {
+  position: fixed;
+  z-index: 10021;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(92vw, 420px);
+  background: linear-gradient(160deg, #ffffff, #f3f6ff);
+  border-radius: 22px;
+  padding: 22px 24px 24px;
+  box-shadow: 0 30px 70px rgba(15, 23, 42, 0.35);
+  animation: tourWelcomeFloat 0.5s ease;
+}
+
+.app-tour-welcome h3 {
+  margin: 0 0 10px;
+  font-size: 1.35rem;
+  color: #0f172a;
+}
+
+.app-tour-welcome-kicker {
+  margin: 0 0 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  font-size: 0.7rem;
+  color: #4f46e5;
+  font-weight: 700;
+}
+
+.app-tour-welcome-body {
+  margin: 0 0 18px;
+  color: #334155;
+  font-size: 0.98rem;
+  line-height: 1.5;
+}
+
+.app-tour-welcome-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.app-tour-welcome-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(15, 23, 42, 0.08);
+  color: #0f172a;
+  font-size: 1.1rem;
+  cursor: pointer;
+}
+
+@keyframes tourWelcomeFloat {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -46%) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+.app-tour-tooltip {
+  position: fixed;
+  z-index: 10000;
+  max-width: 320px;
+  background: #ffffff;
+  color: #0a0f14;
+  border-radius: 16px;
+  padding: 16px 18px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.2);
+}
+
+.app-tour-tooltip h3 {
+  margin: 0 0 8px;
+  font-size: 1.05rem;
+}
+
+.app-tour-tooltip p {
+  margin: 0 0 14px;
+  color: #253042;
+  font-size: 0.95rem;
+}
+
+.app-tour-step {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.app-tour-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  align-items: center;
+}
+
+.app-tour-actions .btn {
+  font-size: 0.85rem;
+  padding: 0.45rem 0.85rem;
+}
+
+.app-tour-skip {
+  background: transparent;
+  border: 1px solid rgba(15, 23, 42, 0.15);
+}
+
+@media (max-width: 720px) {
+  .app-tour-tooltip {
+    max-width: 85vw;
+  }
+}

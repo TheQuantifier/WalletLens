@@ -31,14 +31,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const legalCache = new Map();
   const legalSequence = ["terms", "privacy"];
   const APP_NAME_PLACEHOLDER = "<AppName>";
+  const TOUR_STORAGE_KEY = "app_tour_state_v1";
+  const TOUR_ACTIVE_KEY = "app_tour_active_v1";
   let legalFlowActive = false;
   let legalFlowStepIndex = 0;
   let suppressAgreeEvent = false;
+
+  const startAppTour = () => {
+    localStorage.setItem(TOUR_ACTIVE_KEY, "true");
+    localStorage.setItem(TOUR_STORAGE_KEY, JSON.stringify({ index: 0 }));
+  };
 
   if (year) year.textContent = new Date().getFullYear();
 
   const googleRedirect = api.auth.consumeGoogleRedirect();
   if (googleRedirect?.token || googleRedirect?.success) {
+    startAppTour();
     window.location.href = "home.html";
     return;
   }
@@ -440,6 +448,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const result = await api.auth.register(email, password, fullName);
 
       showMsg("✅ Account created! Redirecting…", "ok");
+      startAppTour();
 
       // Wait briefly then verify auth before redirect
       setTimeout(async () => {

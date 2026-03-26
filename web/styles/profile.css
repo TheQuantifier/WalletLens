@@ -496,11 +496,9 @@ textarea { resize: vertical; }
   opacity: 0.72;
 }
 
-.achievement-hint {
-  position: absolute;
-  left: 1rem;
-  right: 1rem;
-  bottom: calc(100% + 0.55rem);
+.achievement-float-hint {
+  position: fixed;
+  max-width: 260px;
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
@@ -510,19 +508,18 @@ textarea { resize: vertical; }
   font-size: 0.85rem;
   line-height: 1.4;
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateY(6px);
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
-  z-index: 5;
+  z-index: 50;
 }
 
-.achievement-card:hover .achievement-hint,
-.achievement-card:focus-within .achievement-hint {
+.achievement-float-hint.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
 
-:root[data-theme="dark"] .achievement-hint {
+:root[data-theme="dark"] .achievement-float-hint {
   background: color-mix(in srgb, var(--card-bg) 94%, #0f172a);
   box-shadow: 0 14px 32px rgba(2, 6, 23, 0.5);
 }

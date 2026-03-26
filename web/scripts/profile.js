@@ -582,10 +582,63 @@ const clearStatusSoon = (ms = 2000) => {
   }, ms);
 };
 
+let achievementHintEl = null;
+
+const ensureAchievementHintEl = () => {
+  if (achievementHintEl) return achievementHintEl;
+  achievementHintEl = document.createElement("div");
+  achievementHintEl.className = "achievement-float-hint";
+  achievementHintEl.setAttribute("role", "tooltip");
+  document.body.appendChild(achievementHintEl);
+  return achievementHintEl;
+};
+
+const showAchievementHint = (card) => {
+  const text = String(card?.dataset?.achievementHint || "").trim();
+  if (!text) return;
+  const hint = ensureAchievementHintEl();
+  hint.textContent = text;
+  hint.classList.add("is-visible");
+  hint.style.top = "0px";
+  hint.style.left = "0px";
+
+  requestAnimationFrame(() => {
+    const rect = card.getBoundingClientRect();
+    const hintRect = hint.getBoundingClientRect();
+    const padding = 12;
+    let top = rect.top - hintRect.height - 12;
+    let left = rect.left + rect.width / 2 - hintRect.width / 2;
+
+    if (left < padding) left = padding;
+    if (left + hintRect.width > window.innerWidth - padding) {
+      left = window.innerWidth - hintRect.width - padding;
+    }
+    if (top < padding) {
+      top = rect.bottom + 12;
+    }
+
+    hint.style.top = `${top}px`;
+    hint.style.left = `${left}px`;
+  });
+};
+
+const hideAchievementHint = () => {
+  if (!achievementHintEl) return;
+  achievementHintEl.classList.remove("is-visible");
+};
+
 const renderAchievements = (payload) => {
   if (!achievementGrid) return;
   const list = Array.isArray(payload?.achievements) ? payload.achievements : [];
   const summary = payload?.summary || {};
+  const fallbackDescriptions = {
+    first_record: "Add your first record.",
+    five_records: "Add 5 total records.",
+  };
+  const fallbackByTitle = {
+    "first record": "Add your first record.",
+    "tracking momentum": "Add 5 total records.",
+  };
 
   if (achievementStatus) {
     achievementStatus.textContent = list.length
@@ -633,16 +686,28 @@ const renderAchievements = (payload) => {
     card.appendChild(badge);
     card.appendChild(body);
 
-    const description = String(item.description || "").trim();
+    const titleKey = String(item.title || "").trim().toLowerCase();
+    const description = String(
+      item.description ||
+        fallbackDescriptions[item.key] ||
+        fallbackByTitle[titleKey] ||
+        ""
+    ).trim();
     if (description) {
-      const hint = document.createElement("span");
-      hint.className = "achievement-hint";
-      hint.textContent = description;
-      card.appendChild(hint);
+      card.dataset.achievementHint = description;
+      card.tabIndex = 0;
+      card.addEventListener("mouseenter", () => showAchievementHint(card));
+      card.addEventListener("mouseleave", hideAchievementHint);
+      card.addEventListener("focus", () => showAchievementHint(card));
+      card.addEventListener("blur", hideAchievementHint);
     }
 
     achievementGrid.appendChild(card);
   });
+
+  achievementGrid.addEventListener("scroll", hideAchievementHint, { passive: true });
+  window.addEventListener("scroll", hideAchievementHint, { passive: true });
+  window.addEventListener("resize", hideAchievementHint);
 };
 
 async function loadAchievements() {
