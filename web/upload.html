@@ -1,8 +1,7 @@
-<!-- upload.html for Upload Page -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
+<script>
     (function () {
       const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
       const currentPage = rawPage === "" ? "index.html" : rawPage;
@@ -28,146 +27,9 @@
 </head>
 
 <body>
-  <!-- Header injected by default.js -->
-  <div id="header"></div>
-
-
-  <main class="main main--upload">
-    <section class="upload-hero">
-      <h1>Upload Receipts</h1>
-      <p class="subtle">Drop PDFs or images to scan receipts. You can choose to save files or scan-only.</p>
-    </section>
-
-    <section class="uploader card">
-      <label for="fileInput" class="file-label">Choose files</label>
-
-      <div id="dropzone" class="dropzone" role="button" tabindex="0" aria-label="Upload dropzone">
-        <div class="dz-inner">
-          <svg class="dz-icon" viewBox="0 0 24 24" aria-hidden="true">
-            <path d="M19 13v6a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2v-6M7 10l5-6 5 6M12 4v12"
-              fill="none" stroke="currentColor" stroke-width="2" />
-          </svg>
-
-          <div class="dz-text">
-            <strong>Click to select</strong>
-            or drag & drop files here
-          </div>
-        </div>
-
-        <input id="fileInput" class="dz-input" type="file" accept=".pdf,.png,.jpg,.jpeg,.heic,.heif,.tif,.tiff,.bmp,.webp" multiple />
-      </div>
-
-      <ul class="tips">
-        <li>Accepted: PDF, PNG, JPG, HEIC/HEIF, TIFF, BMP, WEBP (up to 50MB)</li>
-        <li>Scan-only skips file storage; Save stores the file for later download.</li>
-      </ul>
-
-      <div class="file-list-wrap">
-        <div class="file-list-title">Pending files</div>
-        <div id="fileList" class="file-list"></div>
-      </div>
-
-      <div class="actions">
-        <button id="clearBtn" class="btn" type="button">Clear</button>
-        <button id="uploadBtn" class="btn btn--primary" type="button" disabled>Upload</button>
-      </div>
-
-      <p id="statusMsg" class="status-banner subtle is-hidden" role="status" aria-live="polite"></p>
-    </section>
-
-    <section class="recent card">
-      <h2>Recent uploads</h2>
-
-      <div class="table-wrap">
-        <table class="txn-table">
-          <thead>
-            <tr>
-              <th scope="col">File name</th>
-              <th scope="col">Type</th>
-              <th scope="col" class="num">Size</th>
-              <th scope="col">Uploaded</th>
-              <th scope="col">Status</th>
-              <th scope="col" class="actions-col">Actions</th>
-            </tr>
-          </thead>
-
-          <tbody id="recentTableBody">
-            <tr><td colspan="6" class="subtle">Loading…</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-  </main>
-
-  <!-- Footer injected by default.js -->
-  <div id="footer"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedFooterHtml");
-      if (!cached) return;
-      const el = document.getElementById("footer");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-    })();
-  </script>
-
-
-  <!-- ===================== DELETE RECEIPT MODAL ===================== -->
-  <div id="deleteModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-
-    <div class="modal-content">
-      <h3>Delete Receipt</h3>
-      <p>This receipt may be linked to a financial record. What would you like to delete?</p>
-
-      <div class="modal-actions">
-        <button id="btnDeleteFile" class="btn btn--danger" type="button">Delete Receipt Only</button>
-        <button id="btnDeleteBoth" class="btn btn--warning" type="button">Delete Both Receipt & Record</button>
-        <button id="btnDeleteCancel" class="btn" type="button">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== UPLOAD MODE MODAL ===================== -->
-  <div id="uploadModeModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-
-    <div class="modal-content">
-      <h3>Upload Options</h3>
-      <p>Would you like to save the file, or just scan it without storing?</p>
-
-      <div class="modal-actions">
-        <button id="btnScanOnly" class="btn btn--warning" type="button">Scan Only</button>
-        <button id="btnSaveAndScan" class="btn btn--primary" type="button">Save & Scan</button>
-        <button id="btnUploadCancel" class="btn" type="button">Cancel</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- ===================== OCR REVIEW MODAL ===================== -->
-  <div id="ocrReviewModal" class="modal hidden">
-    <div class="modal-backdrop"></div>
-
-    <div class="modal-content">
-      <h3>Parsed Text Review</h3>
-      <p>
-        This is the parsed text from your receipt. Please make sure it is correct.
-        If not, edit it below to correct it.
-      </p>
-
-      <textarea id="ocrReviewText" rows="12" style="width: 100%;" spellcheck="false"></textarea>
-
-      <div class="modal-actions">
-        <button id="btnOcrReviewDone" class="btn btn--primary" type="button">Done</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Scripts -->
+  <div id="root"></div>
+  <script type="module" src="./src/entries/upload.jsx"></script>
   <script src="scripts/default.js" type="module" defer></script>
   <script src="scripts/upload.js" type="module" defer></script>
 </body>
 </html>
-
-

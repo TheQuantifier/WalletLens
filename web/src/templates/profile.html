@@ -1,0 +1,222 @@
+<div id="header"></div>
+
+
+  <main class="main main--profile">
+
+    <!-- HERO -->
+    <section class="profile-hero">
+      <div class="title-wrap">
+        <h1>Profile</h1>
+        <p class="subtle">View and update your personal info</p>
+      </div>
+      <div class="actions" role="group">
+        <p id="profileStatus" class="status-banner subtle is-hidden profile-status-inline" aria-live="polite"></p>
+        <button id="editProfileBtn" class="btn btn--primary" type="button">
+          Edit Profile
+        </button>
+        <button id="cancelEditBtn" class="btn is-hidden" type="button">
+          Cancel
+        </button>
+        <button id="saveProfileBtn" class="btn btn--primary is-hidden" type="submit" form="editForm">
+          Save Changes
+        </button>
+      </div>
+    </section>
+
+    <div class="profile-grid">
+
+      <!-- SUMMARY + EDIT FORM -->
+      <section class="card profile-card">
+        <div class="avatar-block">
+          <div class="avatar"></div>
+          <div class="identity">
+            <h3 class="name" id="fullName">&mdash;</h3>
+            <p class="subtle" id="username">@&mdash;</p>
+          </div>
+          <div class="avatar-actions">
+            <button class="btn is-hidden" id="changeAvatarBtnTop" data-avatar-trigger type="button">Change Avatar</button>
+          </div>
+        </div>
+
+        <dl id="profileSummary" class="meta">
+          <div><dt>Email</dt><dd id="email">&mdash;</dd></div>
+          <div><dt>Phone</dt><dd id="phoneNumber">&mdash;</dd></div>
+          <div><dt>Location</dt><dd id="location">&mdash;</dd></div>
+          <div><dt>Role</dt><dd id="role">&mdash;</dd></div>
+          <div><dt>Member Since</dt><dd id="createdAt">&mdash;</dd></div>
+          <div><dt>Bio</dt><dd id="bio">&mdash;</dd></div>
+        </dl>
+
+        <!-- EDIT FORM -->
+        <form id="editForm" class="edit-form" hidden>
+          <div class="edit-form-header">
+            <h3>Edit Profile</h3>
+            <p class="subtle">Update your contact details and profile info.</p>
+          </div>
+          <div class="form-grid">
+            <label><span class="label">Full Name</span><input id="input_fullName" name="fullName" type="text" autocomplete="name" required></label>
+            <label><span class="label">Username</span><input id="input_username" name="username" type="text" autocomplete="username" required></label>
+            <label><span class="label">Email</span><input id="input_email" name="email" type="email" autocomplete="email" required></label>
+            <label><span class="label">Phone Number</span><input id="input_phoneNumber" name="phoneNumber" type="tel" autocomplete="tel"></label>
+            <label><span class="label">Location</span><input id="input_location" name="location" type="text" autocomplete="address-level2"></label>
+            <label class="span-2"><span class="label">Bio</span><textarea id="input_bio" name="bio" rows="4" autocomplete="off"></textarea></label>
+          </div>
+
+          <div class="form-actions">
+            <button type="button" id="changeAvatarBtnForm" data-avatar-trigger class="btn">Change Avatar</button>
+          </div>
+        </form>
+
+        <div class="actions">
+          <input id="avatarInput" type="file" accept="image/*" hidden />
+        </div>
+      </section>
+
+      <!-- AVATAR MODAL -->
+      <div id="avatarModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="avatarModalTitle">
+        <div class="modal-backdrop" data-close="avatar"></div>
+        <div class="modal-content card avatar-modal-content">
+          <div class="avatar-modal-header">
+            <h2 id="avatarModalTitle">Choose an Avatar</h2>
+            <button class="btn btn--link avatar-modal-close" id="closeAvatarModal" type="button" aria-label="Close avatar picker">Close</button>
+          </div>
+          <p class="subtle">Pick one of the preset avatars below.</p>
+          <div id="avatarChoices" class="avatar-grid" role="listbox" aria-label="Avatar choices"></div>
+          <div class="modal-actions">
+            <button class="btn" id="cancelAvatarBtn" type="button">Cancel</button>
+            <button class="btn btn--primary" id="saveAvatarBtn" type="button">Use Selected</button>
+          </div>
+        </div>
+      </div>
+      <!-- IDENTITY + STATS -->
+      <section class="card security">
+        <div class="security-header">
+          <h2>Identity & Stats</h2>
+        </div>
+
+        <div id="identityDisplay" class="security-rows">
+          <div class="security-row">
+            <div class="sr-left"><p class="label">Address</p></div>
+            <div class="sr-right align-right" id="identityAddress">&mdash;</div>
+          </div>
+
+          <div class="security-row">
+            <div class="sr-left"><p class="label">Employer</p></div>
+            <div class="sr-right align-right" id="identityEmployer">&mdash;</div>
+          </div>
+
+          <div class="security-row">
+            <div class="sr-left"><p class="label">Income Range</p></div>
+            <div class="sr-right align-right" id="identityIncome">&mdash;</div>
+          </div>
+        </div>
+
+        <form id="identityForm" class="edit-form edit-form--identity" hidden>
+          <div class="form-grid">
+            <label><span class="label">Address</span><input id="input_identityAddress" name="identityAddress" type="text" autocomplete="street-address"></label>
+            <label><span class="label">Employer</span><input id="input_identityEmployer" name="identityEmployer" type="text" autocomplete="organization"></label>
+            <label>
+              <span class="label">Income Range</span>
+              <select id="input_identityIncome" name="identityIncome">
+                <option value="" disabled selected>Select income range</option>
+                <option value="Under $25k">Under $25k</option>
+                <option value="$25k–$50k">$25k–$50k</option>
+                <option value="$50k–$75k">$50k–$75k</option>
+                <option value="$75k–$100k">$75k–$100k</option>
+                <option value="$100k+">$100k+</option>
+              </select>
+            </label>
+          </div>
+        </form>
+
+        <div class="security-rows stats-rows">
+          <div class="security-row">
+            <div class="sr-left"><p class="label">Last Login</p></div>
+            <div class="sr-right align-right" id="stat_lastLogin">&mdash;</div>
+          </div>
+
+          <div class="security-row">
+            <div class="sr-left"><p class="label">Records Uploaded</p></div>
+            <div class="sr-right align-right" id="stat_uploads">&mdash;</div>
+          </div>
+        </div>
+      </section>
+
+      <!-- LINKED ACCOUNTS -->
+      <section class="card linked-accounts">
+        <div class="section-head">
+          <div>
+            <div class="section-headline stack">
+              <h2>Linked Accounts</h2>
+            </div>
+            <p class="testing-banner" role="status">In Testing Phase - Coming Soon</p>
+            <p class="subtle">Connect Plaid sandbox accounts to sync balances and transactions into Records.</p>
+          </div>
+          <button class="btn btn--primary" id="linkAccountBtn" type="button">Connect Account</button>
+          <button class="btn" id="syncAccountsBtn" type="button">Sync Transactions</button>
+        </div>
+
+        <div id="linkedAccountsList" class="linked-list linked-list--scroll">
+          <div class="linked-item">
+            <div>
+              <p class="label">No accounts linked yet</p>
+              <p class="subtle">Connect a Plaid sandbox institution to start importing transactions.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- UNLINK ACCOUNT MODAL -->
+      <div id="unlinkAccountModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="unlinkAccountTitle">
+        <div class="modal-backdrop" data-close="unlink-account"></div>
+        <div class="modal-content card">
+          <div class="modal-header">
+            <h2 id="unlinkAccountTitle">Remove Linked Account</h2>
+            <button class="btn btn--link" id="closeUnlinkAccountModal" type="button">Close</button>
+          </div>
+          <p class="subtle" id="unlinkAccountText">Do you want to export this account's history before unlinking it?</p>
+
+          <p class="subtle">Unlinking removes imported transactions and linked balance data for this account from the app.</p>
+
+          <div class="modal-actions">
+            <button class="btn" id="cancelUnlinkAccount" type="button">Cancel</button>
+            <button class="btn" id="unlinkWithoutExportBtn" type="button">Unlink Without Export</button>
+            <button class="btn btn--primary" id="exportAndUnlinkBtn" type="button">Export and Unlink</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACHIEVEMENTS -->
+      <section class="card achievements">
+        <div class="section-headline inline">
+          <h2>Achievements</h2>
+        </div>
+        <p id="achievementStatus" class="subtle">Loading achievements...</p>
+        <div class="achievement-grid achievement-grid--scroll" id="achievementGrid">
+        </div>
+      </section>
+
+      <!-- ACTIVITY -->
+      <section class="card activity">
+        <h2>Recent Activity</h2>
+        <div class="table-wrap">
+          <table class="txn-table activity-table">
+            <thead>
+              <tr>
+                <th class="date-col"><span class="activity-date">Date</span></th>
+                <th class="activity-col">Activity</th>
+                <th class="ip-col">IP</th>
+                <th class="result-col">Result</th>
+              </tr>
+            </thead>
+            <tbody id="activityBody">
+              <tr><td colspan="4" class="subtle">No activity yet</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+    </div>
+  </main>
+
+  <div id="footer"></div>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
+<script>
     (function () {
       const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
       const currentPage = rawPage === "" ? "index.html" : rawPage;
@@ -30,134 +30,11 @@
 </head>
 
 <body>
-  <div id="header"></div>
-
-
-  <main class="main main--reports">
-
-    <!-- ========== SUMMARY ========== -->
-    <section class="summary report-hero">
-      <div class="hero-head">
-        <div>
-          <p class="hero-kicker">Reports</p>
-          <h1>Command Center</h1>
-          <p class="hero-sub">Fast clarity on where money moves, what wins, and what needs a reset.</p>
-        </div>
-
-        <div class="reports-controls">
-          <label class="control">
-            <span class="label">Date Range</span>
-            <select id="reportsRange" name="reportsRange">
-              <option value="30">Last 30 days</option>
-              <option value="90">Last 90 days</option>
-              <option value="365">Last 12 months</option>
-              <option value="all" selected>All time</option>
-            </select>
-          </label>
-
-          <button class="btn btn--primary" id="btnRefreshReports" type="button">Refresh</button>
-
-          <p id="reportsStatus" class="status-banner subtle is-hidden reports-status" aria-live="polite"></p>
-        </div>
-      </div>
-
-      <div class="cards cards--kpis">
-        <div class="card">
-          <h3>Total Expenses</h3>
-          <p id="total-expenses" aria-live="polite">Loading...</p>
-        </div>
-
-        <div class="card">
-          <h3>Total Income</h3>
-          <p id="total-income" aria-live="polite">Loading...</p>
-        </div>
-
-        <div class="card">
-          <h3>Net Cashflow</h3>
-          <p id="net-cashflow" aria-live="polite">Loading...</p>
-        </div>
-
-        <div class="card">
-          <h3>Monthly Average</h3>
-          <p id="monthly-average" aria-live="polite">Loading...</p>
-        </div>
-
-        <div class="card">
-          <h3>Top Category</h3>
-          <p id="top-category" aria-live="polite">Loading...</p>
-        </div>
-
-        <div class="card">
-          <h3>Savings Rate</h3>
-          <p id="savings-rate" aria-live="polite">Loading...</p>
-        </div>
-      </div>
-
-      <div class="insight-band" aria-live="polite">
-        <div class="insight" id="insight-primary">Loading insights...</div>
-        <div class="insight" id="insight-secondary">Loading insights...</div>
-        <div class="insight" id="insight-tertiary">Loading insights...</div>
-      </div>
-    </section>
-
-    <!-- ========== CATEGORY BARS ========== -->
-    <section class="chart-section chart-section--split">
-      <div class="section-head">
-        <div>
-          <h2>Category Pulse</h2>
-          <p class="section-sub">Bar charts beat pies for quick comparison.</p>
-        </div>
-      </div>
-
-      <div class="chart-row chart-row--tall">
-        <div class="chart-box">
-          <h3>Expenses by Category</h3>
-          <canvas id="barChartExpenses"></canvas>
-        </div>
-
-        <div class="chart-box">
-          <h3>Income Sources</h3>
-          <canvas id="barChartIncome"></canvas>
-        </div>
-      </div>
-    </section>
-
-    <!-- ========== MONTHLY TREND ========== -->
-    <section class="chart-section chart-section--timeline">
-      <div class="section-head">
-        <div>
-          <h2>Cashflow Timeline</h2>
-          <p class="section-sub">See momentum, not just totals.</p>
-        </div>
-
-        <div class="toggles">
-          <label class="toggle"><input type="checkbox" id="toggle-expenses" checked /> <span>Expenses</span></label>
-          <label class="toggle"><input type="checkbox" id="toggle-income" checked /> <span>Income</span></label>
-        </div>
-      </div>
-
-      <canvas id="monthlyChart"></canvas>
-    </section>
-
-  </main>
-
-  <div id="footer"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedFooterHtml");
-      if (!cached) return;
-      const el = document.getElementById("footer");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-    })();
-  </script>
-
-
+  <div id="root"></div>
+  <script type="module" src="./src/entries/reports.jsx"></script>
   <script src="scripts/default.js" type="module" defer></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
   <script src="scripts/reports.js" type="module" defer></script>
-
 </body>
 </html>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
+<script>
     (function () {
       const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
       const currentPage = rawPage === "" ? "index.html" : rawPage;
@@ -28,101 +28,10 @@
     document.documentElement.setAttribute("data-theme", savedTheme);
   </script>
 </head>
+
 <body class="legal-page">
-  <main class="main main--legal">
-    <section class="legal-hero">
-      <button type="button" class="legal-back-btn" id="legalGoBackBtn">Go Back</button>
-      <h1>Privacy Policy</h1>
-      <p class="lead">
-        Effective Date: February 8, 2026
-      </p>
-    </section>
-
-    <section class="legal-content">
-      <article class="card legal-placeholder">
-        <p>
-          &lt;AppName&gt; ("we," "us," or "our") values your privacy. This Privacy Policy explains what information we collect, how we use it, how we share it, and your choices when you use &lt;AppName&gt;.
-        </p>
-
-        <h2>1. Information We Collect</h2>
-        <p>We may collect:</p>
-        <ul>
-          <li>Account information: name, email address, username, password hash, and profile details you choose to provide.</li>
-          <li>Financial content you provide: income and expense records, categories, budgets, notes, and reports.</li>
-          <li>Receipt and document data: uploaded files, extracted OCR text, and parsed metadata.</li>
-          <li>Authentication and security data: session/device information, login activity, and optional two-factor authentication data.</li>
-          <li>Support communications: messages you send through support/contact forms.</li>
-          <li>Technical information: IP address, browser/user agent, and basic usage logs for security and reliability.</li>
-        </ul>
-
-        <h2>2. How We Use Information</h2>
-        <p>We use information to:</p>
-        <ul>
-          <li>Provide and operate &lt;AppName&gt; features.</li>
-          <li>Authenticate users and secure accounts.</li>
-          <li>Process receipt uploads, OCR, and AI-assisted parsing.</li>
-          <li>Store and show your financial records and reports.</li>
-          <li>Respond to support requests.</li>
-          <li>Detect, prevent, and investigate abuse, fraud, and security incidents.</li>
-          <li>Improve product performance and reliability.</li>
-        </ul>
-
-        <h2>3. Google Sign-In</h2>
-        <p>
-          If you use Google Sign-In, we receive basic profile data from Google such as your Google account ID, email, and profile name. We use this information only to authenticate your account and link it to &lt;AppName&gt;.
-        </p>
-
-        <h2>4. How We Share Information</h2>
-        <p>
-          We do not sell your personal information. We may share data with service providers that help us run the app (for example, cloud hosting, storage, email delivery, OCR/AI processing), subject to contractual and security controls. We may also disclose information when required by law, legal process, or to protect rights, safety, and platform security.
-        </p>
-
-        <h2>5. Data Retention</h2>
-        <p>
-          We retain account and app data as long as needed to provide services and comply with legal or operational obligations. If you delete your account, we delete or de-identify data according to our system design and retention requirements, except where retention is required by law.
-        </p>
-
-        <h2>6. Security</h2>
-        <p>
-          We use reasonable administrative, technical, and organizational safeguards to protect data. No system is 100% secure, and we cannot guarantee absolute security.
-        </p>
-
-        <h2>7. Your Choices and Rights</h2>
-        <p>
-          Depending on your location, you may have rights to access, correct, delete, or export personal information. You can also manage some account settings directly in &lt;AppName&gt;. To request privacy-related actions, contact us using the support details provided by the app.
-        </p>
-
-        <h2>8. Children's Privacy</h2>
-        <p>
-          &lt;AppName&gt; is not intended for children under 13 (or the applicable age in your region), and we do not knowingly collect personal data from children.
-        </p>
-
-        <h2>9. International Data Transfers</h2>
-        <p>
-          Your information may be processed and stored in countries other than your own, where privacy laws may differ.
-        </p>
-
-        <h2>10. Changes to This Policy</h2>
-        <p>
-          We may update this Privacy Policy from time to time. We will update the Effective Date above and post the revised version in the app or website.
-        </p>
-
-        <h2>11. Contact</h2>
-        <p>
-          If you have questions about this Privacy Policy, contact us through &lt;AppName&gt; support channels.
-        </p>
-      </article>
-    </section>
-  </main>
-  <script>
-    document.getElementById("legalGoBackBtn")?.addEventListener("click", () => {
-      if (window.history.length > 1) {
-        window.history.back();
-      } else {
-        window.location.href = "register.html";
-      }
-    });
-  </script>
+  <div id="root"></div>
+  <script type="module" src="./src/entries/privacy.jsx"></script>
   <script src="scripts/default.js" type="module" defer></script>
 </body>
 </html>

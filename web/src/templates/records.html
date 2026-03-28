@@ -1,0 +1,420 @@
+<div id="header"></div>
+
+
+  <main class="main">
+
+    <!-- ========================================================
+         EXPENSES SECTION
+    ========================================================= -->
+    <section class="records-section">
+
+      <div class="records-header">
+        <div class="records-title">
+          <h1>Expenses</h1>
+          <p class="subtle">Search, filter, sort, and export your expense transactions.</p>
+        </div>
+
+        <div class="records-actions">
+          <button class="btn" id="btnAddExpense" type="button">Add Expense</button>
+          <button class="btn btn--primary" id="btnExportExpenses" type="button">Export</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card records-subsection">
+        <form id="filtersForm">
+
+          <div class="records-filters-grid">
+
+            <label>
+              <span>Search</span>
+              <input type="text" id="q" name="q" placeholder="Category or note…" autocomplete="off" />
+            </label>
+
+            <label>
+              <span>Category</span>
+              <select id="category" name="category">
+                <option value="">All</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Min Date</span>
+              <input type="date" id="minDate" name="minDate" />
+            </label>
+
+            <label>
+              <span>Max Date</span>
+              <input type="date" id="maxDate" name="maxDate" />
+            </label>
+
+            <label>
+              <span>Min Amount</span>
+              <input type="number" id="minAmt" name="minAmt" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+            </label>
+
+            <label>
+              <span>Max Amount</span>
+              <input type="number" id="maxAmt" name="maxAmt" step="0.01" min="0" inputmode="decimal" placeholder="9999.99" />
+            </label>
+
+            <label>
+              <span>Rows per page</span>
+              <select id="pageSize" name="pageSize">
+                <option selected>5</option>
+                <option>10</option>
+                <option>25</option>
+                <option>50</option>
+              </select>
+            </label>
+
+          </div>
+
+          <div class="flex" style="gap: 1rem;">
+            <button type="submit" class="btn btn--primary">Apply</button>
+            <button type="button" class="btn btn--link" id="btnClear">Clear</button>
+          </div>
+
+        </form>
+      </div>
+
+      <p id="recordsStatusExpense" class="status-banner subtle is-hidden" aria-live="polite"></p>
+
+      <!-- Table -->
+      <div class="records-table records-subsection">
+        <div class="table-wrap card">
+          <table class="txn-table">
+            <thead>
+              <tr>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="date">
+                    Date <span class="sort-arrow" data-arrow-for="expense:date">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="type">
+                    Type <span class="sort-arrow" data-arrow-for="expense:type">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="category">
+                    Category <span class="sort-arrow" data-arrow-for="expense:category">↕</span>
+                  </button>
+                </th>
+                <th class="num">
+                  <button type="button" class="records-sort-btn records-sort-btn--num" data-sort-table="expense" data-sort-key="amount">
+                    Amount <span class="sort-arrow" data-arrow-for="expense:amount">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="note">
+                    Note <span class="sort-arrow" data-arrow-for="expense:note">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="expense" data-sort-key="origin">
+                    Origin <span class="sort-arrow" data-arrow-for="expense:origin">↕</span>
+                  </button>
+                </th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbody" aria-live="polite">
+              <tr><td colspan="7" class="subtle">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <nav class="records-pager">
+          <button class="btn" id="prevPageExpense" type="button" disabled>← Prev</button>
+          <span id="pageInfoExpense" class="subtle">Page 1 of 1</span>
+          <button class="btn" id="nextPageExpense" type="button" disabled>Next →</button>
+        </nav>
+      </div>
+
+    </section>
+
+    <!-- ========================================================
+         INCOME SECTION
+    ========================================================= -->
+    <section class="records-section">
+
+      <div class="records-header">
+        <div class="records-title">
+          <h1>Income</h1>
+          <p class="subtle">Search, filter, sort, and export your income transactions.</p>
+        </div>
+
+        <div class="records-actions">
+          <button class="btn" id="btnAddIncome" type="button">Add Income</button>
+          <button class="btn btn--primary" id="btnExportIncome" type="button">Export</button>
+        </div>
+      </div>
+
+      <!-- Filters -->
+      <div class="card records-subsection">
+        <form id="filtersFormIncome">
+
+          <div class="records-filters-grid">
+
+            <label>
+              <span>Search</span>
+              <input type="text" id="qIncome" name="qIncome" placeholder="Category or note…" autocomplete="off" />
+            </label>
+
+            <label>
+              <span>Category</span>
+              <select id="categoryIncome" name="categoryIncome">
+                <option value="">All</option>
+              </select>
+            </label>
+
+            <label>
+              <span>Min Date</span>
+              <input type="date" id="minDateIncome" name="minDateIncome" />
+            </label>
+
+            <label>
+              <span>Max Date</span>
+              <input type="date" id="maxDateIncome" name="maxDateIncome" />
+            </label>
+
+            <label>
+              <span>Min Amount</span>
+              <input type="number" id="minAmtIncome" name="minAmtIncome" step="0.01" min="0" inputmode="decimal" placeholder="0.00" />
+            </label>
+
+            <label>
+              <span>Max Amount</span>
+              <input type="number" id="maxAmtIncome" name="maxAmtIncome" step="0.01" min="0" inputmode="decimal" placeholder="99999.99" />
+            </label>
+
+            <label>
+              <span>Rows per page</span>
+              <select id="pageSizeIncome" name="pageSizeIncome">
+                <option selected>5</option>
+                <option>10</option>
+                <option>25</option>
+                <option>50</option>
+              </select>
+            </label>
+
+          </div>
+
+          <div class="flex" style="gap: 1rem;">
+            <button type="submit" class="btn btn--primary">Apply</button>
+            <button type="button" class="btn btn--link" id="btnClearIncome">Clear</button>
+          </div>
+
+        </form>
+      </div>
+
+      <p id="recordsStatusIncome" class="status-banner subtle is-hidden" aria-live="polite"></p>
+
+      <!-- Table -->
+      <div class="records-table records-subsection">
+        <div class="table-wrap card">
+          <table class="txn-table">
+            <thead>
+              <tr>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="date">
+                    Date <span class="sort-arrow" data-arrow-for="income:date">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="type">
+                    Type <span class="sort-arrow" data-arrow-for="income:type">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="category">
+                    Category <span class="sort-arrow" data-arrow-for="income:category">↕</span>
+                  </button>
+                </th>
+                <th class="num">
+                  <button type="button" class="records-sort-btn records-sort-btn--num" data-sort-table="income" data-sort-key="amount">
+                    Amount <span class="sort-arrow" data-arrow-for="income:amount">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="note">
+                    Note <span class="sort-arrow" data-arrow-for="income:note">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="records-sort-btn" data-sort-table="income" data-sort-key="origin">
+                    Origin <span class="sort-arrow" data-arrow-for="income:origin">↕</span>
+                  </button>
+                </th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="recordsTbodyIncome" aria-live="polite">
+              <tr><td colspan="7" class="subtle">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <nav class="records-pager">
+          <button class="btn" id="prevPageIncome" type="button" disabled>← Prev</button>
+          <span id="pageInfoIncome" class="subtle">Page 1 of 1</span>
+          <button class="btn" id="nextPageIncome" type="button" disabled>Next →</button>
+        </nav>
+      </div>
+
+    </section>
+
+    <!-- ========================================================
+         ADD/EDIT MODALS
+    ========================================================= -->
+
+    <!-- Add Expense Modal -->
+    <div id="addExpenseModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Add New Expense</h2>
+
+        <form id="expenseForm" class="txn-form">
+          <div class="form-row">
+            <label><span>Date</span><input type="date" id="expenseDate" name="expenseDate" required /></label>
+            <label><span>Amount</span><input type="number" id="expenseAmount" name="expenseAmount" step="0.01" min="0" inputmode="decimal" required /></label>
+          </div>
+
+          <div class="form-row">
+            <label>
+              <span>Category</span>
+              <select id="expenseCategory" name="expenseCategory" required>
+                <option value="" disabled selected>Select a category</option>
+              </select>
+            </label>
+            <div class="custom-category-list" id="expenseCustomCategories" aria-live="polite"></div>
+          </div>
+
+          <div class="form-row">
+            <label><span>Notes</span><input type="text" id="expenseNotes" name="expenseNotes" autocomplete="off" /></label>
+          </div>
+
+          <div class="form-row form-row--compact">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="applyRulesExpense" checked />
+              <span>Apply rules to this record</span>
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <button type="submit" class="btn btn--primary">Save Expense</button>
+            <button type="button" class="btn" id="cancelExpenseBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- Add Income Modal -->
+    <div id="addIncomeModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Add New Income</h2>
+
+        <form id="incomeForm" class="txn-form">
+          <div class="form-row">
+            <label><span>Date</span><input type="date" id="incomeDate" name="incomeDate" required /></label>
+            <label><span>Amount</span><input type="number" id="incomeAmount" name="incomeAmount" step="0.01" min="0" inputmode="decimal" required /></label>
+          </div>
+
+          <div class="form-row">
+            <label>
+              <span>Category</span>
+              <select id="incomeCategory" name="incomeCategory" required>
+                <option value="" disabled selected>Select a category</option>
+              </select>
+            </label>
+            <div class="custom-category-list" id="incomeCustomCategories" aria-live="polite"></div>
+          </div>
+
+          <div class="form-row">
+            <label><span>Notes</span><input type="text" id="incomeNotes" name="incomeNotes" autocomplete="off" /></label>
+          </div>
+
+          <div class="form-row form-row--compact">
+            <label class="checkbox-inline">
+              <input type="checkbox" id="applyRulesIncome" checked />
+              <span>Apply rules to this record</span>
+            </label>
+          </div>
+
+          <div class="modal-actions">
+            <button type="submit" class="btn btn--primary">Save Income</button>
+            <button type="button" class="btn" id="cancelIncomeBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         DELETE RECORD MODAL  (NEW)
+    ========================================================= -->
+    <div id="deleteRecordModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Delete Record</h2>
+        <p id="deleteRecordText">
+          This record is linked to an uploaded receipt.
+        </p>
+
+        <div class="modal-actions">
+          <button id="btnDeleteRecordOnly" class="btn btn--danger" type="button">Delete Record</button>
+          <button id="btnDeleteRecordAndReceipt" class="btn btn--warning" type="button">Delete Record & Receipt</button>
+          <button id="btnCancelDeleteRecord" class="btn" type="button">Cancel</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="receiptItemsModal" class="modal hidden" aria-labelledby="receiptItemsTitle">
+      <div class="modal-content">
+        <h2 id="receiptItemsTitle">Receipt Items</h2>
+        <p id="receiptItemsSubtitle" class="subtle">Line items saved for this receipt.</p>
+
+        <div id="receiptItemsStatus" class="status-banner subtle is-hidden" aria-live="polite"></div>
+
+        <div class="receipt-items-panel">
+          <div class="receipt-items-header">
+            <span>Item</span>
+            <span>Price</span>
+          </div>
+          <div id="receiptItemsList" class="receipt-items-list" aria-live="polite">
+            <p class="subtle">Loading…</p>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button id="btnCloseReceiptItems" class="btn" type="button">Close</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ========================================================
+         CUSTOM CATEGORY MODAL
+    ========================================================= -->
+    <div id="customCategoryModal" class="modal hidden">
+      <div class="modal-content">
+        <h2>Add Custom Category</h2>
+        <p class="subtle">Enter a name to add a custom category.</p>
+
+        <form id="customCategoryForm" class="txn-form">
+          <div class="form-row">
+            <label><span>Category Name</span><input type="text" id="customCategoryInput" autocomplete="off" required /></label>
+          </div>
+
+          <div class="modal-actions">
+            <button type="submit" class="btn btn--primary">Save Category</button>
+            <button type="button" class="btn" id="cancelCustomCategoryBtn">Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="footer"></div>
+  
+
+
+  <!-- Scripts -->

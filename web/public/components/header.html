@@ -1,0 +1,111 @@
+<header>
+  <div class="navbar">
+
+    <!-- Left: Logo -->
+    <div class="logo-group">
+      <h1 class="logo">
+        <a class="logo-link" href="about.html">
+          <img src="images/favicon.png" alt="App icon" class="logo-icon" />
+          <span id="appName">&lt;AppName&gt;</span>
+        </a>
+      </h1>
+      <span class="tagline">Track Smarter. Stress Less.</span>
+    </div>
+
+    <!-- Middle: Navigation -->
+    <nav class="nav-links">
+      <a href="home.html">Home</a>
+      <a href="upload.html">Upload</a>
+      <a href="records.html">Records</a>
+      <a href="recurring.html">Recurring</a>
+      <a href="rules.html">Rules</a>
+      <a href="budgeting.html">Budgeting</a>
+      <a href="reports.html">Reports</a>
+      <a href="about.html">About</a>
+    </nav>
+    <!-- Right side: Account dropdown -->
+    <div class="account-controls">
+      <div class="mobile-nav" aria-label="Primary navigation">
+        <button
+          id="mobileNavToggle"
+          class="mobile-nav-toggle"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="mobileNavMenu"
+        >
+          <span class="sr-only">Open navigation menu</span>
+          <span class="hamburger" aria-hidden="true"></span>
+        </button>
+        <ul id="mobileNavMenu" class="mobile-nav-menu" role="menu">
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./home.html">Home</button></li>
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./upload.html">Upload</button></li>
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./records.html">Records</button></li>
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./recurring.html">Recurring</button></li>
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./rules.html">Rules</button></li>
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./budgeting.html">Budgeting</button></li>
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./reports.html">Reports</button></li>
+          <li><button role="menuitem" class="mobile-nav-link" data-href="./about.html">About</button></li>
+          <li class="admin-only is-hidden"><button role="menuitem" class="mobile-nav-link" data-href="./admin.html">Admin</button></li>
+        </ul>
+      </div>
+
+      <div id="accountArea" class="account-area">
+
+        <!-- Avatar / Icon -->
+        <div
+          id="account-icon"
+          class="account-icon"
+          tabindex="0"
+          aria-haspopup="true"
+          aria-expanded="false"
+        >
+          <div id="avatarLetters" class="avatar-initials">?</div>
+        </div>
+
+        <!-- Dropdown -->
+        <ul id="account-menu" class="account-menu" role="menu">
+
+          <!-- Username (replaces "Account") -->
+          <li class="section-title" id="headerUserName">User</li>
+
+          <!-- Menu items -->
+          <li>
+            <button class="menu-btn" onclick="window.location.href='profile.html'">
+              Profile
+            </button>
+          </li>
+
+          <li>
+            <button class="menu-btn" onclick="window.location.href='settings.html'">
+              Settings
+            </button>
+          </li>
+
+          <li>
+            <button class="menu-btn" onclick="window.location.href='help.html'">
+              Help
+            </button>
+          </li>
+
+          <li class="admin-only is-hidden">
+            <button class="menu-btn" onclick="window.location.href='admin.html'">
+              Admin
+            </button>
+          </li>
+
+          <!-- Logout -->
+          <li class="logout">
+            <button id="logoutBtn" role="menuitem" class="menu-btn">
+              Log Out
+            </button>
+          </li>
+
+        </ul>
+
+      </div>
+
+    </div>
+
+  </div>
+</header>

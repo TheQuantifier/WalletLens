@@ -1,0 +1,817 @@
+<div id="header"></div>
+
+  <main class="main admin-main">
+    <section class="admin-hero">
+      <div>
+        <h1>Admin Console</h1>
+        <p class="subtle">Oversee users, records, and global app configuration.</p>
+      </div>
+      <div class="admin-badge">Admin Only</div>
+    </section>
+
+    <section class="admin-grid">
+      <section class="card admin-panel" id="statsPanel">
+        <div class="admin-panel-header">
+          <div>
+            <h2>Overview</h2>
+            <p class="subtle">Live totals across the platform.</p>
+          </div>
+        </div>
+        <div class="admin-tags">
+          <div class="admin-tag admin-tag--users">
+            <span class="admin-tag-label">Users</span>
+            <strong id="statsUsers">0</strong>
+          </div>
+          <div class="admin-tag admin-tag--records">
+            <span class="admin-tag-label">Records</span>
+            <strong id="statsRecords">0</strong>
+          </div>
+          <div class="admin-tag admin-tag--receipts">
+            <span class="admin-tag-label">Receipts</span>
+            <strong id="statsReceipts">0</strong>
+          </div>
+        </div>
+        <p id="statsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </section>
+
+      <section class="card admin-panel is-collapsed" id="usersPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button
+              class="admin-caret-toggle"
+              id="toggleUsersPanelCaret"
+              type="button"
+              aria-expanded="false"
+              aria-controls="usersPanelBody"
+              aria-label="Expand Users section"
+            >
+              >
+            </button>
+            <div>
+              <h2>Users</h2>
+              <p class="subtle">Enter a username, name, or email to find a user and view related data.</p>
+            </div>
+          </div>
+          <div class="admin-actions">
+            <input
+              id="userSearch"
+              type="text"
+              placeholder="Enter username, name, or email"
+              autocomplete="off"
+              list="adminUserOptions"
+            />
+            <button class="btn btn--primary" id="userSearchBtn" type="button">Find User</button>
+            <button class="btn btn--link" id="userClearBtn" type="button" aria-label="Clear selected user data">X</button>
+          </div>
+        </div>
+        <div id="usersPanelBody">
+        <datalist id="adminUserOptions"></datalist>
+
+        <p id="usersStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+
+        <div class="table-wrap">
+          <table class="admin-table">
+            <thead>
+              <tr>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="name">
+                    Name <span class="sort-arrow" data-arrow-for="users:name">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="email">
+                    Email <span class="sort-arrow" data-arrow-for="users:email">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="role">
+                    Role <span class="sort-arrow" data-arrow-for="users:role">↕</span>
+                  </button>
+                </th>
+                <th>
+                  <button type="button" class="admin-sort-btn" data-table="users" data-key="created">
+                    Created <span class="sort-arrow" data-arrow-for="users:created">↕</span>
+                  </button>
+                </th>
+                <th class="actions-col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="usersTbody">
+              <tr><td colspan="5" class="subtle">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <nav class="admin-pager">
+          <button class="btn" id="usersPrevPage" type="button" disabled>← Prev</button>
+          <span id="usersPageInfo" class="subtle">Page 1 of 1</span>
+          <button class="btn" id="usersNextPage" type="button" disabled>Next →</button>
+        </nav>
+        <section id="userDataSections" class="admin-grid is-hidden">
+        <section class="card admin-panel" id="recordsPanel">
+          <div class="admin-panel-header">
+            <div>
+              <h2>Records</h2>
+              <p id="recordsContext" class="subtle">Search for a user to view records.</p>
+            </div>
+            <div class="admin-actions">
+              <select id="recordsType">
+                <option value="">All types</option>
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+              <button class="btn btn--primary" id="recordsSearchBtn" type="button">Apply Filter</button>
+            </div>
+          </div>
+
+          <p id="recordsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="date">
+                      Date <span class="sort-arrow" data-arrow-for="records:date">↕</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="userName">
+                      User Name <span class="sort-arrow" data-arrow-for="records:userName">↕</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="type">
+                      Type <span class="sort-arrow" data-arrow-for="records:type">↕</span>
+                    </button>
+                  </th>
+                  <th>
+                    <button type="button" class="admin-sort-btn" data-table="records" data-key="category">
+                      Category <span class="sort-arrow" data-arrow-for="records:category">↕</span>
+                    </button>
+                  </th>
+                  <th class="num">
+                    <button type="button" class="admin-sort-btn admin-sort-btn--num" data-table="records" data-key="amount">
+                      Amount <span class="sort-arrow" data-arrow-for="records:amount">↕</span>
+                    </button>
+                  </th>
+                  <th class="actions-col">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="recordsTbody">
+                <tr><td colspan="6" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card admin-panel" id="receiptsPanel">
+          <div class="admin-panel-header">
+            <div>
+              <h2>Receipts</h2>
+              <p class="subtle">Receipts uploaded by the selected user.</p>
+            </div>
+          </div>
+          <p id="receiptsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Date Added</th>
+                  <th>Source</th>
+                  <th>Status</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody id="receiptsTbody">
+                <tr><td colspan="4" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card admin-panel" id="budgetsPanel">
+          <div class="admin-panel-header">
+            <div>
+              <h2>Budgets</h2>
+              <p class="subtle">Budget sheets for the selected user.</p>
+            </div>
+          </div>
+          <p id="budgetsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Cadence</th>
+                  <th>Period</th>
+                  <th>Created</th>
+                  <th>Updated</th>
+                </tr>
+              </thead>
+              <tbody id="budgetsTbody">
+                <tr><td colspan="4" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+      </section>
+        </div>
+      </section>
+
+      <section class="card admin-panel" id="settingsPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button
+              class="admin-caret-toggle"
+              id="toggleSettingsPanelCaret"
+              type="button"
+              aria-expanded="true"
+              aria-controls="settingsPanelBody"
+              aria-label="Collapse App Settings section"
+            >
+              v
+            </button>
+            <div>
+              <h2>App Settings</h2>
+              <p class="subtle">Update global configuration like app name.</p>
+            </div>
+          </div>
+        </div>
+        <div id="settingsPanelBody">
+          <form id="settingsForm" class="admin-form">
+            <h3 class="admin-settings-subtitle">General</h3>
+            <label class="settings-item">
+              <span>App Name</span>
+              <input id="appNameInput" type="text" placeholder="&lt;AppName&gt;" />
+            </label>
+            <label class="settings-item">
+              <span>Receipt Storage</span>
+              <div class="checkbox-row">
+                <input id="receiptKeepFilesInput" type="checkbox" />
+                <span>
+                  Keep receipt files in storage.
+                  <span class="subtle">Disabling will block new uploads and delete files after parsing.</span>
+                </span>
+              </div>
+            </label>
+            <label class="settings-item">
+              <span>Session Timeout (minutes)</span>
+              <input id="sessionTimeoutMinutesInput" type="number" min="1" max="60" step="1" value="15" />
+            </label>
+            <label class="settings-item">
+              <span>Max Concurrent Sessions Per User</span>
+              <input
+                id="maxConcurrentSessionsInput"
+                type="number"
+                min="0"
+                max="1000"
+                step="1"
+                value="0"
+              />
+              <span class="subtle">Use 0 for infinite sessions.</span>
+            </label>
+            <label class="settings-item">
+              <span>Require 2FA For Admin Roles</span>
+              <div class="checkbox-row">
+                <input id="require2faForAdminRolesInput" type="checkbox" />
+                <span><span class="subtle">When enabled, admin/org-admin/support/analyst roles must have 2FA enabled to log in.</span></span>
+              </div>
+            </label>
+
+            <h3 class="admin-settings-subtitle">Notifications</h3>
+            <div class="admin-settings-inline-grid">
+              <label class="settings-item">
+                <span>Weekly Digest Day</span>
+                <select id="weeklyDigestDayInput">
+                  <option value="0">Sunday</option>
+                  <option value="1">Monday</option>
+                  <option value="2">Tuesday</option>
+                  <option value="3">Wednesday</option>
+                  <option value="4">Thursday</option>
+                  <option value="5">Friday</option>
+                  <option value="6">Saturday</option>
+                </select>
+              </label>
+              <label class="settings-item">
+                <span>Weekly Digest Time (24h)</span>
+                <input id="weeklyDigestTimeInput" type="time" value="09:00" />
+              </label>
+              <label class="settings-item">
+                <span>Weekly Digest Timezone</span>
+                <select id="weeklyDigestTimezoneInput"></select>
+              </label>
+            </div>
+            <label class="settings-item">
+              <span>Pause Non-Security Emails</span>
+              <div class="checkbox-row">
+                <input id="pauseNonSecurityEmailsInput" type="checkbox" />
+                <span><span class="subtle">Security emails can still be sent.</span></span>
+              </div>
+            </label>
+            <label class="settings-item">
+              <span>Pause All Notifications</span>
+              <div class="checkbox-row">
+                <input id="pauseAllNotificationsInput" type="checkbox" />
+                <span><span class="subtle">Disables notification delivery and in-app notification feed.</span></span>
+              </div>
+            </label>
+
+            <h3 class="admin-settings-subtitle">Uploads and OCR</h3>
+            <label class="settings-item">
+              <span>Max Upload Size (MB)</span>
+              <input id="maxUploadSizeMbInput" type="number" min="1" max="250" step="1" value="50" />
+            </label>
+            <label class="settings-item">
+              <span>OCR Timeout (seconds)</span>
+              <input id="ocrTimeoutSecondsInput" type="number" min="5" max="300" step="1" value="25" />
+            </label>
+            <label class="settings-item">
+              <span>OCR Retry Limit</span>
+              <input id="ocrRetryLimitInput" type="number" min="0" max="5" step="1" value="1" />
+            </label>
+
+            <h3 class="admin-settings-subtitle">Data and Privacy</h3>
+            <label class="settings-item">
+              <span>Default Data Export Format</span>
+              <div class="checkbox-row">
+                <input id="defaultDataExportFormatInput" type="checkbox" />
+                <span><span class="subtle">Use JSON export by default (unchecked = CSV).</span></span>
+              </div>
+            </label>
+
+            <h3 class="admin-settings-subtitle">System Operations</h3>
+            <div class="admin-settings-inline-grid admin-settings-inline-grid--maintenance">
+              <label class="settings-item">
+                <span>Maintenance Mode</span>
+                <div class="checkbox-row">
+                  <input id="maintenanceModeEnabledInput" type="checkbox" />
+                  <span><span class="subtle">Please be aware: Maintenance is underway.</span></span>
+                </div>
+              </label>
+              <label class="settings-item">
+                <span>Maintenance Banner Text</span>
+                <input id="maintenanceModeBannerTextInput" type="text" placeholder="Please be aware: Maintenance is underway." />
+              </label>
+            </div>
+
+            <div class="admin-actions">
+              <button class="btn btn--primary" type="submit">Save Settings</button>
+            </div>
+            <div class="admin-actions">
+              <button class="btn btn--danger" id="forceLogoutAllSessionsBtn" type="button">
+                Force Logout All Users
+              </button>
+            </div>
+            <p id="settingsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          </form>
+        </div>
+      </section>
+
+      <section class="card admin-panel" id="achievementsPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button
+              class="admin-caret-toggle"
+              id="toggleAchievementsPanelCaret"
+              type="button"
+              aria-expanded="true"
+              aria-controls="achievementsPanelBody"
+              aria-label="Collapse Achievements section"
+            >
+              v
+            </button>
+            <div>
+              <h2>Achievements Catalog</h2>
+              <p class="subtle">Add and remove achievement rules used across all users.</p>
+            </div>
+          </div>
+        </div>
+        <div id="achievementsPanelBody">
+          <div class="admin-achievements">
+            <div class="admin-achievement-builder">
+              <label id="achievementKeyWrap">
+                <span>Key</span>
+                <input id="achievementKeyInput" type="text" placeholder="expense_tracker_25" />
+                <small id="achievementKeyStatus" class="admin-field-hint is-hidden" aria-live="polite"></small>
+              </label>
+              <label>
+                <span>Title</span>
+                <input id="achievementTitleInput" type="text" placeholder="Expense Tracker Pro" />
+              </label>
+              <label>
+                <span>Description</span>
+                <input id="achievementDescriptionInput" type="text" placeholder="Add 25 expense records." />
+              </label>
+              <label id="achievementIconWrap">
+                <span>Icon</span>
+                <input id="achievementIconInput" type="text" maxlength="2" placeholder="💸" />
+              </label>
+              <label>
+                <span>Metric</span>
+                <select id="achievementMetricInput">
+                  <option value="records_total">records_total</option>
+                  <option value="records_income">records_income</option>
+                  <option value="records_expense">records_expense</option>
+                  <option value="receipts_total">receipts_total</option>
+                  <option value="budgets_total">budgets_total</option>
+                  <option value="net_worth_items">net_worth_items</option>
+                  <option value="account_age_years">account_age_years</option>
+                  <option value="two_fa_enabled">two_fa_enabled</option>
+                  <option value="google_signin_enabled">google_signin_enabled</option>
+                  <option value="avatar_selected">avatar_selected</option>
+                </select>
+              </label>
+              <label id="achievementTargetNumberWrap">
+                <span>Target</span>
+                <input id="achievementTargetInput" type="number" min="0.01" step="0.01" value="1" />
+              </label>
+              <label id="achievementTargetBooleanWrap" class="is-hidden">
+                <span>Target</span>
+                <select id="achievementTargetBooleanInput">
+                  <option value="true">true</option>
+                </select>
+              </label>
+              <div class="admin-add-achievement-wrap">
+                <span class="admin-add-achievement-spacer" aria-hidden="true">Action</span>
+                <button class="btn btn--primary" id="addAchievementBtn" type="button">Add</button>
+              </div>
+            </div>
+          </div>
+          <div id="adminAchievementsList" class="admin-achievements-list"></div>
+          <p id="achievementStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card admin-panel is-collapsed" id="notificationsPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button
+              class="admin-caret-toggle"
+              id="toggleNotificationsPanelCaret"
+              type="button"
+              aria-expanded="false"
+              aria-controls="notificationsPanelBody"
+              aria-label="Expand Notifications section"
+            >
+              >
+            </button>
+            <div>
+              <h2>Notifications</h2>
+              <p class="subtle">Create rich-text notifications shown to users at the top bar until dismissed.</p>
+            </div>
+          </div>
+        </div>
+        <div id="notificationsPanelBody">
+          <div class="admin-notification-editor card">
+            <div class="admin-notification-toolbar" role="toolbar" aria-label="Notification formatting controls">
+              <button class="btn btn--link" type="button" data-notification-cmd="bold"><strong>B</strong></button>
+              <button class="btn btn--link" type="button" data-notification-cmd="italic"><em>I</em></button>
+              <button class="btn btn--link" type="button" data-notification-cmd="underline"><u>U</u></button>
+              <button class="btn btn--link" type="button" data-notification-cmd="insertUnorderedList">• List</button>
+              <button class="btn btn--link" type="button" data-notification-cmd="insertOrderedList">1. List</button>
+              <button class="btn btn--link" type="button" data-notification-cmd="createLink">Link</button>
+              <button class="btn btn--link" type="button" data-notification-cmd="removeFormat">Clear</button>
+              <label class="admin-notification-toolbar-type">
+                <span>Type</span>
+                <select id="notificationTypeInput">
+                  <option value="general">general</option>
+                  <option value="updates">updates</option>
+                  <option value="security">security</option>
+                </select>
+              </label>
+              <label class="admin-notification-toolbar-type">
+                <span>Audience</span>
+                <select id="notificationAudienceInput">
+                  <option value="all">all users</option>
+                  <option value="organization">organization only</option>
+                </select>
+              </label>
+              <label class="admin-notification-toolbar-type is-hidden" id="notificationOrganizationWrap" hidden>
+                <span>Organization ID</span>
+                <input id="notificationOrganizationIdInput" type="text" placeholder="organization-id" />
+              </label>
+            </div>
+            <div
+              id="notificationEditor"
+              class="admin-notification-input"
+              contenteditable="true"
+              role="textbox"
+              aria-multiline="true"
+              data-placeholder="Write notification text here..."
+            ></div>
+            <div class="admin-actions">
+              <button class="btn btn--primary" id="publishNotificationBtn" type="button">Publish Notification</button>
+            </div>
+            <p id="notificationAdminStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          </div>
+
+          <div class="admin-actions">
+            <label>
+              <span>History Filter</span>
+              <select id="notificationFilterType">
+                <option value="">all</option>
+                <option value="general">general</option>
+                <option value="updates">updates</option>
+                <option value="security">security</option>
+              </select>
+            </label>
+            <label>
+              <span>Active</span>
+              <select id="notificationFilterActive">
+                <option value="">all</option>
+                <option value="true">active</option>
+                <option value="false">inactive</option>
+              </select>
+            </label>
+            <button class="btn" id="notificationFilterApplyBtn" type="button">Apply</button>
+          </div>
+
+          <section class="admin-notification-history-wrap">
+            <h3>Notification History</h3>
+            <div id="notificationHistoryList" class="admin-notification-history">
+              <p class="subtle">Loading notifications…</p>
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="card admin-panel is-collapsed" id="auditPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button class="admin-caret-toggle" id="toggleAuditPanelCaret" type="button" aria-expanded="false" aria-controls="auditPanelBody" aria-label="Expand Audit Log section">></button>
+            <div>
+              <h2>Audit Log</h2>
+              <p class="subtle">Track administrative actions and critical system updates.</p>
+            </div>
+          </div>
+          <div class="admin-actions">
+            <select id="auditScopeInput">
+              <option value="all">all activity</option>
+              <option value="admins">admin actions</option>
+              <option value="users">user actions</option>
+            </select>
+            <input id="auditQueryInput" type="text" placeholder="Search action, user, or email" />
+            <button class="btn" id="auditRefreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="auditPanelBody">
+          <div class="table-wrap audit-log-scroll">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Actor</th>
+                  <th>Action</th>
+                  <th>Entity</th>
+                </tr>
+              </thead>
+              <tbody id="auditTbody">
+                <tr><td colspan="4" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="auditStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card admin-panel is-collapsed" id="supportPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button class="admin-caret-toggle" id="toggleSupportPanelCaret" type="button" aria-expanded="false" aria-controls="supportPanelBody" aria-label="Expand Support Inbox section">></button>
+            <div>
+              <h2>Support Inbox</h2>
+              <p class="subtle">Review incoming support tickets and update status.</p>
+            </div>
+          </div>
+          <div class="admin-actions">
+            <select id="supportStatusFilter">
+              <option value="">all statuses</option>
+              <option value="open">open</option>
+              <option value="in_progress">in_progress</option>
+              <option value="resolved">resolved</option>
+              <option value="closed">closed</option>
+            </select>
+            <button class="btn" id="supportRefreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="supportPanelBody">
+          <div class="table-wrap">
+            <table class="admin-table">
+              <thead>
+                <tr>
+                  <th>Created</th>
+                  <th>From</th>
+                  <th>Subject</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="supportTbody">
+                <tr><td colspan="5" class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="supportStatusMsg" class="status-banner subtle is-hidden" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card admin-panel is-collapsed" id="systemHealthPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button class="admin-caret-toggle" id="toggleSystemHealthPanelCaret" type="button" aria-expanded="false" aria-controls="systemHealthPanelBody" aria-label="Expand System Health section">></button>
+            <div>
+              <h2>System Health</h2>
+              <p class="subtle">APIs, services, and connections with live test and emergency disconnect actions.</p>
+            </div>
+          </div>
+          <div class="admin-actions">
+            <button class="btn" id="healthRefreshBtn" type="button">Refresh</button>
+          </div>
+        </div>
+        <div id="systemHealthPanelBody">
+          <div class="table-wrap admin-health-list-wrap">
+            <table class="admin-table admin-health-table">
+              <thead>
+                <tr>
+                  <th>Name</th>
+                  <th>Type</th>
+                  <th>State</th>
+                  <th>Details</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody id="healthSummary">
+                <tr><td colspan="5" class="subtle">Loading system health…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="healthStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+        </div>
+      </section>
+
+      <section class="card admin-panel is-collapsed" id="permissionsPanel">
+        <div class="admin-panel-header">
+          <div class="admin-panel-title">
+            <button class="admin-caret-toggle" id="togglePermissionsPanelCaret" type="button" aria-expanded="false" aria-controls="permissionsPanelBody" aria-label="Expand Permissions section">></button>
+            <div>
+              <h2>Permissions</h2>
+              <p class="subtle">Role access matrix for admin capabilities.</p>
+            </div>
+          </div>
+        </div>
+        <div id="permissionsPanelBody">
+          <div class="table-wrap admin-permissions-wrap">
+            <table class="admin-table admin-permissions-table">
+              <thead>
+                <tr id="permissionsHeadRow">
+                  <th>Role</th>
+                </tr>
+              </thead>
+              <tbody id="permissionsTbody">
+                <tr><td class="subtle">Loading…</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <p id="permissionsStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+          <p class="subtle admin-permissions-note">Only full admins can view this section.</p>
+        </div>
+      </section>
+    </section>
+  </main>
+
+  <div id="footer"></div>
+
+  <div id="adminUserModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminUserTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminUserTitle">Edit User</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <form id="adminUserForm" class="admin-form">
+        <input type="hidden" id="adminUserId" />
+        <label>
+          <span>Full Name</span>
+          <input id="adminUserFullName" type="text" />
+        </label>
+        <label>
+          <span>Email</span>
+          <input id="adminUserEmail" type="email" />
+        </label>
+        <label>
+          <span>Username</span>
+          <input id="adminUserUsername" type="text" />
+        </label>
+        <label>
+          <span>
+            Role
+            <span class="info-popover">
+              <button
+                type="button"
+                class="info-popover__trigger"
+                aria-label="Org admin role scope"
+              >
+                i
+              </button>
+              <span class="info-popover__panel" role="tooltip">
+                <strong>org_admin</strong> users can only control members in their own organization. They cannot manage users from any other organization.
+              </span>
+            </span>
+          </span>
+          <select id="adminUserRole">
+            <option value="user">user</option>
+            <option value="org_user">org_user</option>
+            <option value="admin">admin</option>
+            <option value="org_admin">org_admin</option>
+            <option value="support_admin">support_admin</option>
+            <option value="analyst">analyst</option>
+          </select>
+        </label>
+        <label>
+          <span>Organization ID</span>
+          <input id="adminUserOrganizationId" type="text" />
+        </label>
+        <div class="admin-actions">
+          <button class="btn btn--primary" type="submit">Save User</button>
+          <button class="btn btn--link" type="button" data-close-modal>Cancel</button>
+        </div>
+        <p id="adminUserStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="adminRecordModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminRecordTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminRecordTitle">Edit Record</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <form id="adminRecordForm" class="admin-form">
+        <input type="hidden" id="adminRecordId" />
+        <label>
+          <span>Date</span>
+          <input id="adminRecordDate" type="date" />
+        </label>
+        <label>
+          <span>Type</span>
+          <select id="adminRecordType">
+            <option value="expense">expense</option>
+            <option value="income">income</option>
+          </select>
+        </label>
+        <label>
+          <span>Category</span>
+          <input id="adminRecordCategory" type="text" />
+        </label>
+        <label>
+          <span>Amount</span>
+          <input id="adminRecordAmount" type="number" min="0" step="0.01" inputmode="decimal" />
+        </label>
+        <label>
+          <span>Note</span>
+          <textarea id="adminRecordNote" rows="3"></textarea>
+        </label>
+        <div class="admin-actions">
+          <button class="btn btn--primary" type="submit">Save Record</button>
+          <button class="btn btn--link" type="button" data-close-modal>Cancel</button>
+        </div>
+        <p id="adminRecordStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="adminPermissionModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminPermissionTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminPermissionTitle">Permission Required</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <p id="adminPermissionMessage" class="subtle">
+        You must be admin type or higher to edit.
+      </p>
+      <div class="admin-actions">
+        <button class="btn btn--primary" type="button" data-close-modal>OK</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="adminHealthDisconnectModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="adminHealthDisconnectTitle">
+    <div class="modal-content admin-modal">
+      <div class="modal-header">
+        <h3 id="adminHealthDisconnectTitle">Disconnect Service</h3>
+        <button class="modal-close" type="button" data-close-modal>&times;</button>
+      </div>
+      <p id="adminHealthDisconnectMessage" class="subtle">
+        Are you sure? Enter your password and press Disconnect.
+      </p>
+      <form id="adminHealthDisconnectForm" class="admin-form">
+        <label>
+          <span id="adminHealthDisconnectCredentialLabel">Password</span>
+          <input id="adminHealthDisconnectPassword" type="password" autocomplete="current-password" required />
+        </label>
+        <div class="admin-actions">
+          <button class="btn btn--primary" id="adminHealthDisconnectBtn" type="submit">Disconnect</button>
+          <button class="btn btn--link" type="button" data-close-modal>Cancel</button>
+        </div>
+        <p id="adminHealthDisconnectStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </form>
+    </div>
+  </div>

@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
+<script>
     (function () {
       const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
       const currentPage = rawPage === "" ? "index.html" : rawPage;
@@ -28,179 +28,11 @@
     document.documentElement.setAttribute("data-theme", savedTheme);
   </script>
 </head>
+
 <body>
-  <div id="header"></div>
-
-
-  <main class="main main--budgeting">
-    <section class="budget-hero">
-      <div>
-        <h1>Budgeting</h1>
-        <p class="subtle">Plan your spend, track actuals, and move unused funds to savings or another category.</p>
-      </div>
-      <div class="budget-hero-meta">
-        <div class="budget-selector">
-          <label class="subtle" for="budgetSelector">Budget</label>
-          <select id="budgetSelector" class="month-select" aria-label="Select budget"></select>
-        </div>
-        <button class="btn btn--primary" id="btnAddBudget" type="button">Add budget</button>
-      </div>
-    </section>
-
-    <section class="budget-summary" aria-label="Budget summary">
-      <article class="summary-card summary-card--total">
-        <h2>Total Budget</h2>
-        <p id="summaryTotalBudget">—</p>
-      </article>
-      <article class="summary-card summary-card--spent">
-        <h2>Spent</h2>
-        <p id="summarySpent">—</p>
-      </article>
-      <article class="summary-card summary-card--remaining">
-        <h2>Remaining</h2>
-        <p id="summaryRemaining">—</p>
-      </article>
-      <article class="summary-card summary-card--unused">
-        <h2>Unused (reallocatable)</h2>
-        <p id="summaryUnused">—</p>
-      </article>
-    </section>
-
-    <section class="budget-actions" aria-label="Budget actions">
-      <div class="action-card">
-        <h3>Move unused funds</h3>
-        <p class="subtle">Unused amounts can be reallocated to another category or added to savings.</p>
-        <div class="action-row">
-          <button class="btn btn--primary" id="btnAddUnusedToSavings" type="button">Add unused to Savings</button>
-          <div class="reallocate">
-            <label for="reallocateTarget" class="subtle">Or reallocate to</label>
-            <select id="reallocateTarget"></select>
-            <button class="btn" id="btnReallocateUnused" type="button">Move unused</button>
-          </div>
-        </div>
-      </div>
-      <p id="budgetStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
-    </section>
-
-    <section class="budget-table" aria-label="Category budgets">
-      <div class="table-header">
-        <h2>Categories</h2>
-        <span class="pill" id="budgetPeriod" aria-live="polite">—</span>
-        <div class="table-header-actions">
-          <span class="subtle">Edit your budget to update remaining totals.</span>
-          <button class="btn" id="btnResetBudgets" type="button">Reset defaults</button>
-        </div>
-      </div>
-      <div class="table-wrap" role="region" aria-label="Budget table" tabindex="0">
-        <table>
-          <thead>
-            <tr>
-              <th>Category</th>
-              <th class="num">Budget</th>
-              <th class="num">Spent</th>
-              <th class="num">Remaining</th>
-              <th>Progress</th>
-            </tr>
-          </thead>
-          <tbody id="budgetTbody">
-            <tr><td colspan="5" class="subtle">Loading budgets…</td></tr>
-          </tbody>
-        </table>
-      </div>
-      <div class="budget-table-actions">
-        <button class="btn" id="btnAddBudgetCategory" type="button">Add category</button>
-        <div class="budget-table-actions-right">
-          <span id="budgetSaveStatus" class="status-banner subtle is-hidden budget-save-status" aria-live="polite"></span>
-          <button class="btn" id="btnExportBudgetCsv" type="button">Export Budget</button>
-          <button class="btn btn--primary" id="btnSaveBudget" type="button" disabled>Save budget</button>
-          <button class="btn btn--danger" id="btnDeleteBudget" type="button">Delete budget</button>
-        </div>
-      </div>
-    </section>
-  </main>
-
-  <div id="footer"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedFooterHtml");
-      if (!cached) return;
-      const el = document.getElementById("footer");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-    })();
-  </script>
-
-
-  <!-- ========== CUSTOM CATEGORY MODAL ========== -->
-  <div id="addBudgetModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="addBudgetTitle">
-    <div class="modal-content card">
-      <h2 id="addBudgetTitle">Add Budget</h2>
-      <p class="subtle">Choose a budget frequency and period.</p>
-
-      <form id="addBudgetForm" class="txn-form">
-        <div class="form-row">
-          <label>
-            <span>Budget frequency</span>
-            <select id="budgetCadenceSelect" class="month-select" aria-label="Select budget frequency">
-              <option value="weekly">Weekly</option>
-              <option value="biweekly">Biweekly</option>
-              <option value="monthly">Monthly</option>
-              <option value="quarterly">Quarterly</option>
-              <option value="semi-annually">Semi-Annually</option>
-              <option value="yearly">Yearly</option>
-            </select>
-          </label>
-        </div>
-        <div class="form-row">
-          <label>
-            <span>Period</span>
-            <select id="budgetMonthSelect" class="month-select" aria-label="Select budget period"></select>
-          </label>
-        </div>
-
-        <div class="modal-actions">
-          <button type="submit" class="btn btn--primary">Create budget</button>
-          <button type="button" class="btn" id="cancelAddBudgetBtn">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="customCategoryModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="customCategoryTitle">
-    <div class="modal-content card">
-      <h2 id="customCategoryTitle">Add Custom Category</h2>
-      <p class="subtle">Enter a name to add a custom category.</p>
-
-      <form id="customCategoryForm" class="txn-form">
-        <div class="form-row">
-          <label><span>Category Name</span><input type="text" id="customCategoryInput" autocomplete="off" required /></label>
-        </div>
-
-        <div class="modal-actions">
-          <button type="submit" class="btn btn--primary">Save Category</button>
-          <button type="button" class="btn" id="cancelCustomCategoryBtn">Cancel</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <!-- ========== DELETE BUDGET MODAL ========== -->
-  <div id="deleteBudgetModal" class="modal hidden" role="dialog" aria-modal="true" aria-labelledby="deleteBudgetTitle">
-    <div class="modal-content card">
-      <h2 id="deleteBudgetTitle">Delete Budget</h2>
-      <p class="subtle" id="deleteBudgetText"></p>
-
-      <div class="modal-actions">
-        <button type="button" class="btn btn--danger" id="confirmDeleteBudgetBtn">Yes, delete</button>
-        <button type="button" class="btn" id="cancelDeleteBudgetBtn">No</button>
-      </div>
-    </div>
-  </div>
-
+  <div id="root"></div>
+  <script type="module" src="./src/entries/budgeting.jsx"></script>
   <script src="scripts/default.js" type="module" defer></script>
   <script src="scripts/budgeting.js" type="module" defer></script>
 </body>
 </html>
-
-

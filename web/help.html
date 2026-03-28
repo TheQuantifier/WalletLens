@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <script>
+<script>
     (function () {
       const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
       const currentPage = rawPage === "" ? "index.html" : rawPage;
@@ -25,179 +25,12 @@
     const savedTheme = localStorage.getItem("theme") || "light";
     document.documentElement.setAttribute("data-theme", savedTheme);
   </script>
-  
 </head>
 
 <body>
-
-  <div id="header"></div>
-
-
-  <main class="main main--profile">
-
-    <!-- HERO -->
-    <section class="profile-hero">
-      <div class="title-wrap">
-        <h1>Help & Support</h1>
-        <p class="subtle">Find answers and troubleshoot issues</p>
-      </div>
-    </section>
-
-    <div class="profile-grid">
-
-      <!-- FAQ -->
-      <section class="card">
-        <h2>Frequently Asked Questions</h2>
-
-        <details>
-          <summary>How do I change my password?</summary>
-          <p>Go to Settings and select Change Password in the Security section.</p>
-        </details>
-
-        <details>
-          <summary>Where do I see my transactions?</summary>
-          <p>Open the Records page to view all expenses and income entries.</p>
-        </details>
-
-        <details>
-          <summary>How do I upload receipts?</summary>
-          <p>Use the Upload Receipts page to drag and drop or browse for files.</p>
-        </details>
-
-        <details>
-          <summary>What file types can I upload?</summary>
-          <p>JPG, PNG, and PDF receipts are supported.</p>
-        </details>
-
-        <details>
-          <summary>How do I edit or delete a transaction?</summary>
-          <p>On the Records page, use the actions menu next to a transaction to edit or delete it.</p>
-        </details>
-
-        <details>
-          <summary>How do I add income records?</summary>
-          <p>In Records, switch to the Income section and use the Add Income button.</p>
-        </details>
-
-        <details>
-          <summary>How do categories work?</summary>
-          <p>Categories help organize spending and are used in reports and budgets.</p>
-        </details>
-
-        <details>
-          <summary>Can I create a custom category?</summary>
-          <p>Yes. Use Add Category when creating or editing a record.</p>
-        </details>
-
-        <details>
-          <summary>Why don’t my charts match my records?</summary>
-          <p>Charts reflect the selected date range and filters. Update the range to match what you’re viewing.</p>
-        </details>
-
-        <details>
-          <summary>How do I export my data?</summary>
-          <p>Use Export on each page to download that page's data, or go to Settings to choose CSV, Excel, Google Sheets, or PDF and export your full account.</p>
-        </details>
-
-        <details>
-          <summary>How do budgets work?</summary>
-          <p>Set a budget per category on the Budgeting page and track remaining amounts.</p>
-        </details>
-
-        <details>
-          <summary>What does Budget frequency mean?</summary>
-          <p>Frequency controls the time span for budgets (monthly, quarterly, etc.).</p>
-        </details>
-
-        <details>
-          <summary>How do I change my dashboard view?</summary>
-          <p>Update the Default Dashboard View in Settings to Weekly, Monthly, Yearly, or All Time.</p>
-        </details>
-
-        <details>
-          <summary>How do I change my time zone?</summary>
-          <p>Open Settings and choose your Time Zone under Formatting.</p>
-        </details>
-
-        <details>
-          <summary>How do I update my currency format?</summary>
-          <p>Go to Settings and choose your preferred currency and number format.</p>
-        </details>
-
-        <details>
-          <summary>Are linked accounts supported?</summary>
-          <p>Linked accounts are coming soon. For now, you can manage records manually.</p>
-        </details>
-
-        <details>
-          <summary>How do notifications work?</summary>
-          <p>Enable or disable email and SMS notifications in Settings.</p>
-        </details>
-
-        <details>
-          <summary>How do I delete my account?</summary>
-          <p>Open Settings and use Delete Account. This action is permanent.</p>
-        </details>
-
-        <details>
-          <summary>How do I contact support?</summary>
-          <p>Email us at <a href="mailto:support.wisewallet@manuswebworks.org">support.wisewallet@manuswebworks.org</a></p>
-        </details>
-      </section>
-
-      <!-- CONTACT -->
-      <section class="card">
-        <h2>Contact Support</h2>
-
-        <form id="supportForm" method="post" action="" novalidate>
-          <label for="supportSubject">
-            <span class="label">Subject</span>
-            <input
-              id="supportSubject"
-              name="subject"
-              type="text"
-              autocomplete="off"
-              placeholder="What can we help with?"
-              required
-            />
-          </label>
-
-          <label for="supportMessage">
-            <span class="label">Message</span>
-            <textarea
-              id="supportMessage"
-              name="message"
-              rows="5"
-              placeholder="Tell us what happened (include steps to reproduce and any error messages)."
-              required
-            ></textarea>
-          </label>
-
-          <p id="supportStatus" class="subtle is-hidden" aria-live="polite"></p>
-
-          <button type="submit" class="btn btn--primary">Send Message</button>
-        </form>
-      </section>
-
-    </div>
-  </main>
-
-  <div id="footer"></div>
-  <script>
-    (function () {
-      const cached = sessionStorage.getItem("cachedFooterHtml");
-      if (!cached) return;
-      const el = document.getElementById("footer");
-      if (el && !el.hasChildNodes()) {
-        el.innerHTML = cached;
-      }
-    })();
-  </script>
-
-
+  <div id="root"></div>
+  <script type="module" src="./src/entries/help.jsx"></script>
   <script src="scripts/default.js" type="module"></script>
   <script src="scripts/help.js" type="module"></script>
-
 </body>
 </html>
-
