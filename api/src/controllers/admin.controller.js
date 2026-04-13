@@ -55,6 +55,10 @@ function isOrganizationScopedRole(role) {
   return normalized === ORG_USER_ROLE || normalized === ORG_ADMIN_ROLE;
 }
 
+function isFullAdminRole(role) {
+  return String(role || "").trim().toLowerCase() === "admin";
+}
+
 function getActorOrganizationId(req) {
   return String(req.user?.organization_id || req.user?.organizationId || "").trim();
 }
@@ -513,6 +517,10 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
     "customIncomeCategories",
   ];
 
+  if (isFullAdminRole(req.user?.role)) {
+    allowedFields.push("accessExpiresAt");
+  }
+
   for (const key of allowedFields) {
     if (req.body[key] !== undefined) {
       updates[key] = typeof req.body[key] === "string" ? req.body[key].trim() : req.body[key];
@@ -544,6 +552,19 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
     !["user", "org_user", "admin", "org_admin", "support_admin", "analyst"].includes(updates.role)
   ) {
     return res.status(400).json({ message: "Invalid role" });
+  }
+
+  if (req.body?.accessExpiresAt !== undefined && !isFullAdminRole(req.user?.role)) {
+    return res.status(403).json({ message: "Only full admins can change account expiry." });
+  }
+
+  if (updates.accessExpiresAt !== undefined) {
+    const rawValue = String(updates.accessExpiresAt || "").trim();
+    const parsed = new Date(rawValue);
+    if (!rawValue || Number.isNaN(parsed.getTime())) {
+      return res.status(400).json({ message: "accessExpiresAt must be a valid date/time." });
+    }
+    updates.accessExpiresAt = parsed.toISOString();
   }
 
   if (isOrgAdminRole(req.user?.role) && updates.role !== undefined && updates.role !== ORG_USER_ROLE) {

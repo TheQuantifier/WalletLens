@@ -76,6 +76,8 @@ import {
     googleConnectRow: $("#googleConnectRow"),
     googleConnectStatus: $("#googleConnectStatus"),
     connectGoogleBtn: $("#connectGoogleBtn"),
+    accountAccessStatus: $("#accountAccessStatus"),
+    accountAccessMeta: $("#accountAccessMeta"),
   };
 
   const state = {
@@ -111,6 +113,34 @@ import {
     const date = new Date(value);
     if (Number.isNaN(date.getTime())) return "";
     return date.toLocaleString();
+  };
+
+  const renderAccountAccess = (user) => {
+    if (!els.accountAccessStatus || !els.accountAccessMeta) return;
+    if (!user) {
+      els.accountAccessStatus.textContent = "Unavailable";
+      els.accountAccessMeta.textContent = "";
+      return;
+    }
+    const accountStatus = String(user?.account_status || user?.accountStatus || "active")
+      .trim()
+      .toLowerCase();
+    const expiresAt = user?.access_expires_at || user?.accessExpiresAt || "";
+    const remainingMs = Number(user?.access_remaining_ms ?? user?.accessRemainingMs ?? 0);
+
+    els.accountAccessStatus.textContent = accountStatus === "expired" ? "Expired" : "Active";
+    if (!expiresAt) {
+      els.accountAccessMeta.textContent = "";
+      return;
+    }
+
+    if (accountStatus === "expired") {
+      els.accountAccessMeta.textContent = `Expired ${formatDateTime(expiresAt)}.`;
+      return;
+    }
+
+    const remainingDays = Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+    els.accountAccessMeta.textContent = `Access ends ${formatDateTime(expiresAt)} (${remainingDays} day${remainingDays === 1 ? "" : "s"} left).`;
   };
 
   // ===============================
@@ -447,12 +477,14 @@ import {
       const { user } = await api.auth.me();
       const enabled = !!user?.two_fa_enabled || !!user?.twoFaEnabled;
       state.twoFaEnabled = enabled;
+      renderAccountAccess(user);
       els.twoFaStatus.textContent = enabled ? "Enabled" : "Disabled";
       els.enableTwoFaBtn?.classList.toggle("is-hidden", enabled);
       els.disableTwoFaBtn?.classList.toggle("is-hidden", !enabled);
       return user || null;
     } catch {
       state.twoFaEnabled = false;
+      renderAccountAccess(null);
       els.twoFaStatus.textContent = "Unavailable";
       els.enableTwoFaBtn?.classList.add("is-hidden");
       els.disableTwoFaBtn?.classList.add("is-hidden");

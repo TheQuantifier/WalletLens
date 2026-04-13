@@ -1,13 +1,44 @@
 // src/models/user.model.js
 import { query } from "../config/db.js";
+import {
+  computeDefaultAccessExpiresAt,
+  decorateUserAccessState,
+  decorateUserAccessStateList,
+} from "../services/account_access.service.js";
 
 /**
  * Expected Postgres table: users
  * Columns:
  * id (uuid), username, email, password_hash (nullable for Google-only users), full_name, location, role, phone_number, bio,
  * avatar_url, custom_expense_categories, custom_income_categories, address, employer, income_range,
- * created_at, updated_at
+ * trial_started_at, access_expires_at, created_at, updated_at
  */
+
+const SAFE_USER_COLUMNS = `
+  id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
+  full_name, location, role, organization_id, phone_number, bio, avatar_url,
+  address, employer, income_range, custom_expense_categories, custom_income_categories,
+  two_fa_enabled, two_fa_method, two_fa_confirmed_at,
+  trial_started_at, access_expires_at,
+  created_at, updated_at
+`;
+
+const AUTH_USER_COLUMNS = `
+  id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
+  organization_id,
+  address, employer, income_range, custom_expense_categories, custom_income_categories,
+  two_fa_enabled, two_fa_method, two_fa_confirmed_at,
+  trial_started_at, access_expires_at,
+  created_at, updated_at
+`;
+
+const LIST_USER_COLUMNS = `
+  id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
+  full_name, location, role, organization_id, phone_number, bio, avatar_url,
+  address, employer, income_range, custom_expense_categories, custom_income_categories,
+  trial_started_at, access_expires_at,
+  created_at, updated_at
+`;
 
 export function normalizeIdentifier(value) {
   return String(value || "").toLowerCase().trim();
@@ -30,19 +61,18 @@ export async function createUser({
   incomeRange = "",
   customExpenseCategories = [],
   customIncomeCategories = [],
+  trialStartedAt = new Date(),
+  accessExpiresAt = computeDefaultAccessExpiresAt(trialStartedAt),
 }) {
   const { rows } = await query(
     `
     INSERT INTO users
       (username, email, password_hash, google_id, full_name, location, role, organization_id, phone_number, bio, avatar_url, address, employer, income_range,
-       custom_expense_categories, custom_income_categories)
+       custom_expense_categories, custom_income_categories, trial_started_at, access_expires_at)
     VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18)
     RETURNING
-      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, organization_id, phone_number, bio, avatar_url,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      created_at, updated_at
+      ${LIST_USER_COLUMNS}
     `,
     [
       normalizeIdentifier(username),
@@ -61,46 +91,39 @@ export async function createUser({
       incomeRange,
       customExpenseCategories,
       customIncomeCategories,
+      trialStartedAt,
+      accessExpiresAt,
     ]
   );
-  return rows[0];
+  return decorateUserAccessState(rows[0]);
 }
 
 export async function findUserById(id) {
   const { rows } = await query(
     `
     SELECT
-      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, organization_id, phone_number, bio, avatar_url,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      two_fa_enabled, two_fa_method, two_fa_confirmed_at,
-      created_at, updated_at
+      ${SAFE_USER_COLUMNS}
     FROM users
     WHERE id = $1
     LIMIT 1
     `,
     [id]
   );
-  return rows[0] || null;
+  return decorateUserAccessState(rows[0] || null);
 }
 
 export async function findUserAuthById(id) {
-  // Includes password_hash for auth-only use
   const { rows } = await query(
     `
     SELECT
-      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
-      organization_id,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      two_fa_enabled, two_fa_method, two_fa_confirmed_at,
-      created_at, updated_at
+      ${AUTH_USER_COLUMNS}
     FROM users
     WHERE id = $1
     LIMIT 1
     `,
     [id]
   );
-  return rows[0] || null;
+  return decorateUserAccessState(rows[0] || null);
 }
 
 export async function findUserAuthByIdentifier(identifier) {
@@ -109,36 +132,28 @@ export async function findUserAuthByIdentifier(identifier) {
   const { rows } = await query(
     `
     SELECT
-      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
-      organization_id,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      two_fa_enabled, two_fa_method, two_fa_confirmed_at,
-      created_at, updated_at
+      ${AUTH_USER_COLUMNS}
     FROM users
     WHERE lower(username) = $1 OR lower(email) = $1
     LIMIT 1
     `,
     [ident]
   );
-  return rows[0] || null;
+  return decorateUserAccessState(rows[0] || null);
 }
 
 export async function findUserAuthByGoogleId(googleId) {
   const { rows } = await query(
     `
     SELECT
-      id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
-      organization_id,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      two_fa_enabled, two_fa_method, two_fa_confirmed_at,
-      created_at, updated_at
+      ${AUTH_USER_COLUMNS}
     FROM users
     WHERE google_id = $1
     LIMIT 1
     `,
     [googleId]
   );
-  return rows[0] || null;
+  return decorateUserAccessState(rows[0] || null);
 }
 
 export async function linkUserGoogleId(id, googleId) {
@@ -149,18 +164,14 @@ export async function linkUserGoogleId(id, googleId) {
         updated_at = now()
     WHERE id = $2
     RETURNING
-      id, username, email, password_hash, google_id, full_name, location, role, organization_id, phone_number, bio, avatar_url,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      two_fa_enabled, two_fa_method, two_fa_confirmed_at,
-      created_at, updated_at
+      ${AUTH_USER_COLUMNS}
     `,
     [googleId, id]
   );
-  return rows[0] || null;
+  return decorateUserAccessState(rows[0] || null);
 }
 
 export async function updateUserById(id, changes = {}) {
-  // whitelist of updatable fields (no password here)
   const allowed = {
     username: "username",
     email: "email",
@@ -176,6 +187,8 @@ export async function updateUserById(id, changes = {}) {
     incomeRange: "income_range",
     customExpenseCategories: "custom_expense_categories",
     customIncomeCategories: "custom_income_categories",
+    trialStartedAt: "trial_started_at",
+    accessExpiresAt: "access_expires_at",
   };
 
   const sets = [];
@@ -184,10 +197,10 @@ export async function updateUserById(id, changes = {}) {
 
   for (const [key, col] of Object.entries(allowed)) {
     if (changes[key] !== undefined) {
-      const v =
+      const value =
         key === "username" || key === "email" ? normalizeIdentifier(changes[key]) : changes[key];
       sets.push(`${col} = $${i++}`);
-      values.push(v);
+      values.push(value);
     }
   }
 
@@ -202,15 +215,12 @@ export async function updateUserById(id, changes = {}) {
         updated_at = now()
     WHERE id = $${i}
     RETURNING
-      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, organization_id, phone_number, bio, avatar_url,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      created_at, updated_at
+      ${LIST_USER_COLUMNS}
     `,
     values
   );
 
-  return rows[0] || null;
+  return decorateUserAccessState(rows[0] || null);
 }
 
 export async function updateUserPasswordHash(id, passwordHash) {
@@ -366,10 +376,7 @@ export async function listUsers({
   const { rows } = await query(
     `
     SELECT
-      id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-      full_name, location, role, organization_id, phone_number, bio, avatar_url,
-      address, employer, income_range, custom_expense_categories, custom_income_categories,
-      created_at, updated_at
+      ${LIST_USER_COLUMNS}
     FROM users
     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
     ORDER BY created_at DESC
@@ -378,7 +385,7 @@ export async function listUsers({
     params
   );
   return {
-    users: rows,
+    users: decorateUserAccessStateList(rows),
     total: Number(countRows?.[0]?.total || 0),
   };
 }

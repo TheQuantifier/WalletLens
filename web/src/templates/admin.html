@@ -88,6 +88,8 @@
                     Role <span class="sort-arrow" data-arrow-for="users:role">↕</span>
                   </button>
                 </th>
+                <th>Status</th>
+                <th>Access Ends</th>
                 <th>
                   <button type="button" class="admin-sort-btn" data-table="users" data-key="created">
                     Created <span class="sort-arrow" data-arrow-for="users:created">↕</span>
@@ -728,6 +730,18 @@
         <label>
           <span>Organization ID</span>
           <input id="adminUserOrganizationId" type="text" />
+        </label>
+        <label>
+          <span>Trial Started</span>
+          <input id="adminUserTrialStartedAt" type="text" readonly />
+        </label>
+        <label>
+          <span>Account Status</span>
+          <input id="adminUserAccountStatus" type="text" readonly />
+        </label>
+        <label>
+          <span>Access Expires At</span>
+          <input id="adminUserAccessExpiresAt" type="datetime-local" />
         </label>
         <div class="admin-actions">
           <button class="btn btn--primary" type="submit">Save User</button>

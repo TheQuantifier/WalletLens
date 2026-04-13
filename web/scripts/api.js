@@ -75,6 +75,13 @@ async function request(path, options = {}) {
     if (res.status === 401) {
       clearAuthToken();
     }
+    if (res.status === 403 && data?.code === "account_expired") {
+      window.dispatchEvent(
+        new CustomEvent("account:expired", {
+          detail: data || null,
+        })
+      );
+    }
     const message = data?.message || `Request failed (${res.status})`;
     const error = new Error(message);
     error.status = res.status;

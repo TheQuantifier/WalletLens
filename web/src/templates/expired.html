@@ -1,0 +1,43 @@
+<header class="nf-header" role="banner">
+  <div class="nf-header-inner">
+    <div class="logo-group">
+      <h1 class="logo">
+        <a class="logo-link" href="index.html" style="text-decoration:none; color:inherit;">
+          <img src="images/favicon.png" alt="App icon" class="logo-icon" />
+          <span>&lt;AppName&gt;</span>
+        </a>
+      </h1>
+      <span class="tagline">Track Smarter. Stress Less.</span>
+    </div>
+  </div>
+</header>
+
+<main class="main main--login">
+  <section class="nf-hero">
+    <div class="nf-hero-content" style="max-width: 760px;">
+      <h1 class="nf-title">Account Access Expired</h1>
+      <p class="nf-subtitle">
+        Your free trial has ended. You can export your data, delete your account, or request renewed access.
+      </p>
+      <div class="nf-signup" style="max-width: 560px; gap: 0.9rem;">
+        <div class="card" style="text-align:left; width:100%; padding:1rem 1.1rem; border-radius:18px;">
+          <p class="subtle" style="margin:0 0 0.35rem;">Access status</p>
+          <strong id="expiredAccountStatus">Checking account…</strong>
+          <p id="expiredAccountMeta" class="subtle" style="margin:0.45rem 0 0;"></p>
+          <p id="expiredSupportMeta" class="subtle" style="margin:0.45rem 0 0;"></p>
+        </div>
+        <textarea
+          id="expiredRequestMessage"
+          rows="5"
+          placeholder="Optional note for the support team"
+          style="width:100%; border-radius:18px; padding:1rem; border:1px solid rgba(15,23,42,0.14); resize:vertical;"
+        ></textarea>
+        <button class="nf-btn" id="expiredExportBtn" type="button" style="text-align:center;">Download All My Data</button>
+        <button class="nf-btn" id="expiredRequestBtn" type="button" style="text-align:center;">Request Access</button>
+        <button class="nf-btn" id="expiredDeleteBtn" type="button" style="text-align:center; background:#b91c1c;">Delete Account</button>
+        <a class="nf-login" id="expiredLogoutLink" href="login.html" style="text-align:center;">Log Out</a>
+        <p id="expiredStatus" class="status-banner subtle is-hidden" aria-live="polite"></p>
+      </div>
+    </div>
+  </section>
+</main>

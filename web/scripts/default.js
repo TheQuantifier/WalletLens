@@ -56,6 +56,7 @@ const PUBLIC_PAGES = [
   "careers.html",
   "help.html",
   "timeout.html",
+  "expired.html",
   "",
 ];
 
@@ -78,7 +79,14 @@ async function runAuthGuard() {
   }
 
   try {
-    await api.auth.me(); // succeeds if logged in
+    const data = await api.auth.me();
+    const user = data?.user || {};
+    const accountStatus = String(user?.account_status || user?.accountStatus || "active")
+      .trim()
+      .toLowerCase();
+    if (accountStatus === "expired" && currentPage !== "expired.html") {
+      window.location.href = "expired.html";
+    }
   } catch {
     console.warn("User not authenticated. Redirecting to index.html");
     window.location.href = "index.html";
@@ -87,6 +95,13 @@ async function runAuthGuard() {
 
 // Run immediately (before DOMContentLoaded)
 runAuthGuard();
+
+window.addEventListener("account:expired", () => {
+  const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+  const currentPage = rawPage === "" ? "index.html" : rawPage;
+  if (currentPage === "expired.html") return;
+  window.location.href = "expired.html";
+});
 
 
 /* ===============================================

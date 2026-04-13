@@ -132,6 +132,9 @@ const els = {
   userUsername: document.getElementById("adminUserUsername"),
   userRole: document.getElementById("adminUserRole"),
   userOrganizationId: document.getElementById("adminUserOrganizationId"),
+  userTrialStartedAt: document.getElementById("adminUserTrialStartedAt"),
+  userAccountStatus: document.getElementById("adminUserAccountStatus"),
+  userAccessExpiresAt: document.getElementById("adminUserAccessExpiresAt"),
   userStatus: document.getElementById("adminUserStatus"),
 
   recordModal: document.getElementById("adminRecordModal"),
@@ -282,6 +285,14 @@ function setStatus(el, message, variant = "info") {
 function setText(el, value) {
   if (!el) return;
   el.textContent = String(value ?? "");
+}
+
+function formatDateTimeInputValue(value) {
+  if (!value) return "";
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  const pad = (num) => String(num).padStart(2, "0");
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
 }
 
 function openModal(modal) {
@@ -907,7 +918,7 @@ function renderUsers() {
   }
   if (!rows.length) {
     const message = state.usersQuery ? "No users found." : "No users available.";
-    els.usersTbody.innerHTML = `<tr><td colspan="${showActionsCol ? 5 : 4}" class="subtle">${message}</td></tr>`;
+    els.usersTbody.innerHTML = `<tr><td colspan="${showActionsCol ? 7 : 6}" class="subtle">${message}</td></tr>`;
     renderUsersPager();
     return;
   }
@@ -919,6 +930,8 @@ function renderUsers() {
           <td>${getUserLabel(user)}</td>
           <td>${user.email || "—"}</td>
           <td>${user.role || "user"}</td>
+          <td>${String(user.account_status || user.accountStatus || "active")}</td>
+          <td>${formatDateTime(user.access_expires_at || user.accessExpiresAt)}</td>
           <td>${formatDate(user.created_at || user.createdAt)}</td>
           ${
             showActionsCol
@@ -1926,6 +1939,18 @@ function openUserModal(user) {
   if (els.userOrganizationId) {
     els.userOrganizationId.value = user.organization_id || user.organizationId || "";
   }
+  if (els.userTrialStartedAt) {
+    els.userTrialStartedAt.value = formatDateTime(user.trial_started_at || user.trialStartedAt);
+  }
+  if (els.userAccountStatus) {
+    els.userAccountStatus.value = String(user.account_status || user.accountStatus || "active");
+  }
+  if (els.userAccessExpiresAt) {
+    els.userAccessExpiresAt.value = formatDateTimeInputValue(
+      user.access_expires_at || user.accessExpiresAt || ""
+    );
+    els.userAccessExpiresAt.disabled = state.currentRole !== "admin" || !hasPermission("users.write");
+  }
   applyScopedUserRoleOptions();
   els.userRole.value = user.role || "user";
   setStatus(els.userStatus, "");
@@ -1949,6 +1974,9 @@ async function saveUser(event) {
       username: els.userUsername.value,
       role: els.userRole.value,
       organizationId: els.userOrganizationId?.value || "",
+      ...(state.currentRole === "admin"
+        ? { accessExpiresAt: els.userAccessExpiresAt?.value || "" }
+        : {}),
     });
     setStatus(els.userStatus, "User updated.", "ok");
     await Promise.all([loadUsers(), loadUserOptions(), loadStats()]);

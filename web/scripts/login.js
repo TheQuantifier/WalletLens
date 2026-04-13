@@ -29,6 +29,13 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
+  const getPostAuthDestination = (user) => {
+    const accountStatus = String(user?.account_status || user?.accountStatus || "active")
+      .trim()
+      .toLowerCase();
+    return accountStatus === "expired" ? "expired.html" : "home.html";
+  };
+
   const redirectMsg = sessionStorage.getItem("authRedirectMessage");
   if (redirectMsg && errorEl) {
     errorEl.textContent = redirectMsg;
@@ -37,7 +44,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const googleRedirect = api.auth.consumeGoogleRedirect();
   if (googleRedirect?.token || googleRedirect?.success) {
-    window.location.href = "home.html";
+    api.auth
+      .me()
+      .then(({ user }) => {
+        window.location.href = getPostAuthDestination(user);
+      })
+      .catch(() => {
+        window.location.href = "home.html";
+      });
     return;
   }
   if (googleRedirect?.error && errorEl) {
@@ -107,8 +121,7 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // Success → redirect to dashboard
-      window.location.href = "home.html";
+      window.location.href = getPostAuthDestination(result?.user);
 
     } catch (err) {
       console.error("Login error:", err);
@@ -178,7 +191,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.location.href = "settings.html?passwordReset=1";
         return;
       }
-      window.location.href = "home.html";
+      window.location.href = getPostAuthDestination(result?.user);
     } catch (err) {
       console.error("2FA verify error:", err);
       errorEl.textContent = err.message || "Verification failed.";

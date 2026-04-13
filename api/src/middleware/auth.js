@@ -4,6 +4,7 @@ import jwt from "jsonwebtoken";
 import env from "../config/env.js";
 import { findUserById } from "../models/user.model.js";
 import { getSessionById, revokeSessionById, updateSessionLastSeen } from "../models/session.model.js";
+import { getAccountAccessState } from "../services/account_access.service.js";
 
 const SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
 const TRUSTED_ORIGINS = new Set(
@@ -24,6 +25,17 @@ function isTrustedOriginValue(raw) {
   } catch {
     return false;
   }
+}
+
+function isExpiredAccountRouteAllowed(req) {
+  const routeKey = `${String(req.method || "GET").toUpperCase()} ${req.baseUrl}${req.path}`;
+  return new Set([
+    "GET /api/auth/me",
+    "POST /api/auth/logout",
+    "DELETE /api/auth/me",
+    "GET /api/settings/export-all",
+    "POST /api/support/contact",
+  ]).has(routeKey);
 }
 
 export default async function auth(req, res, next) {
@@ -119,6 +131,16 @@ export default async function auth(req, res, next) {
     ---------------------------------------------- */
     req.user = user;
     req.sessionId = session.id;
+    req.accountAccess = getAccountAccessState(user);
+
+    if (req.accountAccess.isExpired && !isExpiredAccountRouteAllowed(req)) {
+      return res.status(403).json({
+        message: "This account's access has expired.",
+        code: "account_expired",
+        accountStatus: req.accountAccess.accountStatus,
+        accessExpiresAt: user.access_expires_at || user.accessExpiresAt || null,
+      });
+    }
 
     return next();
   } catch (err) {

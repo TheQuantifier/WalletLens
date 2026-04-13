@@ -32,6 +32,7 @@ export const getPublic = asyncHandler(async (_req, res) => {
     maintenanceModeEnabled,
     maintenanceModeBannerText,
     defaultDataExportFormat,
+    supportEmail: process.env.SUPPORT_EMAIL || "support.wisewallet@manuswebworks.org",
   });
 });
 

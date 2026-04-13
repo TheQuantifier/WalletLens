@@ -35,11 +35,25 @@ document.addEventListener("DOMContentLoaded", () => {
   let legalFlowStepIndex = 0;
   let suppressAgreeEvent = false;
 
+  const getPostAuthDestination = (user) => {
+    const accountStatus = String(user?.account_status || user?.accountStatus || "active")
+      .trim()
+      .toLowerCase();
+    return accountStatus === "expired" ? "expired.html" : "home.html";
+  };
+
   if (year) year.textContent = new Date().getFullYear();
 
   const googleRedirect = api.auth.consumeGoogleRedirect();
   if (googleRedirect?.token || googleRedirect?.success) {
-    window.location.href = "home.html";
+    api.auth
+      .me()
+      .then(({ user }) => {
+        window.location.href = getPostAuthDestination(user);
+      })
+      .catch(() => {
+        window.location.href = "home.html";
+      });
     return;
   }
 
@@ -444,8 +458,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Wait briefly then verify auth before redirect
       setTimeout(async () => {
         try {
-          await api.auth.me();
-          window.location.href = "home.html";
+          const { user } = await api.auth.me();
+          window.location.href = getPostAuthDestination(user);
         } catch {
           sessionStorage.setItem(
             "authRedirectMessage",
