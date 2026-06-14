@@ -4,6 +4,7 @@ import {
   computeDefaultAccessExpiresAt,
   decorateUserAccessState,
   decorateUserAccessStateList,
+  isAdminRoleType,
 } from "../services/account_access.service.js";
 
 /**
@@ -62,7 +63,7 @@ export async function createUser({
   customExpenseCategories = [],
   customIncomeCategories = [],
   trialStartedAt = new Date(),
-  accessExpiresAt = computeDefaultAccessExpiresAt(trialStartedAt),
+  accessExpiresAt = isAdminRoleType(role) ? null : computeDefaultAccessExpiresAt(trialStartedAt),
 }) {
   const { rows } = await query(
     `

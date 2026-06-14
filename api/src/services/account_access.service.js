@@ -5,6 +5,16 @@ export function getDefaultFreeTrialDays() {
   return DEFAULT_FREE_TRIAL_DAYS;
 }
 
+export function isAdminRoleType(role) {
+  const normalized = String(role || "").trim().toLowerCase();
+  return (
+    normalized === "admin" ||
+    normalized === "org_admin" ||
+    normalized === "support_admin" ||
+    normalized === "analyst"
+  );
+}
+
 export function computeDefaultAccessExpiresAt(startedAt = new Date()) {
   const start = startedAt instanceof Date ? startedAt : new Date(startedAt);
   return new Date(start.getTime() + DEFAULT_FREE_TRIAL_DAYS * DAY_MS);

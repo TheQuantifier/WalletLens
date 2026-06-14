@@ -10,6 +10,10 @@ import {
   findUserAuthById,
   updateUserById,
 } from "../models/user.model.js";
+import {
+  computeDefaultAccessExpiresAt,
+  isAdminRoleType,
+} from "../services/account_access.service.js";
 import { revokeAllActiveSessions } from "../models/session.model.js";
 import {
   listRecordsAdmin,
@@ -559,12 +563,16 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
   }
 
   if (updates.accessExpiresAt !== undefined) {
+    if (updates.accessExpiresAt === null) {
+      // Timerless access for admin-type roles.
+    } else {
     const rawValue = String(updates.accessExpiresAt || "").trim();
     const parsed = new Date(rawValue);
     if (!rawValue || Number.isNaN(parsed.getTime())) {
       return res.status(400).json({ message: "accessExpiresAt must be a valid date/time." });
     }
     updates.accessExpiresAt = parsed.toISOString();
+    }
   }
 
   if (isOrgAdminRole(req.user?.role) && updates.role !== undefined && updates.role !== ORG_USER_ROLE) {
@@ -591,6 +599,17 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
       ? updates.organizationId
       : currentUser.organization_id ?? currentUser.organizationId ?? ""
   ).trim();
+
+  if (isAdminRoleType(effectiveRole)) {
+    updates.accessExpiresAt = null;
+  } else if (
+    isAdminRoleType(currentUser.role) &&
+    updates.accessExpiresAt === undefined &&
+    !currentUser.access_expires_at &&
+    !currentUser.accessExpiresAt
+  ) {
+    updates.accessExpiresAt = computeDefaultAccessExpiresAt(new Date()).toISOString();
+  }
 
   if (isOrganizationScopedRole(effectiveRole) && !effectiveOrganizationId) {
     return res.status(400).json({
