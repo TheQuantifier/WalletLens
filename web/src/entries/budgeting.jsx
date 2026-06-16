@@ -1,4 +1,4 @@
-import html from "../templates/budgeting.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import BudgetingPage from "../pages/BudgetingPage.jsx";
 
-renderTemplatePage(html);
+renderPage(BudgetingPage);

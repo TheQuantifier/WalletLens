@@ -1,4 +1,4 @@
-import html from "../templates/rules.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import RulesPage from "../pages/RulesPage.jsx";
 
-renderTemplatePage(html);
+renderPage(RulesPage);

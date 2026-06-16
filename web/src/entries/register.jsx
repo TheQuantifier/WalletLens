@@ -1,4 +1,4 @@
-import html from "../templates/register.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import RegisterPage from "../pages/RegisterPage.jsx";
 
-renderTemplatePage(html);
+renderPage(RegisterPage);

@@ -1,4 +1,4 @@
-import html from "../templates/login.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import LoginPage from "../pages/LoginPage.jsx";
 
-renderTemplatePage(html);
+renderPage(LoginPage);

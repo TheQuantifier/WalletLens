@@ -1,4 +1,4 @@
-import html from "../templates/help.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import HelpPage from "../pages/HelpPage.jsx";
 
-renderTemplatePage(html);
+renderPage(HelpPage);

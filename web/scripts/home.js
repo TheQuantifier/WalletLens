@@ -4,6 +4,7 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
 
 (() => {
   const CURRENCY_FALLBACK = "USD";
+  const RECORD_PAGE_SIZE = 1000;
   const $ = (sel, root = document) => root.querySelector(sel);
   const BASE_EXPENSE_CATEGORIES = [
     "Housing",
@@ -1706,15 +1707,25 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
   // ============================================================
   //  API LOADER
   // ============================================================
+  async function loadAllRecords() {
+    const all = [];
+    for (let offset = 0; ; offset += RECORD_PAGE_SIZE) {
+      const batch = await api.records.getAll({ limit: RECORD_PAGE_SIZE, offset });
+      const rows = Array.isArray(batch) ? batch : (batch?.records || batch?.data || []);
+      all.push(...rows);
+      if (!Array.isArray(rows) || rows.length < RECORD_PAGE_SIZE) break;
+    }
+    allRecordsCache = all;
+    return all;
+  }
+
   async function loadFromAPI() {
     try {
       await api.plaid.sync();
     } catch {
       // Plaid sync is best-effort on dashboard load.
     }
-    const records = await api.records.getAll();
-    allRecordsCache = Array.isArray(records) ? records : [];
-    return records;
+    return loadAllRecords();
   }
 
   // ============================================================
@@ -1751,7 +1762,7 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
 
     $("#btnExport")?.addEventListener("click", async () => {
       try {
-        const records = await api.records.getAll();
+        const records = await loadAllRecords();
         await exportRecords(records);
       } catch (err) {
         alert("Failed to export data: " + err.message);
@@ -2019,5 +2030,17 @@ import { exportSheets, getPreferredExportFormat } from "./export-utils.js";
     }
   }
 
-  document.addEventListener("DOMContentLoaded", init);
+  let initialized = false;
+  function initOnce() {
+    if (initialized) return;
+    initialized = true;
+    init();
+  }
+
+  document.addEventListener("walletlens:template-ready", initOnce);
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", initOnce);
+  } else {
+    window.setTimeout(initOnce, 0);
+  }
 })();

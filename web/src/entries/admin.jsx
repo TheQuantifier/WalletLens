@@ -1,4 +1,4 @@
-import html from "../templates/admin.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import AdminPage from "../pages/AdminPage.jsx";
 
-renderTemplatePage(html);
+renderPage(AdminPage);

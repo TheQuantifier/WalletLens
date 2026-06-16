@@ -1,4 +1,4 @@
-import html from "../templates/upload.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import UploadPage from "../pages/UploadPage.jsx";
 
-renderTemplatePage(html);
+renderPage(UploadPage);

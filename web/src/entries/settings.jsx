@@ -1,4 +1,4 @@
-import html from "../templates/settings.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import SettingsPage from "../pages/SettingsPage.jsx";
 
-renderTemplatePage(html);
+renderPage(SettingsPage);

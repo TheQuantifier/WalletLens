@@ -7,10 +7,17 @@
 // --------------------------------------
 // CONFIG (auto-switch for localhost vs Render)
 // --------------------------------------
-const API_BASE =
-  window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1")
+const configuredApiBase =
+  window.__WALLETLENS_API_BASE__ ||
+  import.meta.env?.VITE_API_BASE_URL ||
+  "";
+
+const API_BASE = (
+  configuredApiBase ||
+  (window.location.hostname.includes("localhost") || window.location.hostname.includes("127.0.0.1")
     ? "http://localhost:4000/api"
-    : "https://wisewallet-l1d5.onrender.com/api";
+    : "https://wisewallet-l1d5.onrender.com/api")
+).replace(/\/$/, "");
 
 // --------------------------------------
 // AUTH TOKEN STORAGE (fallback for blocked cookies)

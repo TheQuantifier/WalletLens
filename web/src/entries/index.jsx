@@ -1,4 +1,4 @@
-import html from "../templates/index.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import IndexPage from "../pages/IndexPage.jsx";
 
-renderTemplatePage(html);
+renderPage(IndexPage);

@@ -2,11 +2,7 @@ import React from "react";
 import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
-function TemplatePage({ html }) {
-  return <div style={{ display: "contents" }} dangerouslySetInnerHTML={{ __html: html }} />;
-}
-
-export function renderTemplatePage(html) {
+export function renderPage(Page) {
   const container = document.getElementById("root");
   if (!container) {
     throw new Error("Missing #root mount node.");
@@ -15,7 +11,7 @@ export function renderTemplatePage(html) {
   flushSync(() => {
     createRoot(container).render(
       <React.StrictMode>
-        <TemplatePage html={html} />
+        <Page />
       </React.StrictMode>
     );
   });

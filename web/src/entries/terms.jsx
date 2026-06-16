@@ -1,4 +1,4 @@
-import html from "../templates/terms.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import TermsPage from "../pages/TermsPage.jsx";
 
-renderTemplatePage(html);
+renderPage(TermsPage);

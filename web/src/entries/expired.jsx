@@ -1,4 +1,4 @@
-import html from "../templates/expired.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import ExpiredPage from "../pages/ExpiredPage.jsx";
 
-renderTemplatePage(html);
+renderPage(ExpiredPage);

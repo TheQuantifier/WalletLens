@@ -1,4 +1,4 @@
-import html from "../templates/careers.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import CareersPage from "../pages/CareersPage.jsx";
 
-renderTemplatePage(html);
+renderPage(CareersPage);

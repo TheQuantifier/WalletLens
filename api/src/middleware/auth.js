@@ -11,6 +11,10 @@ const TRUSTED_ORIGINS = new Set(
   [
     ...(env.clientOrigins || []),
     "https://wisewallet.manuswebworks.org",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
     "http://localhost:5500",
     "http://127.0.0.1:5500",
     "http://localhost:3000",
@@ -21,7 +25,12 @@ const TRUSTED_ORIGINS = new Set(
 function isTrustedOriginValue(raw) {
   if (!raw) return false;
   try {
-    return TRUSTED_ORIGINS.has(new URL(String(raw)).origin);
+    const url = new URL(String(raw));
+    if (TRUSTED_ORIGINS.has(url.origin)) return true;
+    return (
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+      (url.protocol === "http:" || url.protocol === "https:")
+    );
   } catch {
     return false;
   }

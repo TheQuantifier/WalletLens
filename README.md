@@ -79,7 +79,7 @@ GOOGLE_CLIENT_ID=your_google_oauth_client_id
 GOOGLE_CLIENT_SECRET=your_google_oauth_client_secret
 GOOGLE_REDIRECT_URI=http://localhost:4000/api/auth/google/callback
 
-CORS_ORIGIN=http://localhost:5500,http://127.0.0.1:5500
+CORS_ORIGIN=http://localhost:5173,http://127.0.0.1:5173,http://localhost:5500,http://127.0.0.1:5500
 
 OCR_ENABLED=true
 OCR_WORKER_SCRIPT=../worker/ocr_demo.py
@@ -119,7 +119,8 @@ SUPPORT_EMAIL=support@example.com
 2. Configure OAuth consent screen.
 3. Create an OAuth client of type `Web application`.
 4. Add authorized JavaScript origins for your frontend, for example:
-   - `http://localhost:5500`
+   - `http://localhost:5173`
+   - `http://127.0.0.1:5173`
    - your production frontend origin (e.g. `https://yourdomain.com`)
 5. Add authorized redirect URIs, for example:
    - `http://localhost:4000/api/auth/google/callback`
@@ -140,7 +141,17 @@ for f in api/src/db/migrations/*.sql; do
 done
 ```
 
-### 5) Start the API
+### 5) Start the app locally
+
+From the repo root, start both the API and the Vite React frontend:
+
+```bash
+npm run dev:all
+```
+
+Open: `http://localhost:5173`
+
+You can also run the API and frontend separately:
 
 ```bash
 cd api
@@ -153,18 +164,11 @@ API health check:
 curl http://localhost:4000/health
 ```
 
-### 6) Run the frontend
-
-Serve `web/` with any static server (VS Code Live Server, `python -m http.server`, etc.).
-
-Example:
-
 ```bash
-cd web
-python3 -m http.server 5500
+npm run dev:web
 ```
 
-Open: `http://localhost:5500`
+The frontend calls the local API at `http://localhost:4000/api` by default.
 
 ## API route groups
 
@@ -214,3 +218,4 @@ npm run replace:categories  # category replacement utility
 - Frontend API base is auto-switched in `web/scripts/api.js`:
   - localhost -> `http://localhost:4000/api`
   - non-localhost -> hosted Render API URL
+  - override locally with `VITE_API_BASE_URL`

@@ -5,6 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "vite --config vite.config.js",
+    "dev:web": "vite --config vite.config.js",
+    "dev:api": "npm --prefix api run dev",
+    "dev:all": "node scripts/dev.mjs",
     "build": "vite build --config vite.config.js",
     "preview": "vite preview --config vite.config.js"
   },

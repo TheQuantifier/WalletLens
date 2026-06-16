@@ -14,6 +14,7 @@ const htmlInputs = Object.fromEntries(
 export default defineConfig({
   root: webRoot,
   base: "./",
+  clearScreen: false,
   plugins: [react()],
   build: {
     outDir: resolve(process.cwd(), "dist"),

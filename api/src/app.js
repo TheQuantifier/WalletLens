@@ -51,6 +51,10 @@ const allowedOrigins = Array.from(
     "https://wisewallet.manuswebworks.org",
 
     // Local dev
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:4173",
+    "http://127.0.0.1:4173",
     "http://localhost:5000",
     "http://localhost:5500",
     "http://127.0.0.1:5500",
@@ -58,11 +62,23 @@ const allowedOrigins = Array.from(
   ])
 );
 
+function isAllowedLocalDevOrigin(origin) {
+  try {
+    const url = new URL(String(origin));
+    return (
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1") &&
+      (url.protocol === "http:" || url.protocol === "https:")
+    );
+  } catch {
+    return false;
+  }
+}
+
 const corsOptions = {
   origin: (origin, callback) => {
     if (!origin) return callback(null, true); // Postman / curl / server-side
 
-    if (allowedOrigins.includes(origin)) {
+    if (allowedOrigins.includes(origin) || isAllowedLocalDevOrigin(origin)) {
       return callback(null, true);
     }
 

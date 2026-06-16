@@ -1,4 +1,4 @@
-import html from "../templates/timeout.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import TimeoutPage from "../pages/TimeoutPage.jsx";
 
-renderTemplatePage(html);
+renderPage(TimeoutPage);

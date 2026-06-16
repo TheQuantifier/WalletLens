@@ -1,4 +1,4 @@
-import html from "../templates/privacy.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import PrivacyPage from "../pages/PrivacyPage.jsx";
 
-renderTemplatePage(html);
+renderPage(PrivacyPage);

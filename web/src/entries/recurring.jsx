@@ -1,4 +1,4 @@
-import html from "../templates/recurring.html?raw";
-import { renderTemplatePage } from "../renderTemplatePage.jsx";
+import { renderPage } from "../renderPage.jsx";
+import RecurringPage from "../pages/RecurringPage.jsx";
 
-renderTemplatePage(html);
+renderPage(RecurringPage);
