@@ -121,6 +121,18 @@
   color: var(--text);
 }
 
+.actions-menu-wrap details > summary.actions-btn {
+  list-style: none;
+}
+
+.actions-menu-wrap details > summary.actions-btn::-webkit-details-marker {
+  display: none;
+}
+
+.actions-menu-wrap details:not([open]) .actions-dropdown {
+  display: none;
+}
+
 .actions-btn:hover {
   background: rgba(0,0,0,0.06);
 }

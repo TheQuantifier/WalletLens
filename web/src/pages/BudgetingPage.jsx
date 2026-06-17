@@ -1,4 +1,14 @@
+import { useEffect } from "react";
+import { initBudgetingPage } from "../pageControllers/budgetingPageController.js";
+
 export default function BudgetingPage() {
+  useEffect(() => {
+    initBudgetingPage();
+    return () => {
+      window.__walletlensBudgetingPageInitialized = false;
+    };
+  }, []);
+
   return (
     <>
       <div id="header"></div>

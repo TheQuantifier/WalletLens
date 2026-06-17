@@ -5,7 +5,7 @@ export default function IndexPage() {
           <div className="nf-header-inner">
             <div className="logo-group">
               <h1 className="logo">
-                <a className="logo-link" href="index.html" style={{ "textDecoration": "none", "color": "inherit" }}>
+                <a className="logo-link" href="/" style={{ "textDecoration": "none", "color": "inherit" }}>
                   <img src="images/favicon.png" alt="App icon" className="logo-icon" />
                   <span>&lt;AppName&gt;</span>
                 </a>
@@ -14,8 +14,8 @@ export default function IndexPage() {
             </div>
       
             <nav className="index-auth-actions" aria-label="Authentication">
-              <a href="login.html" className="btn">Login</a>
-              <a href="register.html" className="btn btn--primary">Register</a>
+              <a href="/login" className="btn">Login</a>
+              <a href="/register" className="btn btn--primary">Register</a>
             </nav>
           </div>
         </header>
@@ -39,8 +39,8 @@ export default function IndexPage() {
               </div>
       
               <div className="index-cta-row">
-                <a href="register.html" className="btn btn--primary index-primary-cta">Create Free Account</a>
-                <a href="login.html" className="btn index-secondary-cta">Log In</a>
+                <a href="/register" className="btn btn--primary index-primary-cta">Create Free Account</a>
+                <a href="/login" className="btn index-secondary-cta">Log In</a>
               </div>
       
               <div className="index-proof-grid" aria-label="Highlights">
@@ -289,7 +289,7 @@ export default function IndexPage() {
                 <h2>See what your finances look like when the system does the boring part.</h2>
               </div>
               <div className="index-cta-actions">
-                <a href="register.html" className="btn btn--primary">Create Your Account</a>
+                <a href="/register" className="btn btn--primary">Create Your Account</a>
               </div>
             </div>
           </section>
@@ -299,12 +299,13 @@ export default function IndexPage() {
           <div className="nf-footer-inner">
             <p>&copy; <span id="year"></span> &lt;AppName&gt;. All rights reserved.</p>
             <nav className="nf-legal" aria-label="Footer">
-              <a href="about.html" className="nf-legal-link">About</a><span className="sep">&bull;</span>
-              <a href="privacy.html" className="nf-legal-link">Privacy</a><span className="sep">&bull;</span>
-              <a href="terms.html" className="nf-legal-link">Terms</a>
+              <a href="/about" className="nf-legal-link">About</a><span className="sep">&bull;</span>
+              <a href="/privacy" className="nf-legal-link">Privacy</a><span className="sep">&bull;</span>
+              <a href="/terms" className="nf-legal-link">Terms</a>
             </nav>
           </div>
         </footer>
     </>
   );
 }
+

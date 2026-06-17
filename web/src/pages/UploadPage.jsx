@@ -1,4 +1,14 @@
+import { useEffect } from "react";
+import { initUploadPage } from "../pageControllers/uploadPageController.js";
+
 export default function UploadPage() {
+  useEffect(() => {
+    initUploadPage();
+    return () => {
+      window.__walletlensUploadPageInitialized = false;
+    };
+  }, []);
+
   return (
     <>
       {/* Header injected by default.js */}

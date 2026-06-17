@@ -38,10 +38,6 @@
   <meta name="twitter:image" content="images/walterlens.jpeg" />
   <link rel="icon" type="image/png" href="images/favicon.png" />
 
-  <link rel="stylesheet" href="styles/default.css" />
-  <link rel="stylesheet" href="styles/auth.css" />
-  <link rel="stylesheet" href="styles/index.css" />
-
   <script>
     const savedTheme = localStorage.getItem("theme") || "light";
     document.documentElement.setAttribute("data-theme", savedTheme);
@@ -50,7 +46,10 @@
 
 <body class="landing-light">
   <div id="root"></div>
-  <script type="module" src="./src/entries/index.jsx"></script>
+  <script src="https://cdn.plaid.com/link/v2/stable/link-initialize.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2"></script>
+  <script type="module" src="./src/main.jsx"></script>
   <script src="scripts/default.js" type="module" defer></script>
 </body>
 </html>

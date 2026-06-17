@@ -1,4 +1,14 @@
+import { useEffect } from "react";
+import { initAdminPage } from "../pageControllers/adminPageController.js";
+
 export default function AdminPage() {
+  useEffect(() => {
+    initAdminPage();
+    return () => {
+      window.__walletlensAdminPageInitialized = false;
+    };
+  }, []);
+
   return (
     <>
       <div id="header"></div>

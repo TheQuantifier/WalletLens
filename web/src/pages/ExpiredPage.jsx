@@ -5,7 +5,7 @@ export default function ExpiredPage() {
         <div className="nf-header-inner">
           <div className="logo-group">
             <h1 className="logo">
-              <a className="logo-link" href="index.html" style={{ "textDecoration": "none", "color": "inherit" }}>
+              <a className="logo-link" href="/" style={{ "textDecoration": "none", "color": "inherit" }}>
                 <img src="images/favicon.png" alt="App icon" className="logo-icon" />
                 <span>&lt;AppName&gt;</span>
               </a>
@@ -38,7 +38,7 @@ export default function ExpiredPage() {
               <button className="nf-btn" id="expiredExportBtn" type="button" style={{ "textAlign": "center" }}>Download All My Data</button>
               <button className="nf-btn" id="expiredRequestBtn" type="button" style={{ "textAlign": "center" }}>Request Access</button>
               <button className="nf-btn" id="expiredDeleteBtn" type="button" style={{ "textAlign": "center", "background": "#b91c1c" }}>Delete Account</button>
-              <a className="nf-login" id="expiredLogoutLink" href="login.html" style={{ "textAlign": "center" }}>Log Out</a>
+              <a className="nf-login" id="expiredLogoutLink" href="/login" style={{ "textAlign": "center" }}>Log Out</a>
               <p id="expiredStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
             </div>
           </div>
@@ -47,3 +47,4 @@ export default function ExpiredPage() {
     </>
   );
 }
+

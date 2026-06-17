@@ -29,7 +29,7 @@ const MAX_SESSION_TIMEOUT_MINUTES = 60;
 const INACTIVITY_HEARTBEAT_MS = 15000;
 const INACTIVITY_ACTIVITY_KEY = "lastActivityAt";
 const INACTIVITY_MIN_WRITE_MS = 10000;
-const TIMEOUT_PAGE = "timeout.html";
+const TIMEOUT_PAGE = "/timeout";
 let achievementMonitorStarted = false;
 let achievementToastQueue = [];
 let achievementToastShowing = false;
@@ -47,18 +47,34 @@ const DEFAULT_EXPORT_FORMAT_KEY = "defaultDataExportFormat";
  * Pages that do NOT require authentication
  */
 const PUBLIC_PAGES = [
+  "index",
   "index.html",
+  "login",
   "login.html",
+  "register",
   "register.html",
+  "privacy",
   "privacy.html",
+  "terms",
   "terms.html",
+  "about",
   "about.html",
+  "careers",
   "careers.html",
+  "help",
   "help.html",
+  "timeout",
   "timeout.html",
+  "expired",
   "expired.html",
   "",
 ];
+
+function getCurrentPageToken() {
+  const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+  if (!rawPage) return "index";
+  return rawPage.endsWith(".html") ? rawPage.slice(0, -5) : rawPage;
+}
 
 /**
  * If the page is not public, check login status BEFORE loading anything else.
@@ -67,8 +83,7 @@ const PUBLIC_PAGES = [
 async function runAuthGuard() {
   if (!AUTH_GUARD_ENABLED) return;
 
-  const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
-  const currentPage = rawPage === "" ? "index.html" : rawPage;
+  const currentPage = getCurrentPageToken();
 
   if (PUBLIC_PAGES.includes(currentPage)) return;
 
@@ -84,12 +99,12 @@ async function runAuthGuard() {
     const accountStatus = String(user?.account_status || user?.accountStatus || "active")
       .trim()
       .toLowerCase();
-    if (accountStatus === "expired" && currentPage !== "expired.html") {
-      window.location.href = "expired.html";
+    if (accountStatus === "expired" && currentPage !== "expired") {
+      window.location.href = "/expired";
     }
   } catch {
-    console.warn("User not authenticated. Redirecting to index.html");
-    window.location.href = "index.html";
+    console.warn("User not authenticated. Redirecting to /");
+    window.location.href = "/";
   }
 }
 
@@ -97,10 +112,9 @@ async function runAuthGuard() {
 runAuthGuard();
 
 window.addEventListener("account:expired", () => {
-  const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
-  const currentPage = rawPage === "" ? "index.html" : rawPage;
-  if (currentPage === "expired.html") return;
-  window.location.href = "expired.html";
+  const currentPage = getCurrentPageToken();
+  if (currentPage === "expired") return;
+  window.location.href = "/expired";
 });
 
 
@@ -127,7 +141,7 @@ applySavedTheme();
 
 document.addEventListener("DOMContentLoaded", () => {
   cachePageTitle();
-  setLogoLinkDestination("index.html");
+  setLogoLinkDestination("/");
   loadHeaderAndFooter();
   initLiveNavigation();
   applyCachedAppName();
@@ -179,7 +193,7 @@ function loadHeaderAndFooter() {
       headerEl.innerHTML = html;
     }
     sessionStorage.setItem("cachedHeaderHtml", html);
-    setLogoLinkDestination("index.html");
+    setLogoLinkDestination("/");
 
     setActiveNavLink();
       initMobileNavMenu();
@@ -210,7 +224,7 @@ function loadHeaderAndFooter() {
 }
 
 function setLogoLinkDestination(href) {
-  const target = String(href || "index.html").trim() || "index.html";
+  const target = String(href || "/").trim() || "/";
   document.querySelectorAll(".logo-link").forEach((link) => {
     link.setAttribute("href", target);
   });
@@ -708,6 +722,12 @@ function initMobileNavMenu() {
       navigateLive(url, { pushState: true });
       return;
     }
+    if (window.__WALLETLENS_REACT_SPA__) {
+      const url = new URL(href, window.location.href);
+      window.history.pushState({}, "", `${url.pathname}${url.search}${url.hash}`);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      return;
+    }
     window.location.assign(href);
   });
 
@@ -870,7 +890,7 @@ async function updateHeaderAuthState() {
     applyAccountAvatar(avatarUrl, user.fullName || user.full_name || user.username || "");
     sessionStorage.setItem("cachedUser", JSON.stringify(user));
     setAdminVisibility(user?.role);
-    setLogoLinkDestination("about.html");
+    setLogoLinkDestination("/about");
 
   } catch {
     // Not authenticated
@@ -882,7 +902,7 @@ async function updateHeaderAuthState() {
 
     applyAccountAvatar("", "");
     setAdminVisibility("user");
-    setLogoLinkDestination("index.html");
+    setLogoLinkDestination("/");
   }
 }
 
@@ -1072,7 +1092,7 @@ function wireLogoutButton() {
 
     try {
       await api.auth.logout();
-      window.location.href = "login.html";
+      window.location.href = "/login";
     } catch (err) {
       console.error("Logout failed:", err);
       alert("Could not log out.");
@@ -1461,3 +1481,4 @@ function prefetchAllLinks() {
       });
   });
 }
+

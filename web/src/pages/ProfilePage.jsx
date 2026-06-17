@@ -1,4 +1,14 @@
+import { useEffect } from "react";
+import { initProfilePage } from "../pageControllers/profilePageController.js";
+
 export default function ProfilePage() {
+  useEffect(() => {
+    initProfilePage();
+    return () => {
+      window.__walletlensProfilePageInitialized = false;
+    };
+  }, []);
+
   return (
     <>
       <div id="header"></div>

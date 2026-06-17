@@ -1,4 +1,14 @@
+import { useEffect } from "react";
+import { initRulesPage } from "../pageControllers/rulesPageController.js";
+
 export default function RulesPage() {
+  useEffect(() => {
+    initRulesPage();
+    return () => {
+      window.__walletlensRulesPageInitialized = false;
+    };
+  }, []);
+
   return (
     <>
       <div id="header"></div>

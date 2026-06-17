@@ -1,4 +1,14 @@
+import { useEffect } from "react";
+import { initSettingsPage } from "../pageControllers/settingsPageController.js";
+
 export default function SettingsPage() {
+  useEffect(() => {
+    initSettingsPage();
+    return () => {
+      window.__walletlensSettingsPageInitialized = false;
+    };
+  }, []);
+
   return (
     <>
       <div id="header"></div>

@@ -1,4 +1,374 @@
+import { useEffect } from "react";
+import { api } from "../../scripts/api.js";
+
+function postAuthDestination(user) {
+  const accountStatus = String(user?.account_status || user?.accountStatus || "active").trim().toLowerCase();
+  return accountStatus === "expired" ? "/expired" : "/home";
+}
+
+function navigateTo(path) {
+  if (window.__walletlensNavigate) window.__walletlensNavigate(path);
+  else window.location.href = path;
+}
+
 export default function RegisterPage() {
+  useEffect(() => {
+    const year = document.getElementById("year");
+    const form = document.getElementById("registerForm");
+    const msg = document.getElementById("registerMessage");
+    const btn = document.getElementById("registerBtn");
+    const googleRegisterBtn = document.getElementById("googleRegisterBtn");
+    const passwordInput = document.getElementById("password");
+    const confirmInput = document.getElementById("confirmPassword");
+    const agreeCheckbox = document.getElementById("agree");
+    const legalModal = document.getElementById("legalModal");
+    const legalModalTitle = document.getElementById("legalModalTitle");
+    const legalModalBody = document.getElementById("legalModalBody");
+    const legalConsentActions = document.getElementById("legalConsentActions");
+    const legalDisagreeBtn = document.getElementById("legalDisagreeBtn");
+    const legalAgreeBtn = document.getElementById("legalAgreeBtn");
+    const contactModal = document.getElementById("contactModal");
+    const contactForm = document.getElementById("authContactForm");
+    const contactStatus = document.getElementById("contactStatus");
+    const contactSubmitBtn = document.getElementById("contactSubmitBtn");
+
+    if (year) year.textContent = new Date().getFullYear();
+
+    let legalFlowActive = false;
+    let legalFlowStepIndex = 0;
+    let suppressAgreeEvent = false;
+    const legalSequence = ["terms", "privacy"];
+
+    const googleRedirect = api.auth.consumeGoogleRedirect();
+    if (googleRedirect?.token || googleRedirect?.success) {
+      api.auth.me()
+        .then(({ user }) => {
+          navigateTo(postAuthDestination(user));
+        })
+        .catch(() => {
+          navigateTo("/home");
+        });
+      return undefined;
+    }
+
+    const showMsg = (text, kind = "info") => {
+      if (!msg) return;
+      msg.textContent = text;
+      msg.style.display = "block";
+      msg.classList.remove("is-hidden");
+      msg.style.color = kind === "error" ? "#b91c1c" : kind === "ok" ? "#166534" : "#111827";
+    };
+
+    const clearMsg = () => {
+      if (!msg) return;
+      msg.textContent = "";
+      msg.style.display = "none";
+      msg.classList.add("is-hidden");
+      msg.style.color = "";
+    };
+
+    if (googleRedirect?.error) showMsg(googleRedirect.error, "error");
+
+    const setPasswordStyle = (input, isValid) => {
+      if (!input) return;
+      input.style.borderColor = isValid ? "#16a34a" : "#b91c1c";
+      input.style.color = isValid ? "#166534" : "#b91c1c";
+      input.style.boxShadow = document.activeElement === input
+        ? isValid
+          ? "0 0 0 3px rgba(22,163,74,0.2)"
+          : "0 0 0 3px rgba(185,28,28,0.15)"
+        : "none";
+    };
+
+    const updatePasswordStyles = () => {
+      const passwordValue = passwordInput?.value || "";
+      const confirmValue = confirmInput?.value || "";
+      const passwordOk = passwordValue.length >= 8;
+      setPasswordStyle(passwordInput, passwordOk);
+      setPasswordStyle(confirmInput, passwordOk && confirmValue === passwordValue);
+    };
+
+    const passwordToggleHandler = (event) => {
+      const toggle = event.currentTarget;
+      const targetId = toggle.getAttribute("data-target");
+      const target = targetId ? document.getElementById(targetId) : null;
+      if (!target) return;
+      const showing = target.type === "password";
+      target.type = showing ? "text" : "password";
+      toggle.classList.toggle("is-active", showing);
+      toggle.setAttribute("aria-pressed", showing ? "true" : "false");
+      toggle.setAttribute("aria-label", showing ? "Hide password" : "Show password");
+      target.focus();
+      updatePasswordStyles();
+    };
+
+    document.querySelectorAll(".password-toggle").forEach((toggle) => {
+      toggle.addEventListener("click", passwordToggleHandler);
+    });
+
+    const syncScrollLock = () => {
+      const legalOpen = legalModal && !legalModal.classList.contains("hidden");
+      const contactOpen = contactModal && !contactModal.classList.contains("hidden");
+      document.body.style.overflow = legalOpen || contactOpen ? "hidden" : "";
+    };
+
+    const setModalOpen = (modal, open) => {
+      modal?.classList.toggle("hidden", !open);
+      syncScrollLock();
+    };
+
+    const setAgree = (checked) => {
+      if (!agreeCheckbox) return;
+      suppressAgreeEvent = true;
+      agreeCheckbox.checked = checked;
+      suppressAgreeEvent = false;
+    };
+
+    const loadLegal = async (kind) => {
+      const config = {
+        terms: { title: "Terms of Service", url: "/terms" },
+        privacy: { title: "Privacy Policy", url: "/privacy" },
+      }[kind];
+      if (!config || !legalModalTitle || !legalModalBody) return;
+      legalModalTitle.textContent = config.title;
+      legalModalBody.innerHTML = `<p class="subtle">Loading...</p>`;
+      const template = document.getElementById(kind === "terms" ? "termsTemplate" : "privacyTemplate");
+      if (template?.innerHTML?.trim()) {
+        legalModalBody.innerHTML = template.innerHTML;
+        return;
+      }
+      try {
+        const res = await fetch(config.url, { cache: "force-cache" });
+        const html = await res.text();
+        const parsed = new DOMParser().parseFromString(html, "text/html");
+        legalModalBody.innerHTML = (parsed.querySelector("main.main--legal") || parsed.querySelector("main"))?.innerHTML || "<p>Content unavailable.</p>";
+      } catch {
+        legalModalBody.innerHTML = "<p>Could not load content. Please try again.</p>";
+      }
+    };
+
+    const closeLegalFlow = () => {
+      legalFlowActive = false;
+      legalFlowStepIndex = 0;
+      legalConsentActions?.classList.add("is-hidden");
+      setAgree(false);
+      setModalOpen(legalModal, false);
+    };
+
+    const loadLegalFlowStep = async () => {
+      await loadLegal(legalSequence[legalFlowStepIndex] || "terms");
+      if (legalAgreeBtn) {
+        legalAgreeBtn.textContent = legalFlowStepIndex < legalSequence.length - 1 ? "Agree & Continue" : "Agree";
+      }
+    };
+
+    const startLegalFlow = async () => {
+      legalFlowActive = true;
+      legalFlowStepIndex = 0;
+      legalConsentActions?.classList.remove("is-hidden");
+      setModalOpen(legalModal, true);
+      await loadLegalFlowStep();
+    };
+
+    const legalLinkHandler = (event) => {
+      const kind = event.currentTarget.getAttribute("data-legal");
+      if (!kind) return;
+      event.preventDefault();
+      legalFlowActive = false;
+      legalConsentActions?.classList.add("is-hidden");
+      setModalOpen(legalModal, true);
+      loadLegal(kind);
+    };
+
+    document.querySelectorAll(".legal-link").forEach((link) => {
+      link.addEventListener("click", legalLinkHandler);
+    });
+
+    const legalModalClick = (event) => {
+      if (!event.target?.matches("[data-legal-close]")) return;
+      if (legalFlowActive) closeLegalFlow();
+      else setModalOpen(legalModal, false);
+    };
+    legalModal?.addEventListener("click", legalModalClick);
+
+    const agreeChange = async () => {
+      if (suppressAgreeEvent || !agreeCheckbox?.checked) return;
+      setAgree(false);
+      clearMsg();
+      await startLegalFlow();
+    };
+    agreeCheckbox?.addEventListener("change", agreeChange);
+
+    const disagreeClick = () => closeLegalFlow();
+    legalDisagreeBtn?.addEventListener("click", disagreeClick);
+
+    const agreeClick = async () => {
+      if (!legalFlowActive) {
+        setModalOpen(legalModal, false);
+        return;
+      }
+      if (legalFlowStepIndex < legalSequence.length - 1) {
+        legalFlowStepIndex += 1;
+        await loadLegalFlowStep();
+        return;
+      }
+      legalFlowActive = false;
+      legalFlowStepIndex = 0;
+      legalConsentActions?.classList.add("is-hidden");
+      setAgree(true);
+      setModalOpen(legalModal, false);
+    };
+    legalAgreeBtn?.addEventListener("click", agreeClick);
+
+    const contactOpenHandler = () => {
+      if (contactStatus) {
+        contactStatus.textContent = "";
+        contactStatus.classList.add("is-hidden");
+      }
+      setModalOpen(contactModal, true);
+      document.getElementById("contactSubject")?.focus();
+    };
+    document.querySelectorAll("[data-contact-open='true']").forEach((trigger) => {
+      trigger.addEventListener("click", contactOpenHandler);
+    });
+
+    const contactModalClick = (event) => {
+      if (event.target?.matches("[data-contact-close]")) setModalOpen(contactModal, false);
+    };
+    contactModal?.addEventListener("click", contactModalClick);
+
+    const contactSubmit = async (event) => {
+      event.preventDefault();
+      const subject = document.getElementById("contactSubject")?.value?.trim() || "";
+      const email = document.getElementById("contactEmail")?.value?.trim() || "";
+      const message = document.getElementById("contactMessage")?.value?.trim() || "";
+      if (!subject || !email || !message) {
+        if (contactStatus) {
+          contactStatus.textContent = "Please add subject, email, and message.";
+          contactStatus.classList.remove("is-hidden");
+          contactStatus.style.color = "#b91c1c";
+        }
+        return;
+      }
+      if (contactSubmitBtn) {
+        contactSubmitBtn.disabled = true;
+        contactSubmitBtn.textContent = "Sending...";
+      }
+      try {
+        await api.support.contactPublic({ subject, email, message, name: "Guest User" });
+        if (contactStatus) {
+          contactStatus.textContent = "Thanks! Your message has been sent to support.";
+          contactStatus.classList.remove("is-hidden");
+          contactStatus.style.color = "#166534";
+        }
+        contactForm?.reset();
+      } catch (err) {
+        if (contactStatus) {
+          contactStatus.textContent = err?.message || "Unable to send message right now.";
+          contactStatus.classList.remove("is-hidden");
+          contactStatus.style.color = "#b91c1c";
+        }
+      } finally {
+        if (contactSubmitBtn) {
+          contactSubmitBtn.disabled = false;
+          contactSubmitBtn.textContent = "Send Message";
+        }
+      }
+    };
+    contactForm?.addEventListener("submit", contactSubmit);
+
+    api.auth.googleConfig()
+      .then((cfg) => {
+        if (!cfg?.enabled && googleRegisterBtn) {
+          googleRegisterBtn.disabled = true;
+          googleRegisterBtn.title = "Google registration is not configured yet.";
+        }
+      })
+      .catch(() => {
+        if (googleRegisterBtn) {
+          googleRegisterBtn.disabled = true;
+          googleRegisterBtn.title = "Google registration is unavailable.";
+        }
+      });
+
+    const googleClick = () => {
+      clearMsg();
+      api.auth.beginGoogleAuth("register", window.location.href);
+    };
+    googleRegisterBtn?.addEventListener("click", googleClick);
+
+    const submit = async (event) => {
+      event.preventDefault();
+      clearMsg();
+      const fullName = document.getElementById("name")?.value.trim();
+      const email = document.getElementById("email")?.value.trim();
+      const password = passwordInput?.value || "";
+      const confirmPassword = confirmInput?.value || "";
+      const agree = agreeCheckbox?.checked;
+
+      if (!fullName || !email || !password || !confirmPassword) {
+        showMsg("Please fill in all fields.", "error");
+        return;
+      }
+      if (!email.includes("@") || !email.includes(".")) {
+        showMsg("Please enter a valid email.", "error");
+        return;
+      }
+      if (password.length < 8) {
+        showMsg("Password must be at least 8 characters long.", "error");
+        return;
+      }
+      if (password !== confirmPassword) {
+        showMsg("Passwords do not match.", "error");
+        return;
+      }
+      if (!agree) {
+        showMsg("Please agree to the Terms and Privacy Policy.", "error");
+        return;
+      }
+
+      showMsg("Creating your account...");
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Creating...";
+      }
+      try {
+        await api.auth.register(email, password, fullName);
+        showMsg("Account created! Redirecting...", "ok");
+        const { user } = await api.auth.me();
+        navigateTo(postAuthDestination(user));
+      } catch (err) {
+        showMsg(err?.message || "Registration failed.", "error");
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = "Create Account";
+        }
+      }
+    };
+
+    form?.addEventListener("submit", submit);
+    passwordInput?.addEventListener("input", updatePasswordStyles);
+    confirmInput?.addEventListener("input", updatePasswordStyles);
+    passwordInput?.addEventListener("blur", updatePasswordStyles);
+    confirmInput?.addEventListener("blur", updatePasswordStyles);
+    updatePasswordStyles();
+
+    return () => {
+      document.querySelectorAll(".password-toggle").forEach((toggle) => toggle.removeEventListener("click", passwordToggleHandler));
+      document.querySelectorAll(".legal-link").forEach((link) => link.removeEventListener("click", legalLinkHandler));
+      document.querySelectorAll("[data-contact-open='true']").forEach((trigger) => trigger.removeEventListener("click", contactOpenHandler));
+      legalModal?.removeEventListener("click", legalModalClick);
+      agreeCheckbox?.removeEventListener("change", agreeChange);
+      legalDisagreeBtn?.removeEventListener("click", disagreeClick);
+      legalAgreeBtn?.removeEventListener("click", agreeClick);
+      contactModal?.removeEventListener("click", contactModalClick);
+      contactForm?.removeEventListener("submit", contactSubmit);
+      googleRegisterBtn?.removeEventListener("click", googleClick);
+      form?.removeEventListener("submit", submit);
+    };
+  }, []);
+
   return (
     <>
       {/* Header */}
@@ -6,7 +376,7 @@ export default function RegisterPage() {
           <div className="nf-header-inner">
             <div className="logo-group">
               <h1 className="logo">
-                <a className="logo-link" href="index.html" style={{ "textDecoration": "none", "color": "inherit" }}>
+                <a className="logo-link" href="/" style={{ "textDecoration": "none", "color": "inherit" }}>
                   <img src="images/favicon.png" alt="App icon" className="logo-icon" />
                   <span>&lt;AppName&gt;</span>
                 </a>
@@ -15,7 +385,7 @@ export default function RegisterPage() {
             </div>
       
             <nav className="nf-auth-right" aria-label="Authentication">
-              <a href="login.html" className="nf-login">Login</a>
+              <a href="/login" className="nf-login">Login</a>
             </nav>
           </div>
         </header>
@@ -125,7 +495,7 @@ export default function RegisterPage() {
                 <label style={{ "display": "flex", "gap": "0.5rem", "alignItems": "flex-start", "marginTop": "0.25rem" }}>
                   <input type="checkbox" id="agree" name="agree" required style={{ "marginTop": "0.2rem" }} />
                   <span className="subtle">
-                    I agree to the <a href="terms.html" className="legal-link" data-legal="terms">Terms</a> and <a href="privacy.html" className="legal-link" data-legal="privacy">Privacy Policy</a>.
+                    I agree to the <a href="/terms" className="legal-link" data-legal="terms">Terms</a> and <a href="/privacy" className="legal-link" data-legal="privacy">Privacy Policy</a>.
                   </span>
                 </label>
       
@@ -148,7 +518,7 @@ export default function RegisterPage() {
               </form>
       
               <div className="auth-links">
-                <p>Already have an account? <a href="login.html">Login</a></p>
+                <p>Already have an account? <a href="/login">Login</a></p>
               </div>
             </div>
           </section>
@@ -186,8 +556,8 @@ export default function RegisterPage() {
           <div className="nf-footer-inner">
             <p>&copy; <span id="year"></span> &lt;AppName&gt;. All rights reserved.</p>
             <nav className="nf-legal" aria-label="Footer">
-              <a href="privacy.html" className="nf-legal-link">Privacy</a><span className="sep">&bull;</span>
-              <a href="terms.html" className="nf-legal-link">Terms</a><span className="sep">&bull;</span>
+              <a href="/privacy" className="nf-legal-link">Privacy</a><span className="sep">&bull;</span>
+              <a href="/terms" className="nf-legal-link">Terms</a><span className="sep">&bull;</span>
               <button type="button" className="nf-legal-link" data-contact-open="true">Contact</button>
             </nav>
           </div>
@@ -467,3 +837,4 @@ export default function RegisterPage() {
     </>
   );
 }
+

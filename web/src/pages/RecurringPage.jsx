@@ -1,4 +1,14 @@
+import { useEffect } from "react";
+import { initRecurringPage } from "../pageControllers/recurringPageController.js";
+
 export default function RecurringPage() {
+  useEffect(() => {
+    initRecurringPage();
+    return () => {
+      window.__walletlensRecurringPageInitialized = false;
+    };
+  }, []);
+
   return (
     <>
       <div id="header"></div>
