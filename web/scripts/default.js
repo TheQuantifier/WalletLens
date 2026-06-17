@@ -9,6 +9,7 @@ and manages dashboard view preference.
 
 import { api } from "./api.js";
 import { initWalterLens } from "./walterlens.js";
+import { initAppTour } from "./tour.js";
 
 /* ===============================================
   DEVELOPMENT AUTH GUARD TOGGLE
@@ -152,6 +153,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initializeSharedPageShell();
   initLiveNavigation();
   initWalterLens();
+  initAppTour();
   initAchievementCelebrations();
   initNotifications();
   initInactivityTimeoutMonitor();
@@ -159,6 +161,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("walletlens:template-ready", () => {
   initializeSharedPageShell();
+  initAppTour();
   updateMobileNavActiveState();
 });
 

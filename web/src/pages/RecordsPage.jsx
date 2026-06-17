@@ -285,6 +285,8 @@ function RecordsTable({
   const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
   const safePage = Math.min(Math.max(1, page), totalPages);
   const visible = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
+  const isExpense = type === "expense";
+  const idSuffix = isExpense ? "" : "Income";
 
   return (
     <section className="records-section">
@@ -294,21 +296,23 @@ function RecordsTable({
           <p className="subtle">{description}</p>
         </div>
         <div className="records-actions">
-          <button className="btn" type="button" onClick={() => onOpenForm(type)}>
+          <button className="btn" id={isExpense ? "btnAddExpense" : "btnAddIncome"} type="button" onClick={() => onOpenForm(type)}>
             Add {type === "expense" ? "Expense" : "Income"}
           </button>
-          <button className="btn btn--primary" type="button" onClick={() => onExport(type)} disabled={!rows.length}>
+          <button className="btn btn--primary" id={isExpense ? "btnExportExpenses" : "btnExportIncome"} type="button" onClick={() => onExport(type)} disabled={!rows.length}>
             Export
           </button>
         </div>
       </div>
 
       <div className="card records-subsection">
-        <form onSubmit={(event) => event.preventDefault()}>
+        <form id={isExpense ? "filtersForm" : "filtersFormIncome"} onSubmit={(event) => event.preventDefault()}>
           <div className="records-filters-grid">
             <label>
               <span>Search</span>
               <input
+                id={isExpense ? "q" : "qIncome"}
+                name={isExpense ? "q" : "qIncome"}
                 type="text"
                 value={filters.q}
                 onChange={(event) => onFilterChange(type, "q", event.target.value)}
@@ -318,7 +322,7 @@ function RecordsTable({
             </label>
             <label>
               <span>Category</span>
-              <select value={filters.category} onChange={(event) => onFilterChange(type, "category", event.target.value)}>
+              <select id={isExpense ? "category" : "categoryIncome"} name={isExpense ? "category" : "categoryIncome"} value={filters.category} onChange={(event) => onFilterChange(type, "category", event.target.value)}>
                 <option value="">All</option>
                 {categories.map((category) => (
                   <option value={category} key={category}>
@@ -329,15 +333,17 @@ function RecordsTable({
             </label>
             <label>
               <span>Min Date</span>
-              <input type="date" value={filters.minDate} onChange={(event) => onFilterChange(type, "minDate", event.target.value)} />
+              <input id={`minDate${idSuffix}`} name={`minDate${idSuffix}`} type="date" value={filters.minDate} onChange={(event) => onFilterChange(type, "minDate", event.target.value)} />
             </label>
             <label>
               <span>Max Date</span>
-              <input type="date" value={filters.maxDate} onChange={(event) => onFilterChange(type, "maxDate", event.target.value)} />
+              <input id={`maxDate${idSuffix}`} name={`maxDate${idSuffix}`} type="date" value={filters.maxDate} onChange={(event) => onFilterChange(type, "maxDate", event.target.value)} />
             </label>
             <label>
               <span>Min Amount</span>
               <input
+                id={`minAmt${idSuffix}`}
+                name={`minAmt${idSuffix}`}
                 type="number"
                 value={filters.minAmt}
                 step="0.01"
@@ -350,6 +356,8 @@ function RecordsTable({
             <label>
               <span>Max Amount</span>
               <input
+                id={`maxAmt${idSuffix}`}
+                name={`maxAmt${idSuffix}`}
                 type="number"
                 value={filters.maxAmt}
                 step="0.01"
@@ -361,7 +369,7 @@ function RecordsTable({
             </label>
             <label>
               <span>Rows per page</span>
-              <select value={filters.pageSize} onChange={(event) => onFilterChange(type, "pageSize", event.target.value)}>
+              <select id={`pageSize${idSuffix}`} name={`pageSize${idSuffix}`} value={filters.pageSize} onChange={(event) => onFilterChange(type, "pageSize", event.target.value)}>
                 <option value="5">5</option>
                 <option value="10">10</option>
                 <option value="25">25</option>
@@ -373,7 +381,7 @@ function RecordsTable({
             <button type="submit" className="btn btn--primary">
               Apply
             </button>
-            <button type="button" className="btn btn--link" onClick={() => onClearFilters(type)}>
+            <button type="button" className="btn btn--link" id={isExpense ? "btnClear" : "btnClearIncome"} onClick={() => onClearFilters(type)}>
               Clear
             </button>
           </div>
@@ -394,7 +402,7 @@ function RecordsTable({
                 <th className="actions-col">Actions</th>
               </tr>
             </thead>
-            <tbody aria-live="polite">
+            <tbody id={isExpense ? "recordsTbody" : "incomeTbody"} aria-live="polite">
               {loading ? (
                 <tr><td colSpan="7" className="subtle">Loading...</td></tr>
               ) : visible.length ? (
@@ -468,11 +476,11 @@ function RecordsTable({
         </div>
 
         <nav className="records-pager">
-          <button className="btn" type="button" disabled={safePage <= 1} onClick={() => onPageChange(type, safePage - 1)}>
+          <button className="btn" id={isExpense ? "prevPageExpense" : "prevPageIncome"} type="button" disabled={safePage <= 1} onClick={() => onPageChange(type, safePage - 1)}>
             ← Prev
           </button>
-          <span className="subtle">Page {safePage} of {totalPages}</span>
-          <button className="btn" type="button" disabled={safePage >= totalPages} onClick={() => onPageChange(type, safePage + 1)}>
+          <span id={isExpense ? "pageInfoExpense" : "pageInfoIncome"} className="subtle">Page {safePage} of {totalPages}</span>
+          <button className="btn" id={isExpense ? "nextPageExpense" : "nextPageIncome"} type="button" disabled={safePage >= totalPages} onClick={() => onPageChange(type, safePage + 1)}>
             Next →
           </button>
         </nav>
@@ -485,20 +493,22 @@ function RecordModal({ state, categories, saving, customCategories, onField, onC
   if (!state.open) return null;
   const typeLabel = state.type === "expense" ? "Expense" : "Income";
   const custom = customCategories[state.type] || [];
+  const isExpense = state.type === "expense";
 
   return (
-    <div className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && onClose()}>
+    <div id={isExpense ? "addExpenseModal" : "addIncomeModal"} className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && onClose()}>
       <div className="modal-content" onMouseDown={(event) => event.stopPropagation()}>
         <h2>{state.id ? `Edit ${typeLabel}` : `Add New ${typeLabel}`}</h2>
-        <form className="txn-form" onSubmit={onSubmit}>
+        <form id={isExpense ? "expenseForm" : "incomeForm"} className="txn-form" onSubmit={onSubmit}>
           <div className="form-row">
             <label>
               <span>Date</span>
-              <input type="date" value={state.date} onChange={(event) => onField("date", event.target.value)} required />
+              <input id={isExpense ? "expenseDate" : "incomeDate"} type="date" value={state.date} onChange={(event) => onField("date", event.target.value)} required />
             </label>
             <label>
               <span>Amount</span>
               <input
+                id={isExpense ? "expenseAmount" : "incomeAmount"}
                 type="number"
                 value={state.amount}
                 onChange={(event) => onField("amount", event.target.value)}
@@ -512,7 +522,7 @@ function RecordModal({ state, categories, saving, customCategories, onField, onC
           <div className="form-row">
             <label>
               <span>Category</span>
-              <select value={state.category} onChange={(event) => onField("category", event.target.value)} required>
+              <select id={isExpense ? "expenseCategory" : "incomeCategory"} value={state.category} onChange={(event) => onField("category", event.target.value)} required>
                 <option value="" disabled>Select a category</option>
                 {categories.map((category) => (
                   <option value={category} key={category}>{category}</option>
@@ -520,7 +530,7 @@ function RecordModal({ state, categories, saving, customCategories, onField, onC
                 <option value="__custom__">Add custom category...</option>
               </select>
             </label>
-            <div className="custom-category-list" aria-live="polite">
+            <div id={isExpense ? "expenseCustomCategories" : "incomeCustomCategories"} className="custom-category-list" aria-live="polite">
               {custom.map((name) => (
                 <div className="custom-category-item" key={name}>
                   <span>{name}</span>
@@ -531,12 +541,12 @@ function RecordModal({ state, categories, saving, customCategories, onField, onC
           <div className="form-row">
             <label>
               <span>Notes</span>
-              <input type="text" value={state.note} onChange={(event) => onField("note", event.target.value)} autoComplete="off" />
+              <input id={isExpense ? "expenseNotes" : "incomeNotes"} type="text" value={state.note} onChange={(event) => onField("note", event.target.value)} autoComplete="off" />
             </label>
           </div>
           <div className="form-row form-row--compact">
             <label className="checkbox-inline">
-              <input type="checkbox" checked={state.applyRules} onChange={(event) => onField("applyRules", event.target.checked)} />
+              <input id={isExpense ? "applyRulesExpense" : "applyRulesIncome"} type="checkbox" checked={state.applyRules} onChange={(event) => onField("applyRules", event.target.checked)} />
               <span>Apply rules to this record</span>
             </label>
           </div>
@@ -545,7 +555,7 @@ function RecordModal({ state, categories, saving, customCategories, onField, onC
             <button type="submit" className="btn btn--primary" disabled={saving}>
               {saving ? "Saving..." : `Save ${typeLabel}`}
             </button>
-            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+            <button type="button" id={isExpense ? "cancelExpenseBtn" : "cancelIncomeBtn"} className="btn" onClick={onClose}>Cancel</button>
           </div>
         </form>
       </div>
@@ -844,24 +854,24 @@ export default function RecordsPage() {
         />
 
         {pendingDelete ? (
-          <div className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && setPendingDelete(null)}>
+          <div id="deleteRecordModal" className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && setPendingDelete(null)}>
             <div className="modal-content" onMouseDown={(event) => event.stopPropagation()}>
               <h2>Delete Record</h2>
-              <p>
+              <p id="deleteRecordText">
                 {linkedReceiptId(pendingDelete)
                   ? "This record is linked to an uploaded receipt."
                   : "Are you sure you want to delete this record?"}
               </p>
               <div className="modal-actions">
-                <button className="btn btn--danger" type="button" onClick={() => deleteRecord(false)}>
+                <button id="btnDeleteRecordOnly" className="btn btn--danger" type="button" onClick={() => deleteRecord(false)}>
                   Delete Record
                 </button>
                 {linkedReceiptId(pendingDelete) ? (
-                  <button className="btn btn--warning" type="button" onClick={() => deleteRecord(true)}>
+                  <button id="btnDeleteRecordAndReceipt" className="btn btn--warning" type="button" onClick={() => deleteRecord(true)}>
                     Delete Record & Receipt
                   </button>
                 ) : null}
-                <button className="btn" type="button" onClick={() => setPendingDelete(null)}>Cancel</button>
+                <button id="btnCancelDeleteRecord" className="btn" type="button" onClick={() => setPendingDelete(null)}>Cancel</button>
               </div>
             </div>
           </div>
@@ -900,7 +910,7 @@ export default function RecordsPage() {
                 </div>
               </div>
               <div className="modal-actions">
-                <button className="btn" type="button" onClick={() => setReceiptModal({ open: false })}>Close</button>
+                <button id="btnCloseReceiptItems" className="btn" type="button" onClick={() => setReceiptModal({ open: false })}>Close</button>
               </div>
             </div>
           </div>

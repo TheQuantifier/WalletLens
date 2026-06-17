@@ -1,11 +1,13 @@
 /* =========================================================
-   SETTINGS PAGE STYLES — THEME-SAFE + BLUE CONSISTENCY
+   SETTINGS PAGE STYLES - THEME-SAFE + BLUE CONSISTENCY
    ========================================================= */
 
 .settings-container {
+  --profile-hero-title-size: 1.55rem;
   max-width: 1100px;
   margin: var(--space-4) auto;
   padding: var(--space-4);
+  font-size: 0.95rem;
 }
 
 .settings-title {
@@ -25,7 +27,7 @@
 
 .settings-card h2 {
   margin-bottom: var(--space-3);
-  font-size: 1.25rem;
+  font-size: 1.08rem;
   font-weight: 600;
   color: var(--text);
 }
@@ -48,6 +50,7 @@
 }
 
 .settings-row label {
+  font-size: 0.94rem;
   font-weight: 600;
   margin-bottom: var(--space-2);
   color: var(--text);
@@ -79,7 +82,7 @@
 }
 
 /* =========================================================
-   SAVE BUTTON — MATCHES APP-WIDE BUTTON COLORS
+   SAVE BUTTON - MATCHES APP-WIDE BUTTON COLORS
    ========================================================= */
 
 .settings-btn {

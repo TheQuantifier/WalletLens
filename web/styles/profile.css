@@ -14,6 +14,13 @@
 
 .main--profile {
   --profile-grid-cols: 464px 1fr;
+  --profile-hero-title-size: 1.55rem;
+  font-size: 0.95rem;
+}
+
+.main--profile .profile-hero .title-wrap p,
+.main--profile .subtle {
+  font-size: 0.92rem;
 }
 
 .profile-status-inline {
@@ -63,7 +70,7 @@
 }
 
 .identity .name {
-  font-size: 1.15rem;
+  font-size: 1.05rem;
   font-weight: 700;
 }
 
@@ -103,7 +110,7 @@
 
 /* ===== QUICK STATS ===== */
 .quick-stats h2 {
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin-bottom: 0.6rem;
 }
 
@@ -137,7 +144,7 @@
 
 .edit-form-header h3 {
   margin-bottom: 0.2rem;
-  font-size: 1.05rem;
+  font-size: 1rem;
 }
 
 .form-grid {
@@ -191,7 +198,7 @@ textarea { resize: vertical; }
 
 /* ===== SECURITY ===== */
 .security h2 {
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin-bottom: 0.6rem;
 }
 
@@ -233,7 +240,11 @@ textarea { resize: vertical; }
   color: var(--text);
 }
 
-.sr-left .label { font-weight: 700; }
+.sr-left .label {
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin: 0;
+}
 .sr-left .subtle { color: var(--muted); }
 
 .sr-right {
@@ -496,33 +507,30 @@ textarea { resize: vertical; }
   opacity: 0.72;
 }
 
-.achievement-hint {
-  position: absolute;
-  left: 1rem;
-  right: 1rem;
-  bottom: calc(100% + 0.55rem);
+.achievement-float-hint {
+  position: fixed;
+  max-width: 260px;
   padding: 0.55rem 0.7rem;
   border-radius: 10px;
   border: 1px solid color-mix(in srgb, var(--primary) 14%, var(--border));
-  background: color-mix(in srgb, var(--card-bg) 96%, #fff);
-  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.16);
+  background: color-mix(in srgb, var(--card-bg) 96%, #f8fafc);
+  box-shadow: 0 14px 32px rgba(15, 23, 42, 0.14);
   color: var(--text);
   font-size: 0.85rem;
   line-height: 1.4;
   opacity: 0;
-  transform: translateY(4px);
+  transform: translateY(6px);
   pointer-events: none;
   transition: opacity 140ms ease, transform 140ms ease;
-  z-index: 5;
+  z-index: 50;
 }
 
-.achievement-card:hover .achievement-hint,
-.achievement-card:focus-within .achievement-hint {
+.achievement-float-hint.is-visible {
   opacity: 1;
   transform: translateY(0);
 }
 
-:root[data-theme="dark"] .achievement-hint {
+:root[data-theme="dark"] .achievement-float-hint {
   background: color-mix(in srgb, var(--card-bg) 94%, #0f172a);
   box-shadow: 0 14px 32px rgba(2, 6, 23, 0.5);
 }
@@ -582,7 +590,7 @@ textarea { resize: vertical; }
 .activity { grid-column: 1 / -1; }
 
 .activity h2 {
-  font-size: 1.1rem;
+  font-size: 1rem;
   margin-bottom: 0.6rem;
 }
 

@@ -64,7 +64,7 @@ function ContactModal({ open, onClose }) {
   };
 
   return (
-    <div className="nf-modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+    <div id="contactModal" className="nf-modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
       <div className="nf-modal-backdrop" onClick={onClose}></div>
       <div className="nf-modal-content nf-contact-modal-content" role="document">
         <div className="nf-modal-header">
@@ -72,21 +72,21 @@ function ContactModal({ open, onClose }) {
           <button type="button" className="nf-modal-close" onClick={onClose}>Close</button>
         </div>
         <div className="nf-modal-body">
-          <form className="nf-contact-form" onSubmit={submit}>
-            <label>
+          <form id="authContactForm" className="nf-contact-form" onSubmit={submit}>
+            <label htmlFor="contactSubject">
               <span className="label">Subject</span>
-              <input value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} autoComplete="off" placeholder="What can we help with?" required />
+              <input id="contactSubject" name="subject" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} autoComplete="off" placeholder="What can we help with?" required />
             </label>
-            <label>
+            <label htmlFor="contactEmail">
               <span className="label">Email</span>
-              <input type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} autoComplete="email" placeholder="you@example.com" required />
+              <input id="contactEmail" name="email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} autoComplete="email" placeholder="you@example.com" required />
             </label>
-            <label>
+            <label htmlFor="contactMessage">
               <span className="label">Message</span>
-              <textarea value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} rows="5" placeholder="Tell us what happened." required />
+              <textarea id="contactMessage" name="message" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} rows="5" placeholder="Tell us what happened." required />
             </label>
-            {status ? <p className="subtle" aria-live="polite">{status}</p> : null}
-            <button type="submit" className="nf-btn" disabled={sending}>{sending ? "Sending..." : "Send Message"}</button>
+            {status ? <p id="contactStatus" className="subtle" aria-live="polite">{status}</p> : null}
+            <button type="submit" id="contactSubmitBtn" className="nf-btn" disabled={sending}>{sending ? "Sending..." : "Send Message"}</button>
           </form>
         </div>
       </div>
@@ -232,40 +232,40 @@ export default function LoginPage() {
             <h1 className="nf-title">Welcome back</h1>
             <p className="nf-subtitle">Log in to manage your finances and view your records.</p>
 
-            <form className="nf-signup" autoComplete="off" onSubmit={submit}>
-              <input className="nf-input" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Email or username" aria-label="Email or username" required />
+            <form id="loginForm" className="nf-signup" autoComplete="off" onSubmit={submit}>
+              <input id="email" className="nf-input" value={identifier} onChange={(event) => setIdentifier(event.target.value)} placeholder="Email or username" aria-label="Email or username" required />
               <div className="password-field">
-                <input className="nf-input" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" aria-label="Password" required />
+                <input id="password" className="nf-input" type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="Password" aria-label="Password" required />
                 <button type="button" className={`password-toggle${showPassword ? " is-active" : ""}`} onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Hide password" : "Show password"} aria-pressed={showPassword}>
                   <PasswordEyeIcon />
                 </button>
               </div>
               <button type="submit" className="nf-btn" disabled={loading}>{loading ? "Working..." : "Login"}</button>
-              <button type="button" className="nf-text-btn" onClick={requestPasswordReset} disabled={loading}>Forgot password?</button>
+              <button type="button" id="forgotPasswordBtn" className="nf-text-btn" onClick={requestPasswordReset} disabled={loading}>Forgot password?</button>
 
               <div className="auth-alt">
                 <p className="auth-alt-label">Or Login with</p>
-                <button type="button" className="google-auth-btn" disabled={!googleEnabled} onClick={() => api.auth.beginGoogleAuth("login", window.location.href)} aria-label="Login with Google">
+                <button type="button" id="googleLoginBtn" className="google-auth-btn" disabled={!googleEnabled} onClick={() => api.auth.beginGoogleAuth("login", window.location.href)} aria-label="Login with Google">
                   <GoogleMark />
                   <span>Google</span>
                 </button>
               </div>
 
               {verification.token ? (
-                <div className="two-factor-wrap">
-                  <p className="subtle">
+                <div id="twoFactorWrap" className="two-factor-wrap">
+                  <p id="twoFactorPrompt" className="subtle">
                     {verification.mode === "reset"
                       ? "Enter the password reset code sent to your email."
                       : "Enter the code sent to your email."}
                   </p>
-                  <input className="nf-input" value={verification.code} onChange={(event) => setVerification({ ...verification, code: event.target.value })} placeholder="6-digit code" inputMode="numeric" autoComplete="one-time-code" />
-                  <button type="button" className="nf-btn" onClick={verifyCode} disabled={loading}>Verify Code</button>
+                  <input id="twoFactorCode" className="nf-input" value={verification.code} onChange={(event) => setVerification({ ...verification, code: event.target.value })} placeholder="6-digit code" inputMode="numeric" autoComplete="one-time-code" />
+                  <button type="button" id="verifyTwoFactorBtn" className="nf-btn" onClick={verifyCode} disabled={loading}>Verify Code</button>
                 </div>
               ) : null}
             </form>
 
             <p className="auth-links">Do not have an account? <a href="/register">Create one</a>.</p>
-            {message ? <p className="nf-error" aria-live="polite">{message}</p> : null}
+            {message ? <p id="loginError" className="nf-error" aria-live="polite">{message}</p> : null}
           </div>
         </section>
       </main>

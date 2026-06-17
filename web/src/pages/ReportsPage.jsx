@@ -180,11 +180,11 @@ function computeReports(records, range) {
   };
 }
 
-function KpiCard({ label, value }) {
+function KpiCard({ label, value, id }) {
   return (
     <div className="card">
       <h3>{label}</h3>
-      <p aria-live="polite">{value}</p>
+      <p id={id} aria-live="polite">{value}</p>
     </div>
   );
 }
@@ -484,18 +484,18 @@ export default function ReportsPage() {
             <div className="reports-controls">
               <label className="control">
                 <span className="label">Date Range</span>
-                <select value={range} onChange={(event) => setRange(event.target.value)}>
+                <select id="reportsRange" name="reportsRange" value={range} onChange={(event) => setRange(event.target.value)}>
                   <option value="30">Last 30 days</option>
                   <option value="90">Last 90 days</option>
                   <option value="365">Last 12 months</option>
                   <option value="all">All time</option>
                 </select>
               </label>
-              <button className="btn btn--primary" type="button" onClick={load} disabled={loading}>
+              <button className="btn btn--primary" id="btnRefreshReports" type="button" onClick={load} disabled={loading}>
                 {loading ? "Refreshing..." : "Refresh"}
               </button>
               {status.message ? (
-                <p className={`status-banner subtle reports-status ${status.kind === "error" ? "is-error" : "is-ok"}`} aria-live="polite">
+                <p id="reportsStatus" className={`status-banner subtle reports-status ${status.kind === "error" ? "is-error" : "is-ok"}`} aria-live="polite">
                   {status.message}
                 </p>
               ) : null}
@@ -503,18 +503,18 @@ export default function ReportsPage() {
           </div>
 
           <div className="cards cards--kpis">
-            <KpiCard label="Total Expenses" value={loading ? "Loading..." : fmtMoney(report.totalExpenses)} />
-            <KpiCard label="Total Income" value={loading ? "Loading..." : fmtMoney(report.totalIncome)} />
-            <KpiCard label="Net Cashflow" value={loading ? "Loading..." : fmtMoney(report.net)} />
-            <KpiCard label="Monthly Average" value={loading ? "Loading..." : fmtMoney(report.monthlyAverage)} />
-            <KpiCard label="Top Category" value={loading ? "Loading..." : report.topCategory} />
-            <KpiCard label="Savings Rate" value={loading ? "Loading..." : fmtPercent(report.savingsRate)} />
+            <KpiCard id="total-expenses" label="Total Expenses" value={loading ? "Loading..." : fmtMoney(report.totalExpenses)} />
+            <KpiCard id="total-income" label="Total Income" value={loading ? "Loading..." : fmtMoney(report.totalIncome)} />
+            <KpiCard id="net-cashflow" label="Net Cashflow" value={loading ? "Loading..." : fmtMoney(report.net)} />
+            <KpiCard id="monthly-average" label="Monthly Average" value={loading ? "Loading..." : fmtMoney(report.monthlyAverage)} />
+            <KpiCard id="top-category" label="Top Category" value={loading ? "Loading..." : report.topCategory} />
+            <KpiCard id="savings-rate" label="Savings Rate" value={loading ? "Loading..." : fmtPercent(report.savingsRate)} />
           </div>
 
           <div className="insight-band" aria-live="polite">
-            {report.insights.map((insight) => (
-              <div className="insight" key={insight}>{loading ? "Loading insights..." : insight}</div>
-            ))}
+            <div className="insight" id="insight-primary">{loading ? "Loading insights..." : report.insights[0]}</div>
+            <div className="insight" id="insight-secondary">{loading ? "Loading insights..." : report.insights[1]}</div>
+            <div className="insight" id="insight-tertiary">{loading ? "Loading insights..." : report.insights[2]}</div>
           </div>
         </section>
 
@@ -546,11 +546,11 @@ export default function ReportsPage() {
             </div>
             <div className="toggles">
               <label className="toggle">
-                <input type="checkbox" checked={showExpenses} onChange={(event) => setShowExpenses(event.target.checked)} />
+                <input id="toggle-expenses" type="checkbox" checked={showExpenses} onChange={(event) => setShowExpenses(event.target.checked)} />
                 <span>Expenses</span>
               </label>
               <label className="toggle">
-                <input type="checkbox" checked={showIncome} onChange={(event) => setShowIncome(event.target.checked)} />
+                <input id="toggle-income" type="checkbox" checked={showIncome} onChange={(event) => setShowIncome(event.target.checked)} />
                 <span>Income</span>
               </label>
             </div>

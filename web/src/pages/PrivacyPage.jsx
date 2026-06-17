@@ -1,4 +1,11 @@
+import { useEffect } from "react";
+
 export default function PrivacyPage() {
+  useEffect(() => {
+    document.body.classList.add("legal-page");
+    return () => document.body.classList.remove("legal-page");
+  }, []);
+
   return (
     <>
       <main className="main main--legal">

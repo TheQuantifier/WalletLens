@@ -90,13 +90,21 @@ const LEGAL_KEYWORDS = [
 ];
 
 const PUBLIC_PAGES = new Set([
+  "index",
   "index.html",
+  "login",
   "login.html",
+  "register",
   "register.html",
+  "privacy",
   "privacy.html",
+  "terms",
   "terms.html",
+  "about",
   "about.html",
+  "careers",
   "careers.html",
+  "help",
   "help.html",
   "",
 ]);
@@ -549,9 +557,9 @@ const detectRange = (text) => {
 let publicDocsCache = { ts: 0, docs: [] };
 
 const PUBLIC_DOC_SOURCES = [
-  { page: "privacy.html", topic: "privacy" },
-  { page: "terms.html", topic: "terms" },
-  { page: "help.html", topic: "help" },
+  { page: "/privacy", topic: "privacy" },
+  { page: "/terms", topic: "terms" },
+  { page: "/help", topic: "help" },
 ];
 
 const PUBLIC_APP_NAME = "WalletLens";
@@ -1807,8 +1815,11 @@ const buildLlmContext = (records, range) => {
 export function initWalterLens() {
   const existing = document.getElementById("walterlens-widget");
   if (existing) return;
-  const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
-  const currentPage = rawPage === "" ? "index.html" : rawPage;
+  const getCurrentPageToken = () => {
+    const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
+    return rawPage === "" ? "index" : rawPage.replace(/\.html$/i, "");
+  };
+  const currentPage = getCurrentPageToken();
   const isPublicMode = PUBLIC_PAGES.has(currentPage);
   const headerSubtitle = isPublicMode
     ? "Ask about WalletLens, privacy, or terms."
@@ -1865,31 +1876,31 @@ export function initWalterLens() {
   let pendingRule = null;
 
   const WRITE_PAGE_MAP = {
-    record: new Set(["records.html", "reports.html"]),
-    budget: new Set(["budgeting.html", "reports.html"]),
-    recurring: new Set(["recurring.html", "reports.html"]),
-    rules: new Set(["rules.html", "reports.html"]),
+    record: new Set(["records", "reports"]),
+    budget: new Set(["budgeting", "reports"]),
+    recurring: new Set(["recurring", "reports"]),
+    rules: new Set(["rules", "reports"]),
   };
 
   const refreshIfOnPage = (resource) => {
     const pageMap = {
-      record: new Set(["records.html"]),
-      budget: new Set(["budgeting.html"]),
-      recurring: new Set(["recurring.html"]),
-      rules: new Set(["rules.html"]),
-      receipts: new Set(["upload.html", "records.html"]),
-      networth: new Set(["home.html"]),
-      notifications: new Set(["home.html"]),
+      record: new Set(["records"]),
+      budget: new Set(["budgeting"]),
+      recurring: new Set(["recurring"]),
+      rules: new Set(["rules"]),
+      receipts: new Set(["upload", "records"]),
+      networth: new Set(["home"]),
+      notifications: new Set(["home"]),
     };
     const targets = pageMap[resource];
-    if (!targets || !targets.has(currentPage)) return;
+    if (!targets || !targets.has(getCurrentPageToken())) return;
     window.location.reload();
   };
 
   const canWriteResource = (resource) => {
     const targets = WRITE_PAGE_MAP[resource];
     if (!targets) return false;
-    return targets.has(currentPage);
+    return targets.has(getCurrentPageToken());
   };
 
   let isHandlingMessage = false;

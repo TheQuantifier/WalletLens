@@ -16,6 +16,7 @@ export default function UploadPage() {
       
       
         <main className="main main--upload">
+          <div className="upload-primary">
           <section className="upload-hero">
             <h1>Upload Receipts</h1>
             <p className="subtle">Drop PDFs or images to scan receipts. You can choose to save files or scan-only.</p>
@@ -57,6 +58,7 @@ export default function UploadPage() {
       
             <p id="statusMsg" className="status-banner subtle is-hidden" role="status" aria-live="polite"></p>
           </section>
+          </div>
       
           <section className="recent card">
             <h2>Recent uploads</h2>
