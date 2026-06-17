@@ -139,17 +139,27 @@ applySavedTheme();
   HEADER + FOOTER LOADING
   =============================================== */
 
-document.addEventListener("DOMContentLoaded", () => {
+function initializeSharedPageShell() {
   cachePageTitle();
   setLogoLinkDestination("/");
+  applySavedTheme();
   loadHeaderAndFooter();
-  initLiveNavigation();
   applyCachedAppName();
   updateAppName();
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+  initializeSharedPageShell();
+  initLiveNavigation();
   initWalterLens();
   initAchievementCelebrations();
   initNotifications();
   initInactivityTimeoutMonitor();
+});
+
+document.addEventListener("walletlens:template-ready", () => {
+  initializeSharedPageShell();
+  updateMobileNavActiveState();
 });
 
 /**

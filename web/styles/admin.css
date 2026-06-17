@@ -912,6 +912,121 @@
   cursor: pointer;
 }
 
+:root[data-theme="dark"] .admin-main {
+  background: transparent;
+}
+
+:root[data-theme="dark"] .admin-badge,
+:root[data-theme="dark"] .admin-readonly-badge {
+  background: color-mix(in srgb, var(--primary) 16%, var(--card-bg));
+  border-color: color-mix(in srgb, var(--primary) 35%, var(--border));
+  color: var(--primary);
+}
+
+:root[data-theme="dark"] .admin-tag--users {
+  background: rgba(45, 212, 191, 0.13);
+  border-color: rgba(45, 212, 191, 0.35);
+  color: #99f6e4;
+}
+
+:root[data-theme="dark"] .admin-tag--records {
+  background: rgba(96, 165, 250, 0.13);
+  border-color: rgba(96, 165, 250, 0.35);
+  color: #bfdbfe;
+}
+
+:root[data-theme="dark"] .admin-tag--receipts {
+  background: rgba(251, 191, 36, 0.13);
+  border-color: rgba(251, 191, 36, 0.35);
+  color: #fde68a;
+}
+
+:root[data-theme="dark"] .admin-caret-toggle,
+:root[data-theme="dark"] .admin-notification-input,
+:root[data-theme="dark"] .admin-notification-history,
+:root[data-theme="dark"] .admin-achievement-item,
+:root[data-theme="dark"] .admin-notification-item,
+:root[data-theme="dark"] .admin-health-item,
+:root[data-theme="dark"] .admin-export-output {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .admin-actions input,
+:root[data-theme="dark"] .admin-actions select,
+:root[data-theme="dark"] .admin-form input,
+:root[data-theme="dark"] .admin-form select,
+:root[data-theme="dark"] .admin-form textarea,
+:root[data-theme="dark"] .admin-notification-toolbar-type select {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .admin-actions input::placeholder,
+:root[data-theme="dark"] .admin-form input::placeholder {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] #userClearBtn {
+  background: rgba(251, 113, 133, 0.12);
+  border-color: rgba(251, 113, 133, 0.35);
+  color: #fda4af;
+}
+
+:root[data-theme="dark"] #userClearBtn:hover,
+:root[data-theme="dark"] #userClearBtn:focus-visible,
+:root[data-theme="dark"] .admin-achievement-remove,
+:root[data-theme="dark"] .admin-health-btn--deactivate {
+  color: #fb7185;
+}
+
+:root[data-theme="dark"] .admin-table th,
+:root[data-theme="dark"] .admin-table td {
+  border-bottom-color: var(--border);
+}
+
+:root[data-theme="dark"] .admin-table tbody tr:hover td {
+  background: rgba(45, 212, 191, 0.06);
+}
+
+:root[data-theme="dark"] .admin-health-group-row td {
+  background: #172033;
+  border-top-color: var(--border);
+}
+
+:root[data-theme="dark"] .admin-health-state--active,
+:root[data-theme="dark"] .admin-health-btn--activate,
+:root[data-theme="dark"] .admin-health-pass {
+  color: #5eead4;
+}
+
+:root[data-theme="dark"] .admin-health-state--deactivated,
+:root[data-theme="dark"] .admin-health-state--mixed-deactivated {
+  color: #fbbf24;
+}
+
+:root[data-theme="dark"] .admin-health-state--down,
+:root[data-theme="dark"] .admin-health-state--mixed-down {
+  color: #fb7185;
+}
+
+:root[data-theme="dark"] .admin-health-state--unconfigured,
+:root[data-theme="dark"] .admin-health-state--mixed-unconfigured {
+  color: var(--muted);
+}
+
+:root[data-theme="dark"] .admin-modal {
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+:root[data-theme="dark"] .modal-close {
+  color: var(--text);
+}
+
 @media (max-width: 860px) {
   .admin-hero {
     flex-direction: column;

@@ -27,6 +27,8 @@
   --muted: #5f6b7a;
   --card-bg: #ffffff;
   --border: #e2e8f0;
+  --brand: var(--primary);
+  --surface: var(--card-bg);
   --surface-2: #f8fafc;
   --bg-gradient: radial-gradient(1100px 520px at 8% -10%, rgba(14,165,164,0.16), transparent 60%),
     radial-gradient(900px 520px at 90% -20%, rgba(245,158,11,0.14), transparent 60%);
@@ -1047,6 +1049,8 @@ textarea:focus-visible {
 
   --card-bg: #121b2d;
   --border: #1f2a3c;
+  --brand: var(--primary);
+  --surface: var(--card-bg);
   --surface-2: #0f172a;
   --bg-gradient: radial-gradient(900px 420px at 10% -10%, rgba(45,212,191,0.2), transparent 60%),
     radial-gradient(900px 420px at 90% -20%, rgba(251,191,36,0.18), transparent 60%);
