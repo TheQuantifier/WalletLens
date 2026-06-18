@@ -13,6 +13,8 @@ import ProfilePage from "./pages/ProfilePage.jsx";
 import RecordsPage from "./pages/RecordsPage.jsx";
 import RecurringPage from "./pages/RecurringPage.jsx";
 import RegisterPage from "./pages/RegisterPage.jsx";
+import RegisterWhoPage from "./pages/RegisterWhoPage.jsx";
+import RegisterBusinessPage from "./pages/RegisterBusinessPage.jsx";
 import ReportsPage from "./pages/ReportsPage.jsx";
 import RulesPage from "./pages/RulesPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
@@ -25,6 +27,8 @@ const ROUTES = {
   "/index": { title: "WalletLens", Page: IndexPage },
   "/login": { title: "WalletLens - Login", Page: LoginPage },
   "/register": { title: "WalletLens - Register", Page: RegisterPage },
+  "/registerwho": { title: "WalletLens - Choose Account Type", Page: RegisterWhoPage },
+  "/registerbusiness": { title: "WalletLens - Business Registration", Page: RegisterBusinessPage },
   "/home": { title: "WalletLens - Home", Page: HomePage },
   "/upload": { title: "WalletLens - Upload", Page: UploadPage },
   "/records": { title: "WalletLens - Records", Page: RecordsPage },
@@ -105,7 +109,7 @@ export default function App() {
 
   useEffect(() => {
     document.title = route.title;
-    const landingRoutes = new Set(["/", "/index", "/login", "/register", "/timeout", "/expired"]);
+    const landingRoutes = new Set(["/", "/index", "/login", "/register", "/registerwho", "/registerbusiness", "/timeout", "/expired"]);
     document.body.classList.toggle("landing-light", landingRoutes.has(path));
     window.setTimeout(() => {
       document.dispatchEvent(new CustomEvent("walletlens:template-ready"));

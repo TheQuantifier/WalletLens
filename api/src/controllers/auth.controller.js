@@ -5,7 +5,7 @@ import crypto from "crypto";
 
 import env from "../config/env.js";
 import asyncHandler from "../middleware/async.js";
-import { query } from "../config/db.js";
+import { query, withTransaction } from "../config/db.js";
 
 import {
   createUser,
@@ -17,6 +17,7 @@ import {
   updateUserById,
   updateUserPasswordHash,
 } from "../models/user.model.js";
+import { createOrganization } from "../models/organization.model.js";
 import {
   createSession,
   enforceMaxActiveSessionsForUser,
@@ -691,6 +692,98 @@ export const login = asyncHandler(async (req, res) => {
     req,
   });
   res.json({ user: safeUser, token });
+});
+
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export function validateBusinessRegistration(body = {}) {
+  const value = (key, max = 200) => String(body[key] || "").trim().slice(0, max);
+  const data = {
+    businessName: value("businessName"),
+    businessType: value("businessType", 100),
+    industry: value("industry", 100),
+    businessEmail: value("businessEmail").toLowerCase(),
+    businessPhone: value("businessPhone", 50),
+    website: value("website", 500),
+    address: value("address", 300),
+    city: value("city", 100),
+    region: value("region", 100),
+    postalCode: value("postalCode", 30),
+    country: value("country", 100),
+    adminFullName: value("adminFullName"),
+    adminEmail: value("adminEmail").toLowerCase(),
+    password: String(body.password || ""),
+  };
+
+  if (!data.businessName || !data.businessEmail || !data.adminFullName || !data.adminEmail || !data.password) {
+    return { ok: false, message: "Business name, business email, administrator details, and password are required" };
+  }
+  if (!EMAIL_PATTERN.test(data.businessEmail) || !EMAIL_PATTERN.test(data.adminEmail)) {
+    return { ok: false, message: "Enter valid business and administrator email addresses" };
+  }
+  if (data.password.length < 8) {
+    return { ok: false, message: "Password must be at least 8 characters long" };
+  }
+  if (data.website) {
+    try {
+      const url = new URL(data.website);
+      if (!["http:", "https:"].includes(url.protocol)) throw new Error();
+      data.website = url.toString();
+    } catch {
+      return { ok: false, message: "Website must be a valid http or https URL" };
+    }
+  }
+  return { ok: true, data };
+}
+
+export const registerBusiness = asyncHandler(async (req, res) => {
+  const validation = validateBusinessRegistration(req.body);
+  if (!validation.ok) return res.status(400).json({ message: validation.message });
+  const data = validation.data;
+
+  const existing = await findUserAuthByIdentifier(data.adminEmail);
+  if (existing && String(existing.email).toLowerCase() === data.adminEmail) {
+    return res.status(400).json({ message: "Administrator email already in use" });
+  }
+
+  const passwordHash = await bcrypt.hash(data.password, await bcrypt.genSalt(12));
+  const username = await createUniqueUsername(data.adminEmail.split("@")[0]);
+
+  const { organization, user } = await withTransaction(async (executor) => {
+    const organization = await createOrganization({
+      name: data.businessName,
+      businessType: data.businessType,
+      industry: data.industry,
+      email: data.businessEmail,
+      phoneNumber: data.businessPhone,
+      website: data.website,
+      address: data.address,
+      city: data.city,
+      region: data.region,
+      postalCode: data.postalCode,
+      country: data.country,
+      executor,
+    });
+    const user = await createUser({
+      email: data.adminEmail,
+      username,
+      passwordHash,
+      fullName: data.adminFullName,
+      role: "org_admin",
+      organizationId: organization.id,
+      executor,
+    });
+    return { organization, user };
+  });
+
+  const { session } = await createSessionWithPolicy({
+    userId: user.id,
+    userAgent: req.get("user-agent") || "",
+    ipAddress: getRequestIp(req),
+  });
+  const token = createToken(user.id, session.id);
+  setTokenCookie(res, token);
+  res.status(201).json({ organization, user, token });
 });
 
 /* =====================================================

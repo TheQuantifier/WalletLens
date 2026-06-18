@@ -838,3 +838,192 @@ body.landing-light::before {
 :root[data-theme="dark"] body.landing-light::before {
   border-image-source: url("../images/background.png?v=20260202");
 }
+
+/* Account type and business registration */
+.logo-link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.account-type-main,
+.business-register-main {
+  min-height: calc(100vh - 160px);
+}
+
+.account-type-hero,
+.business-register-hero {
+  padding-top: 4rem;
+  padding-bottom: 4rem;
+}
+
+.account-type-content {
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.registration-step {
+  margin: 0 0 0.5rem;
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.account-choice-grid {
+  display: grid;
+  gap: 1rem;
+  margin: 2rem 0 1.5rem;
+}
+
+.account-choice-card {
+  display: grid;
+  grid-template-columns: 3rem 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  padding: 1.25rem;
+  color: var(--text);
+  text-align: left;
+  text-decoration: none;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  box-shadow: var(--shadow-sm);
+  transition: border-color 160ms ease, transform 160ms ease, box-shadow 160ms ease;
+}
+
+.account-choice-card:hover {
+  border-color: var(--primary);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-2px);
+}
+
+.account-choice-icon {
+  display: grid;
+  width: 3rem;
+  height: 3rem;
+  place-items: center;
+  font-size: 1.5rem;
+  background: var(--blue-3);
+  border-radius: 12px;
+}
+
+.account-choice-copy {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.account-choice-copy strong {
+  font-size: 1.08rem;
+}
+
+.account-choice-copy span {
+  color: var(--muted);
+}
+
+.account-choice-arrow {
+  color: var(--primary);
+  font-size: 1.5rem;
+}
+
+.business-register-content {
+  width: min(920px, 100%);
+  margin: 0 auto;
+}
+
+.registration-back {
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  color: var(--primary);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.business-register-form {
+  margin-top: 2rem;
+  padding: 1.5rem;
+  text-align: left;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+}
+
+.business-register-form fieldset {
+  min-width: 0;
+  margin: 0;
+  padding: 0 0 1.5rem;
+  border: 0;
+}
+
+.business-register-form fieldset + fieldset {
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border);
+}
+
+.business-register-form legend {
+  margin-bottom: 1rem;
+  padding: 0;
+  color: var(--text);
+  font-size: 1.15rem;
+  font-weight: 700;
+}
+
+.business-legend-note {
+  margin: -0.75rem 0 1rem;
+}
+
+.business-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.business-form-grid label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.business-field-wide {
+  grid-column: 1 / -1;
+}
+
+.business-consent {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-start;
+  margin: 0 0 1rem;
+  color: var(--muted);
+}
+
+.business-consent input {
+  margin-top: 0.35rem;
+}
+
+.business-register-form .nf-btn {
+  width: 100%;
+}
+
+.business-register-form .nf-btn:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.business-message-error { color: #b91c1c; }
+.business-message-ok { color: #166534; }
+
+:root[data-theme="dark"] .account-choice-card,
+:root[data-theme="dark"] .business-register-form {
+  background: #111418;
+  border-color: #2a2e35;
+}
+
+@media (max-width: 700px) {
+  .business-form-grid { grid-template-columns: 1fr; }
+  .business-field-wide { grid-column: auto; }
+  .business-register-form { padding: 1rem; }
+  .account-choice-card { grid-template-columns: 2.5rem 1fr auto; padding: 1rem; }
+  .account-choice-icon { width: 2.5rem; height: 2.5rem; }
+}

@@ -19,6 +19,7 @@ router.get("/google/start", oauthLimiter, controller.googleStart);
 router.get("/google/callback", oauthLimiter, controller.googleCallback);
 
 router.post("/register", registerLimiter, controller.register);
+router.post("/register-business", registerLimiter, controller.registerBusiness);
 
 // Login expects: { identifier, password }
 // Controller supports username OR email

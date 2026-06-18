@@ -64,8 +64,9 @@ export async function createUser({
   customIncomeCategories = [],
   trialStartedAt = new Date(),
   accessExpiresAt = isAdminRoleType(role) ? null : computeDefaultAccessExpiresAt(trialStartedAt),
+  executor = query,
 }) {
-  const { rows } = await query(
+  const { rows } = await executor(
     `
     INSERT INTO users
       (username, email, password_hash, google_id, full_name, location, role, organization_id, phone_number, bio, avatar_url, address, employer, income_range,

@@ -120,6 +120,15 @@ export const auth = {
     return data;
   },
 
+  async registerBusiness(payload) {
+    const data = await request("/auth/register-business", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    if (data?.token) setAuthToken(data.token);
+    return data;
+  },
+
   async login(identifier, password) {
     const data = await request("/auth/login", {
       method: "POST",

@@ -221,7 +221,7 @@ export default function LoginPage() {
             <span className="tagline">Track Smarter. Stress Less.</span>
           </div>
           <nav className="nf-auth-right" aria-label="Authentication">
-            <a href="/register" className="nf-login">Register</a>
+            <a href="/registerwho" className="nf-login">Register</a>
           </nav>
         </div>
       </header>
@@ -264,7 +264,7 @@ export default function LoginPage() {
               ) : null}
             </form>
 
-            <p className="auth-links">Do not have an account? <a href="/register">Create one</a>.</p>
+            <p className="auth-links">Do not have an account? <a href="/registerwho">Create one</a>.</p>
             {message ? <p id="loginError" className="nf-error" aria-live="polite">{message}</p> : null}
           </div>
         </section>

@@ -15,7 +15,7 @@ export default function IndexPage() {
       
             <nav className="index-auth-actions" aria-label="Authentication">
               <a href="/login" className="btn">Login</a>
-              <a href="/register" className="btn btn--primary">Register</a>
+              <a href="/registerwho" className="btn btn--primary">Register</a>
             </nav>
           </div>
         </header>
@@ -39,7 +39,7 @@ export default function IndexPage() {
               </div>
       
               <div className="index-cta-row">
-                <a href="/register" className="btn btn--primary index-primary-cta">Create Free Account</a>
+                <a href="/registerwho" className="btn btn--primary index-primary-cta">Create Free Account</a>
                 <a href="/login" className="btn index-secondary-cta">Log In</a>
               </div>
       
@@ -289,7 +289,7 @@ export default function IndexPage() {
                 <h2>See what your finances look like when the system does the boring part.</h2>
               </div>
               <div className="index-cta-actions">
-                <a href="/register" className="btn btn--primary">Create Your Account</a>
+                <a href="/registerwho" className="btn btn--primary">Create Your Account</a>
               </div>
             </div>
           </section>
