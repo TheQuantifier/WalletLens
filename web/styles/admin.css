@@ -803,7 +803,7 @@
   text-decoration: underline;
 }
 
-.sort-arrow {
+.admin-main .sort-arrow {
   font-size: 0.85em;
   opacity: 0.9;
 }
@@ -816,7 +816,7 @@
   width: 140px;
 }
 
-.table-wrap {
+.admin-main .table-wrap {
   overflow-x: auto;
 }
 
@@ -899,13 +899,13 @@
   max-width: 520px;
 }
 
-.modal-header {
+.admin-main .modal-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
-.modal-close {
+.admin-main .modal-close {
   background: transparent;
   border: none;
   font-size: 1.5rem;
@@ -1023,7 +1023,7 @@
   border: 1px solid var(--border);
 }
 
-:root[data-theme="dark"] .modal-close {
+:root[data-theme="dark"] .admin-main .modal-close {
   color: var(--text);
 }
 

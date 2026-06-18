@@ -574,6 +574,7 @@ export default function RecordsPage() {
   const [categories, setCategories] = useState({ expense: EXPENSE_DEFAULTS, income: INCOME_DEFAULTS });
   const [customCategories, setCustomCategories] = useState({ expense: [], income: [] });
   const [form, setForm] = useState({ open: false });
+  const [customCategoryModal, setCustomCategoryModal] = useState({ open: false, type: "expense", name: "", error: "" });
   const [pendingDelete, setPendingDelete] = useState(null);
   const [receiptModal, setReceiptModal] = useState({ open: false, loading: false, record: null, receipt: null, error: "" });
 
@@ -674,10 +675,7 @@ export default function RecordsPage() {
 
   const updateFormField = (key, value) => {
     if (key === "category" && value === "__custom__") {
-      const name = window.prompt("Custom category name");
-      if (name?.trim()) {
-        saveCustomCategory(form.type, name.trim());
-      }
+      setCustomCategoryModal({ open: true, type: form.type || "expense", name: "", error: "" });
       return;
     }
     setForm((current) => ({ ...current, [key]: value, error: "" }));
@@ -707,6 +705,21 @@ export default function RecordsPage() {
     } catch (err) {
       setStatus({ message: `Custom category saved locally, but profile update failed: ${err?.message || "Unknown error"}`, kind: "error" });
     }
+  };
+
+  const closeCustomCategoryModal = () => {
+    setCustomCategoryModal({ open: false, type: "expense", name: "", error: "" });
+  };
+
+  const submitCustomCategory = async (event) => {
+    event.preventDefault();
+    const cleanName = String(customCategoryModal.name || "").trim();
+    if (!cleanName) {
+      setCustomCategoryModal((current) => ({ ...current, error: "Enter a category name." }));
+      return;
+    }
+    await saveCustomCategory(customCategoryModal.type, cleanName);
+    closeCustomCategoryModal();
   };
 
   const submitRecord = async (event) => {
@@ -852,6 +865,44 @@ export default function RecordsPage() {
           onSubmit={submitRecord}
           onCustomCategory={saveCustomCategory}
         />
+
+        {customCategoryModal.open ? (
+          <div id="customCategoryModal" className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && closeCustomCategoryModal()}>
+            <div className="modal-content" onMouseDown={(event) => event.stopPropagation()}>
+              <h2>Add Custom Category</h2>
+              <p className="subtle">Enter a name to add a custom category.</p>
+
+              <form id="customCategoryForm" className="txn-form" onSubmit={submitCustomCategory}>
+                <div className="form-row">
+                  <label>
+                    <span>Category Name</span>
+                    <input
+                      type="text"
+                      id="customCategoryInput"
+                      autoComplete="off"
+                      value={customCategoryModal.name}
+                      onChange={(event) =>
+                        setCustomCategoryModal((current) => ({
+                          ...current,
+                          name: event.target.value,
+                          error: "",
+                        }))
+                      }
+                      required
+                    />
+                  </label>
+                </div>
+
+                {customCategoryModal.error ? <p className="status-banner subtle is-error">{customCategoryModal.error}</p> : null}
+
+                <div className="modal-actions">
+                  <button type="submit" className="btn btn--primary">Save Category</button>
+                  <button type="button" className="btn" id="cancelCustomCategoryBtn" onClick={closeCustomCategoryModal}>Cancel</button>
+                </div>
+              </form>
+            </div>
+          </div>
+        ) : null}
 
         {pendingDelete ? (
           <div id="deleteRecordModal" className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && setPendingDelete(null)}>

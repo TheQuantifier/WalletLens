@@ -129,7 +129,7 @@
 }
 
 /* Actions row */
-.actions {
+.main--upload .actions {
   display: flex;
   justify-content: flex-end;
   gap: 0.6rem;
@@ -140,31 +140,31 @@
   --status-margin: 0.75rem 0 0;
 }
 
-.recent {
+.main--upload .recent {
   padding: 1.25rem;
 }
 
-.actions-col {
+.main--upload .actions-col {
   width: 1%;
   white-space: nowrap;
 }
 
-.recent .txn-table th:nth-child(1),
-.recent .txn-table th:nth-child(4),
-.recent .txn-table th:nth-child(5) {
+.main--upload .recent .txn-table th:nth-child(1),
+.main--upload .recent .txn-table th:nth-child(4),
+.main--upload .recent .txn-table th:nth-child(5) {
   text-align: left;
 }
 
-.recent .txn-table td:nth-child(2) {
+.main--upload .recent .txn-table td:nth-child(2) {
   text-align: center;
 }
 
-.recent .txn-table td:nth-child(5) {
+.main--upload .recent .txn-table td:nth-child(5) {
   text-align: left;
 }
 
 /* Icon button: keep focus ring on the button (accessible), not on the image */
-.icon-btn {
+.main--upload .icon-btn {
   border: none;
   background: none;
   cursor: pointer;
@@ -172,17 +172,17 @@
   border-radius: 6px;
   -webkit-tap-highlight-color: transparent;
 }
-.icon-btn:hover {
+.main--upload .icon-btn:hover {
   background: #f3f4f6;
 }
-.icon-btn:focus {
+.main--upload .icon-btn:focus {
   outline: none;
 }
-.icon-btn:focus-visible {
+.main--upload .icon-btn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
 }
-.icon-trash {
+.main--upload .icon-trash {
   width: 20px;
   height: 20px;
   object-fit: contain;
@@ -191,7 +191,7 @@
   outline: none;
   box-shadow: none;
 }
-.icon-btn img {
+.main--upload .icon-btn img {
   border: none;
   outline: none;
   box-shadow: none;

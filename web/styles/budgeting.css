@@ -244,26 +244,26 @@
   --modal-padding: 1.5rem;
 }
 
-.table-wrap {
+.main--budgeting .table-wrap {
   border: 1px solid var(--border);
   border-radius: var(--radius);
   overflow: hidden;
   background: var(--card-bg);
 }
 
-.table-wrap table {
+.main--budgeting .table-wrap table {
   width: 100%;
   border-collapse: collapse;
 }
 
-.table-wrap th,
-.table-wrap td {
+.main--budgeting .table-wrap th,
+.main--budgeting .table-wrap td {
   padding: 0.75rem;
   border-bottom: 1px solid var(--border);
   text-align: left;
 }
 
-.table-wrap th {
+.main--budgeting .table-wrap th {
   background: linear-gradient(135deg, rgba(0,87,184,0.12), rgba(0,163,224,0.08));
   font-size: 0.9rem;
   color: var(--text);
@@ -272,12 +272,12 @@
   text-transform: uppercase;
 }
 
-.table-wrap td.num,
-.table-wrap th.num {
+.main--budgeting .table-wrap td.num,
+.main--budgeting .table-wrap th.num {
   text-align: right;
 }
 
-.table-wrap tr:last-child td {
+.main--budgeting .table-wrap tr:last-child td {
   border-bottom: 0;
 }
 

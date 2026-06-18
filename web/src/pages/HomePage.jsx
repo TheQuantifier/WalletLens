@@ -207,6 +207,22 @@ function normalizeRecords(payload) {
   return [];
 }
 
+function normalizeCategoryName(value) {
+  return String(value || "").trim().toLowerCase();
+}
+
+function normalizeCategoryList(list) {
+  const seen = new Set();
+  return (Array.isArray(list) ? list : [])
+    .map((item) => String(item || "").trim())
+    .filter((item) => {
+      const key = normalizeCategoryName(item);
+      if (!key || seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+}
+
 async function loadAllRecords() {
   const all = [];
   for (let offset = 0; ; offset += RECORD_PAGE_SIZE) {
@@ -466,6 +482,9 @@ export default function HomePage() {
   const [status, setStatus] = useState("loading");
   const [error, setError] = useState("");
   const [modalOpen, setModalOpen] = useState(false);
+  const [customCategoryOpen, setCustomCategoryOpen] = useState(false);
+  const [customCategoryName, setCustomCategoryName] = useState("");
+  const [customCategoryStatus, setCustomCategoryStatus] = useState("");
   const [txnStatus, setTxnStatus] = useState("");
   const [netWorthStatus, setNetWorthStatus] = useState("");
   const [netWorthForm, setNetWorthForm] = useState({
@@ -482,16 +501,20 @@ export default function HomePage() {
 
   const customCategories = useMemo(
     () => ({
-      expense: Array.isArray(user?.custom_expense_categories)
-        ? user.custom_expense_categories
-        : Array.isArray(user?.customExpenseCategories)
-          ? user.customExpenseCategories
-          : [],
-      income: Array.isArray(user?.custom_income_categories)
-        ? user.custom_income_categories
-        : Array.isArray(user?.customIncomeCategories)
-          ? user.customIncomeCategories
-          : [],
+      expense: normalizeCategoryList(
+        Array.isArray(user?.custom_expense_categories)
+          ? user.custom_expense_categories
+          : Array.isArray(user?.customExpenseCategories)
+            ? user.customExpenseCategories
+            : []
+      ),
+      income: normalizeCategoryList(
+        Array.isArray(user?.custom_income_categories)
+          ? user.custom_income_categories
+          : Array.isArray(user?.customIncomeCategories)
+            ? user.customIncomeCategories
+            : []
+      ),
     }),
     [user]
   );
@@ -500,6 +523,12 @@ export default function HomePage() {
     const base = form.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
     const custom = customCategories[form.type] || [];
     return [...new Set([...base, ...custom])];
+  }, [customCategories, form.type]);
+
+  const visibleCustomCategories = useMemo(() => {
+    const base = form.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const defaults = new Set(base.map(normalizeCategoryName));
+    return (customCategories[form.type] || []).filter((name) => !defaults.has(normalizeCategoryName(name)));
   }, [customCategories, form.type]);
 
   const summary = useMemo(() => computeDashboard(records), [records]);
@@ -644,6 +673,84 @@ export default function HomePage() {
     marker.setAttribute("cx", markerX.toFixed(2));
     marker.setAttribute("cy", markerY.toFixed(2));
   }, [velocity]);
+
+  function setUserCustomCategories(nextCustom) {
+    setUser((current) => ({
+      ...(current || {}),
+      custom_expense_categories: nextCustom.expense,
+      customExpenseCategories: nextCustom.expense,
+      custom_income_categories: nextCustom.income,
+      customIncomeCategories: nextCustom.income,
+    }));
+  }
+
+  async function persistCustomCategories(nextCustom) {
+    await api.auth.updateProfile({
+      customExpenseCategories: nextCustom.expense,
+      customIncomeCategories: nextCustom.income,
+    });
+  }
+
+  function handleCategoryChange(event) {
+    const nextCategory = event.target.value;
+    if (nextCategory === "__custom__") {
+      setCustomCategoryName("");
+      setCustomCategoryStatus("");
+      setCustomCategoryOpen(true);
+      return;
+    }
+    setForm((current) => ({ ...current, category: nextCategory }));
+  }
+
+  function closeCustomCategoryModal() {
+    setCustomCategoryOpen(false);
+    setCustomCategoryName("");
+    setCustomCategoryStatus("");
+  }
+
+  async function handleCustomCategorySubmit(event) {
+    event.preventDefault();
+    const cleanName = String(customCategoryName || "").trim();
+    if (!cleanName) {
+      setCustomCategoryStatus("Enter a category name.");
+      return;
+    }
+
+    const type = form.type === "income" ? "income" : "expense";
+    const nextCustom = {
+      ...customCategories,
+      [type]: normalizeCategoryList([...(customCategories[type] || []), cleanName]),
+    };
+
+    setUserCustomCategories(nextCustom);
+    setForm((current) => ({ ...current, category: cleanName }));
+    closeCustomCategoryModal();
+
+    try {
+      await persistCustomCategories(nextCustom);
+    } catch (err) {
+      setTxnStatus(`Custom category saved locally, but profile update failed: ${err?.message || "Unknown error"}`);
+    }
+  }
+
+  async function deleteCustomCategory(type, name) {
+    const key = normalizeCategoryName(name);
+    if (!key) return;
+
+    const nextCustom = {
+      ...customCategories,
+      [type]: normalizeCategoryList((customCategories[type] || []).filter((item) => normalizeCategoryName(item) !== key)),
+    };
+
+    setUserCustomCategories(nextCustom);
+    setForm((current) => (normalizeCategoryName(current.category) === key ? { ...current, category: "" } : current));
+
+    try {
+      await persistCustomCategories(nextCustom);
+    } catch (err) {
+      setTxnStatus(`Category removed locally, but profile update failed: ${err?.message || "Unknown error"}`);
+    }
+  }
 
   async function handleSubmit(event) {
     event.preventDefault();
@@ -1160,7 +1267,7 @@ export default function HomePage() {
                 </label>
                 <label>
                   <span>Category</span>
-                  <select id="txnCategory" value={form.category} onChange={(event) => setForm({ ...form, category: event.target.value })} required>
+                  <select id="txnCategory" value={form.category} onChange={handleCategoryChange} required>
                     <option value="" disabled>
                       Select a category
                     </option>
@@ -1169,8 +1276,24 @@ export default function HomePage() {
                         {category}
                       </option>
                     ))}
+                    <option value="__custom__">Add custom category...</option>
                   </select>
                 </label>
+                <div className="custom-category-list" id="txnCustomCategories" aria-live="polite">
+                  {visibleCustomCategories.map((name) => (
+                    <div className="custom-category-item" key={name}>
+                      <span>{name}</span>
+                      <button
+                        type="button"
+                        className="custom-category-delete"
+                        aria-label={`Delete ${name}`}
+                        onClick={() => deleteCustomCategory(form.type, name)}
+                      >
+                        &times;
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
               <div className="form-row">
                 <label style={{ width: "100%" }}>
@@ -1184,6 +1307,45 @@ export default function HomePage() {
                   Save
                 </button>
                 <button type="button" className="btn" id="btnCancelModal" onClick={() => setModalOpen(false)}>
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {customCategoryOpen && (
+        <div className="modal" id="customCategoryModal" role="dialog" aria-modal="true" aria-labelledby="customCategoryTitle">
+          <div className="modal-content card">
+            <h2 id="customCategoryTitle">Add Custom Category</h2>
+            <p className="subtle">Enter a name to add a custom category.</p>
+
+            <form className="txn-form" id="customCategoryForm" onSubmit={handleCustomCategorySubmit}>
+              <div className="form-row">
+                <label>
+                  <span>Category Name</span>
+                  <input
+                    type="text"
+                    id="customCategoryInput"
+                    autoComplete="off"
+                    value={customCategoryName}
+                    onChange={(event) => {
+                      setCustomCategoryName(event.target.value);
+                      setCustomCategoryStatus("");
+                    }}
+                    required
+                  />
+                </label>
+              </div>
+
+              {customCategoryStatus && <p className="status-banner subtle is-error">{customCategoryStatus}</p>}
+
+              <div className="modal-actions">
+                <button type="submit" className="btn btn--primary">
+                  Save Category
+                </button>
+                <button type="button" className="btn" id="cancelCustomCategoryBtn" onClick={closeCustomCategoryModal}>
                   Cancel
                 </button>
               </div>
