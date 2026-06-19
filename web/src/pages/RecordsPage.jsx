@@ -44,6 +44,17 @@ const INCOME_DEFAULTS = [
   "Other",
 ];
 
+const BUSINESS_EXPENSE_DEFAULTS = [
+  "Cost of Goods Sold", "Payroll", "Rent & Lease", "Utilities", "Marketing & Advertising",
+  "Software & Subscriptions", "Insurance", "Professional Services", "Travel", "Business Meals",
+  "Taxes & Fees", "Office Supplies", "Repairs & Maintenance", "Other",
+];
+
+const BUSINESS_INCOME_DEFAULTS = [
+  "Sales Revenue", "Service Revenue", "Subscription Revenue", "Interest Income",
+  "Refunds / Reimbursements", "Other Income",
+];
+
 function rowsFromPayload(payload) {
   if (Array.isArray(payload)) return payload;
   if (Array.isArray(payload?.records)) return payload.records;
@@ -572,6 +583,7 @@ export default function RecordsPage() {
   const [pages, setPages] = useState({ expense: 1, income: 1 });
   const [sorts, setSorts] = useState({ expense: { key: "date", dir: "desc" }, income: { key: "date", dir: "desc" } });
   const [categories, setCategories] = useState({ expense: EXPENSE_DEFAULTS, income: INCOME_DEFAULTS });
+  const [isBusiness, setIsBusiness] = useState(false);
   const [customCategories, setCustomCategories] = useState({ expense: [], income: [] });
   const [form, setForm] = useState({ open: false });
   const [customCategoryModal, setCustomCategoryModal] = useState({ open: false, type: "expense", name: "", error: "" });
@@ -597,12 +609,16 @@ export default function RecordsPage() {
         expense: normalizeList(me?.user?.custom_expense_categories ?? me?.user?.customExpenseCategories),
         income: normalizeList(me?.user?.custom_income_categories ?? me?.user?.customIncomeCategories),
       };
+      const nextIsBusiness = Boolean(me?.user?.active_organization_id || me?.user?.activeOrganizationId || ["org_user", "org_admin"].includes(String(me?.user?.role || "").toLowerCase()));
+      const expenseDefaults = nextIsBusiness ? BUSINESS_EXPENSE_DEFAULTS : EXPENSE_DEFAULTS;
+      const incomeDefaults = nextIsBusiness ? BUSINESS_INCOME_DEFAULTS : INCOME_DEFAULTS;
 
       setRecords(nextRecords);
+      setIsBusiness(nextIsBusiness);
       setCustomCategories(nextCustom);
       setCategories({
-        expense: mergeCategories(categoryPayload?.expense || EXPENSE_DEFAULTS, nextCustom.expense, nextRecords, "expense"),
-        income: mergeCategories(categoryPayload?.income || INCOME_DEFAULTS, nextCustom.income, nextRecords, "income"),
+        expense: mergeCategories(nextIsBusiness ? expenseDefaults : (categoryPayload?.expense || expenseDefaults), nextCustom.expense, nextRecords, "expense"),
+        income: mergeCategories(nextIsBusiness ? incomeDefaults : (categoryPayload?.income || incomeDefaults), nextCustom.income, nextRecords, "income"),
       });
       setStatus({ message: "Records updated.", kind: "ok" });
     } catch (err) {
@@ -816,7 +832,7 @@ export default function RecordsPage() {
         <RecordsTable
           type="expense"
           title="Expenses"
-          description="Search, filter, sort, and export your expense transactions."
+          description={isBusiness ? "Review and export organization expenses." : "Search, filter, sort, and export your expense transactions."}
           filters={filters.expense}
           page={pages.expense}
           sort={sorts.expense}
@@ -836,8 +852,8 @@ export default function RecordsPage() {
 
         <RecordsTable
           type="income"
-          title="Income"
-          description="Search, filter, sort, and export your income transactions."
+          title={isBusiness ? "Revenue" : "Income"}
+          description={isBusiness ? "Review and export organization revenue." : "Search, filter, sort, and export your income transactions."}
           filters={filters.income}
           page={pages.income}
           sort={sorts.income}

@@ -82,6 +82,15 @@ export function initRecurringPage() {
     "Government Benefits",
     "Other",
   ];
+  const BUSINESS_EXPENSE_CATEGORIES = [
+    "Cost of Goods Sold", "Payroll", "Rent & Lease", "Utilities", "Marketing & Advertising",
+    "Software & Subscriptions", "Insurance", "Professional Services", "Travel", "Business Meals",
+    "Taxes & Fees", "Office Supplies", "Repairs & Maintenance", "Other",
+  ];
+  const BUSINESS_INCOME_CATEGORIES = [
+    "Sales Revenue", "Service Revenue", "Subscription Revenue", "Interest Income",
+    "Refunds / Reimbursements", "Other Income",
+  ];
 
   let expenseCategoryOptions = [...EXPENSE_CATEGORIES];
   let incomeCategoryOptions = [...INCOME_CATEGORIES];
@@ -293,17 +302,24 @@ export function initRecurringPage() {
   const populateCategoryOptions = async () => {
     let customExpense = [];
     let customIncome = [];
+    let expenseDefaults = EXPENSE_CATEGORIES;
+    let incomeDefaults = INCOME_CATEGORIES;
     try {
       const { user } = await api.auth.me();
       customExpense = user?.customExpenseCategories || user?.custom_expense_categories || [];
       customIncome = user?.customIncomeCategories || user?.custom_income_categories || [];
+      const business = Boolean(user?.active_organization_id || user?.activeOrganizationId || ["org_user", "org_admin"].includes(String(user?.role || "").toLowerCase()));
+      if (business) {
+        expenseDefaults = BUSINESS_EXPENSE_CATEGORIES;
+        incomeDefaults = BUSINESS_INCOME_CATEGORIES;
+      }
     } catch {
       customExpense = [];
       customIncome = [];
     }
 
-    expenseCategoryOptions = uniq([...EXPENSE_CATEGORIES, ...customExpense]);
-    incomeCategoryOptions = uniq([...INCOME_CATEGORIES, ...customIncome]);
+    expenseCategoryOptions = uniq([...expenseDefaults, ...customExpense]);
+    incomeCategoryOptions = uniq([...incomeDefaults, ...customIncome]);
     renderCategoryOptions(els.category?.value || "");
   };
 

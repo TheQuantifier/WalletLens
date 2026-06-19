@@ -129,6 +129,38 @@ export const auth = {
     return data;
   },
 
+  getOrganizationInvitation(token) {
+    return request(`/auth/invitations/${encodeURIComponent(token)}`);
+  },
+
+  async acceptOrganizationInvitation(token, payload) {
+    const data = await request(`/auth/invitations/${encodeURIComponent(token)}/accept`, {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+    if (data?.token) setAuthToken(data.token);
+    return data;
+  },
+
+  acceptExistingOrganizationInvitation(token) {
+    return request(`/auth/invitations/${encodeURIComponent(token)}/accept-existing`, { method: "POST" });
+  },
+
+  listOrganizations() {
+    return request("/auth/organizations");
+  },
+
+  createBusinessAccount(payload) {
+    return request("/auth/organizations", { method: "POST", body: JSON.stringify(payload) });
+  },
+
+  switchOrganization(organizationId) {
+    return request("/auth/organizations/active", {
+      method: "POST",
+      body: JSON.stringify({ organizationId }),
+    });
+  },
+
   async login(identifier, password) {
     const data = await request("/auth/login", {
       method: "POST",
@@ -762,6 +794,59 @@ export const admin = {
     return request(`/admin/users/${id}`, {
       method: "PUT",
       body: JSON.stringify(updates),
+    });
+  },
+
+  listOrganizationInvitations() {
+    return request("/admin/organization/invitations");
+  },
+
+  inviteOrganizationMember(email, message = "") {
+    return request("/admin/organization/invitations", {
+      method: "POST",
+      body: JSON.stringify({ email, message }),
+    });
+  },
+
+  resendOrganizationInvitation(id) {
+    return request(`/admin/organization/invitations/${id}/resend`, { method: "POST" });
+  },
+
+  revokeOrganizationInvitation(id) {
+    return request(`/admin/organization/invitations/${id}`, { method: "DELETE" });
+  },
+
+  requestOrganizationAdminTransferVerification() {
+    return request("/admin/organization/transfer-admin/verification", { method: "POST" });
+  },
+
+  transferOrganizationAdmin(targetUserId, credential) {
+    return request("/admin/organization/transfer-admin", {
+      method: "POST",
+      body: JSON.stringify({ targetUserId, credential }),
+    });
+  },
+
+  getOrganization() {
+    return request("/admin/organization");
+  },
+
+  updateOrganization(payload) {
+    return request("/admin/organization", { method: "PUT", body: JSON.stringify(payload) });
+  },
+
+  requestOrganizationDeletionVerification() {
+    return request("/admin/organization/delete-verification", { method: "POST" });
+  },
+
+  deleteOrganization(payload) {
+    return request("/admin/organization", { method: "DELETE", body: JSON.stringify(payload) });
+  },
+
+  removeOrganizationMember(id, payload) {
+    return request(`/admin/organization/members/${id}`, {
+      method: "DELETE",
+      body: JSON.stringify(payload),
     });
   },
 

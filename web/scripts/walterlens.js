@@ -100,6 +100,8 @@ const PUBLIC_PAGES = new Set([
   "registerwho.html",
   "registerbusiness",
   "registerbusiness.html",
+  "acceptinvite",
+  "acceptinvite.html",
   "privacy",
   "privacy.html",
   "terms",

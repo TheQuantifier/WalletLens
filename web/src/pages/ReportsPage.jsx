@@ -270,6 +270,7 @@ export default function ReportsPage() {
   const [loading, setLoading] = useState(true);
   const [showExpenses, setShowExpenses] = useState(true);
   const [showIncome, setShowIncome] = useState(true);
+  const [isBusiness, setIsBusiness] = useState(false);
   const [, refreshCurrency] = useState(0);
   const expenseCanvasRef = useRef(null);
   const incomeCanvasRef = useRef(null);
@@ -280,8 +281,9 @@ export default function ReportsPage() {
     setLoading(true);
     setStatus({ message: "Loading reports...", kind: "ok" });
     try {
-      const next = await loadAllRecords();
+      const [next, me] = await Promise.all([loadAllRecords(), api.auth.me().catch(() => null)]);
       setRecords(next);
+      setIsBusiness(Boolean(me?.user?.active_organization_id || me?.user?.activeOrganizationId || ["org_user", "org_admin"].includes(String(me?.user?.role || "").toLowerCase())));
       setStatus({ message: "Reports updated.", kind: "ok" });
     } catch (err) {
       setStatus({ message: `Could not load reports: ${err?.message || "Unknown error"}`, kind: "error" });
@@ -417,7 +419,7 @@ export default function ReportsPage() {
               fill: true,
             },
             {
-              label: "Income",
+              label: isBusiness ? "Revenue" : "Income",
               data: report.series.map((point) => point.income),
               hidden: !showIncome,
               borderColor: theme === "dark" ? "#60a5fa" : "#0057b8",
@@ -467,7 +469,7 @@ export default function ReportsPage() {
         } catch {}
       });
     };
-  }, [report, showExpenses, showIncome]);
+  }, [report, showExpenses, showIncome, isBusiness]);
 
   return (
     <>
@@ -477,8 +479,8 @@ export default function ReportsPage() {
           <div className="hero-head">
             <div>
               <p className="hero-kicker">Reports</p>
-              <h1>Command Center</h1>
-              <p className="hero-sub">Fast clarity on where money moves, what wins, and what needs a reset.</p>
+              <h1>{isBusiness ? "Business Reports" : "Command Center"}</h1>
+              <p className="hero-sub">{isBusiness ? "Revenue, expenses, cashflow, and operating trends for this organization." : "Fast clarity on where money moves, what wins, and what needs a reset."}</p>
             </div>
 
             <div className="reports-controls">
@@ -504,11 +506,11 @@ export default function ReportsPage() {
 
           <div className="cards cards--kpis">
             <KpiCard id="total-expenses" label="Total Expenses" value={loading ? "Loading..." : fmtMoney(report.totalExpenses)} />
-            <KpiCard id="total-income" label="Total Income" value={loading ? "Loading..." : fmtMoney(report.totalIncome)} />
+            <KpiCard id="total-income" label={isBusiness ? "Total Revenue" : "Total Income"} value={loading ? "Loading..." : fmtMoney(report.totalIncome)} />
             <KpiCard id="net-cashflow" label="Net Cashflow" value={loading ? "Loading..." : fmtMoney(report.net)} />
             <KpiCard id="monthly-average" label="Monthly Average" value={loading ? "Loading..." : fmtMoney(report.monthlyAverage)} />
             <KpiCard id="top-category" label="Top Category" value={loading ? "Loading..." : report.topCategory} />
-            <KpiCard id="savings-rate" label="Savings Rate" value={loading ? "Loading..." : fmtPercent(report.savingsRate)} />
+            <KpiCard id="savings-rate" label={isBusiness ? "Net Margin" : "Savings Rate"} value={loading ? "Loading..." : fmtPercent(report.savingsRate)} />
           </div>
 
           <div className="insight-band" aria-live="polite">
@@ -532,7 +534,7 @@ export default function ReportsPage() {
               <canvas id="barChartExpenses" ref={expenseCanvasRef}></canvas>
             </div>
             <div className="chart-box">
-              <h3>Income Sources</h3>
+              <h3>{isBusiness ? "Revenue Sources" : "Income Sources"}</h3>
               <canvas id="barChartIncome" ref={incomeCanvasRef}></canvas>
             </div>
           </div>
@@ -551,7 +553,7 @@ export default function ReportsPage() {
               </label>
               <label className="toggle">
                 <input id="toggle-income" type="checkbox" checked={showIncome} onChange={(event) => setShowIncome(event.target.checked)} />
-                <span>Income</span>
+                <span>{isBusiness ? "Revenue" : "Income"}</span>
               </label>
             </div>
           </div>

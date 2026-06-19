@@ -637,6 +637,144 @@ header {
   background: rgba(176,0,32,0.1);
 }
 
+.account-switch-menu-item {
+  margin-top: 0.25rem;
+  padding-top: 0.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.business-account-only {
+  display: none !important;
+}
+
+.business-account-context .business-account-only {
+  display: revert !important;
+}
+
+.business-account-context .settings-row.business-account-only {
+  display: flex !important;
+}
+
+.business-account-context .personal-account-only {
+  display: none !important;
+}
+
+.account-switch-menu-item .menu-btn {
+  font-weight: 600;
+}
+
+.account-switcher-content {
+  max-width: 460px;
+}
+
+.account-switcher-modal {
+  z-index: 1200;
+}
+
+.account-switcher-list {
+  display: grid;
+  gap: 0.65rem;
+  margin: 1rem 0;
+}
+
+.account-switcher-choice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  width: 100%;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--card-bg);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.account-switcher-choice:not(:disabled):hover {
+  border-color: var(--primary);
+  background: rgba(0, 87, 184, 0.06);
+}
+
+.account-switcher-choice > span:first-child {
+  display: grid;
+  gap: 0.2rem;
+}
+
+.account-switcher-choice small {
+  color: var(--muted);
+}
+
+.account-switcher-choice:disabled {
+  cursor: default;
+  opacity: 0.75;
+}
+
+.account-switcher-marker {
+  color: var(--primary);
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.account-switcher-cancel {
+  width: 100%;
+}
+
+.add-account-content {
+  max-width: 720px;
+  max-height: min(90vh, 760px);
+  overflow-y: auto;
+}
+
+.add-account-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 1rem;
+}
+
+.add-account-form label {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.add-account-form input {
+  width: 100%;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--text);
+  font: inherit;
+}
+
+.add-account-wide,
+.add-account-status,
+.add-account-actions {
+  grid-column: 1 / -1;
+}
+
+.add-account-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
+
+@media (max-width: 640px) {
+  .add-account-form {
+    grid-template-columns: 1fr;
+  }
+
+  .add-account-wide,
+  .add-account-status,
+  .add-account-actions {
+    grid-column: auto;
+  }
+}
+
 /* =========================================================
    MAIN CONTENT WRAPPER
    ========================================================= */

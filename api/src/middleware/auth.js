@@ -40,6 +40,8 @@ function isExpiredAccountRouteAllowed(req) {
   const routeKey = `${String(req.method || "GET").toUpperCase()} ${req.baseUrl}${req.path}`;
   return new Set([
     "GET /api/auth/me",
+    "GET /api/auth/organizations",
+    "POST /api/auth/organizations/active",
     "POST /api/auth/logout",
     "DELETE /api/auth/me",
     "GET /api/settings/export-all",

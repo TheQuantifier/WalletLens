@@ -113,6 +113,18 @@
   margin-bottom: var(--space-3);
 }
 
+.admin-invitations {
+  margin: 1rem 0 1.5rem;
+  padding: 1rem;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+
+.admin-invitations h3 {
+  margin: 0;
+}
+
 .admin-panel-title {
   display: flex;
   align-items: center;

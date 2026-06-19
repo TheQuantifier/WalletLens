@@ -30,7 +30,8 @@ async function getEffectivePermissionsMap() {
 
 export default function requireAdminPermission(permission) {
   return async function requirePermission(req, res, next) {
-    const role = String(req.user?.role || "").trim();
+    const platformRole = String(req.user?.platform_role || "").trim();
+    const role = platformRole && platformRole !== "user" ? platformRole : String(req.user?.role || "").trim();
     const permissionsMap = await getEffectivePermissionsMap();
     const allowed = permissionsMap[role];
     if (!allowed || !allowed.has(permission)) {

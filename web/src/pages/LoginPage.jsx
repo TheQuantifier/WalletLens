@@ -3,7 +3,9 @@ import { api } from "../../scripts/api.js";
 
 function postAuthDestination(user) {
   const accountStatus = String(user?.account_status || user?.accountStatus || "active").trim().toLowerCase();
-  return accountStatus === "expired" ? "/expired" : "/home";
+  if (accountStatus === "expired") return "/expired";
+  const requested = new URLSearchParams(window.location.search).get("returnTo") || "";
+  return requested.startsWith("/") && !requested.startsWith("//") ? requested : "/home";
 }
 
 function navigateTo(path) {

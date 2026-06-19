@@ -20,6 +20,8 @@ router.get("/google/callback", oauthLimiter, controller.googleCallback);
 
 router.post("/register", registerLimiter, controller.register);
 router.post("/register-business", registerLimiter, controller.registerBusiness);
+router.get("/invitations/:token", controller.getOrganizationInvitation);
+router.post("/invitations/:token/accept", registerLimiter, controller.acceptOrganizationMemberInvitation);
 
 // Login expects: { identifier, password }
 // Controller supports username OR email
@@ -39,6 +41,10 @@ router.post("/logout", auth, controller.logout);
 // AUTHENTICATED USER ROUTES
 // --------------------------------------------------
 router.get("/me", auth, controller.me);
+router.get("/organizations", auth, controller.listMyOrganizations);
+router.post("/organizations", auth, registerLimiter, controller.createAdditionalBusiness);
+router.post("/organizations/active", auth, controller.switchActiveOrganization);
+router.post("/invitations/:token/accept-existing", auth, controller.acceptExistingOrganizationInvitation);
 router.put("/me", auth, controller.updateMe);
 
 // Change password for current user

@@ -58,6 +58,8 @@ const PUBLIC_PAGES = [
   "registerwho.html",
   "registerbusiness",
   "registerbusiness.html",
+  "acceptinvite",
+  "acceptinvite.html",
   "privacy",
   "privacy.html",
   "terms",
@@ -882,6 +884,7 @@ async function updateHeaderAuthState() {
           cachedUser.avatarUrl || cachedUser.avatar_url || "",
           cachedUser.fullName || cachedUser.full_name || cachedUser.username || ""
         );
+        applyAccountContext(cachedUser);
       } catch {
         sessionStorage.removeItem("cachedUser");
       }
@@ -906,7 +909,9 @@ async function updateHeaderAuthState() {
     const avatarUrl = user.avatarUrl || user.avatar_url || "";
     applyAccountAvatar(avatarUrl, user.fullName || user.full_name || user.username || "");
     sessionStorage.setItem("cachedUser", JSON.stringify(user));
-    setAdminVisibility(user?.role);
+    applyAccountContext(user);
+    setAdminVisibility(user?.platform_role && user.platform_role !== "user" ? user.platform_role : user?.role);
+    await updateOrganizationSwitcher();
     setLogoLinkDestination("/about");
 
   } catch {
@@ -918,6 +923,7 @@ async function updateHeaderAuthState() {
       .forEach((el) => el.classList.remove("hidden"));
 
     applyAccountAvatar("", "");
+    document.body.classList.remove("business-account-context", "personal-account-context");
     setAdminVisibility("user");
     setLogoLinkDestination("/");
   }
@@ -925,10 +931,176 @@ async function updateHeaderAuthState() {
 
 function setAdminVisibility(role) {
   const normalizedRole = String(role || "").trim().toLowerCase();
-  const isAdminType = ["admin", "org_admin", "support_admin", "analyst"].includes(normalizedRole);
+  const isAdminType = ["admin", "support_admin", "analyst"].includes(normalizedRole);
   document.querySelectorAll(".admin-only").forEach((el) => {
     el.classList.toggle("is-hidden", !isAdminType);
   });
+  document.querySelectorAll(".org-admin-only").forEach((el) => {
+    el.classList.toggle("is-hidden", normalizedRole !== "org_admin");
+  });
+}
+
+function applyAccountContext(user) {
+  const role = String(user?.role || "").trim().toLowerCase();
+  const organizationId = user?.active_organization_id || user?.activeOrganizationId || null;
+  const isBusiness = Boolean(organizationId || role === "org_user" || role === "org_admin");
+  document.body.classList.toggle("business-account-context", isBusiness);
+  document.body.classList.toggle("personal-account-context", !isBusiness);
+  document.body.dataset.accountContext = isBusiness ? "business" : "personal";
+  window.__walletlensAccountContext = { type: isBusiness ? "business" : "personal", organizationId };
+  document.querySelectorAll("[data-personal-text][data-business-text]").forEach((element) => {
+    element.textContent = isBusiness ? element.dataset.businessText : element.dataset.personalText;
+  });
+  window.dispatchEvent(new CustomEvent("walletlens:account-context", { detail: window.__walletlensAccountContext }));
+}
+
+async function updateOrganizationSwitcher() {
+  const button = document.getElementById("switchAccountBtn");
+  const addButton = document.getElementById("addAccountBtn");
+  if (addButton) addButton.onclick = openAddAccountModal;
+  if (!button) return;
+  try {
+    const { organizations = [], activeOrganizationId } = await api.auth.listOrganizations();
+    button.onclick = () => openAccountSwitcher(organizations, activeOrganizationId || null);
+  } catch {
+    button.disabled = true;
+  }
+}
+
+function openAddAccountModal() {
+  document.getElementById("account-menu")?.classList.remove("show");
+  document.getElementById("addAccountModal")?.remove();
+  const modal = document.createElement("div");
+  modal.id = "addAccountModal";
+  modal.className = "modal account-switcher-modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+  modal.innerHTML = `
+    <button type="button" class="modal-backdrop" aria-label="Close add account form"></button>
+    <div class="modal-content add-account-content">
+      <h2>Add a business account</h2>
+      <p class="subtle">Your personal login stays the same. This creates a separate business workspace that you will administer.</p>
+      <form class="add-account-form">
+        <label>Business name<input name="businessName" autocomplete="organization" required></label>
+        <label>Business email<input name="businessEmail" type="email" autocomplete="email" required></label>
+        <label>Business type<input name="businessType" placeholder="LLC, corporation, nonprofit..."></label>
+        <label>Industry<input name="industry" placeholder="Retail, consulting, healthcare..."></label>
+        <label>Business phone<input name="businessPhone" type="tel" autocomplete="tel"></label>
+        <label>Website<input name="website" type="url" placeholder="https://example.com"></label>
+        <label class="add-account-wide">Street address<input name="address" autocomplete="street-address"></label>
+        <label>City<input name="city" autocomplete="address-level2"></label>
+        <label>State / province<input name="region" autocomplete="address-level1"></label>
+        <label>Postal code<input name="postalCode" autocomplete="postal-code"></label>
+        <label>Country<input name="country" autocomplete="country-name"></label>
+        <p class="status-banner subtle is-hidden add-account-status" aria-live="polite"></p>
+        <div class="add-account-actions">
+          <button class="btn btn--primary" type="submit">Create Business Account</button>
+          <button class="btn add-account-cancel" type="button">Cancel</button>
+        </div>
+      </form>
+    </div>`;
+  const close = () => modal.remove();
+  modal.querySelector(".modal-backdrop").onclick = close;
+  modal.querySelector(".add-account-cancel").onclick = close;
+  const form = modal.querySelector(".add-account-form");
+  const status = modal.querySelector(".add-account-status");
+  form.onsubmit = async (event) => {
+    event.preventDefault();
+    const submit = form.querySelector('[type="submit"]');
+    submit.disabled = true;
+    status.textContent = "Creating your business account...";
+    status.classList.remove("is-hidden", "status-error");
+    try {
+      await api.auth.createBusinessAccount(Object.fromEntries(new FormData(form).entries()));
+      sessionStorage.removeItem("cachedUser");
+      sessionStorage.removeItem("cachedHeaderHtml");
+      window.location.href = "/home";
+    } catch (error) {
+      status.textContent = error?.message || "Unable to create the business account.";
+      status.classList.add("status-error");
+      submit.disabled = false;
+    }
+  };
+  document.body.appendChild(modal);
+  modal.querySelector('[name="businessName"]')?.focus();
+}
+
+function openAccountSwitcher(organizations, activeOrganizationId) {
+  document.getElementById("account-menu")?.classList.remove("show");
+  document.getElementById("accountSwitcherModal")?.remove();
+
+  const modal = document.createElement("div");
+  modal.id = "accountSwitcherModal";
+  modal.className = "modal account-switcher-modal";
+  modal.setAttribute("role", "dialog");
+  modal.setAttribute("aria-modal", "true");
+
+  const backdrop = document.createElement("button");
+  backdrop.type = "button";
+  backdrop.className = "modal-backdrop";
+  backdrop.setAttribute("aria-label", "Close account switcher");
+
+  const content = document.createElement("div");
+  content.className = "modal-content account-switcher-content";
+  const title = document.createElement("h2");
+  title.textContent = "Switch account";
+  const description = document.createElement("p");
+  description.className = "subtle";
+  description.textContent = "Choose the account workspace you want to use.";
+  const list = document.createElement("div");
+  list.className = "account-switcher-list";
+  const status = document.createElement("p");
+  status.className = "status-banner subtle is-hidden";
+  status.setAttribute("aria-live", "polite");
+
+  const close = () => modal.remove();
+  backdrop.onclick = close;
+
+  const addChoice = ({ id = null, name, detail }) => {
+    const choice = document.createElement("button");
+    choice.type = "button";
+    choice.className = "account-switcher-choice";
+    const isActive = (id || null) === (activeOrganizationId || null);
+    const label = document.createElement("span");
+    label.innerHTML = `<strong>${escapeHtml(name)}</strong><small>${escapeHtml(detail)}</small>`;
+    const marker = document.createElement("span");
+    marker.className = "account-switcher-marker";
+    marker.textContent = isActive ? "Current" : "Switch";
+    choice.append(label, marker);
+    choice.dataset.current = isActive ? "true" : "false";
+    choice.disabled = isActive;
+    choice.onclick = async () => {
+      list.querySelectorAll("button").forEach((item) => { item.disabled = true; });
+      status.textContent = `Switching to ${name}...`;
+      status.classList.remove("is-hidden");
+      try {
+        await api.auth.switchOrganization(id);
+        sessionStorage.removeItem("cachedUser");
+        window.location.href = "/home";
+      } catch (error) {
+        status.textContent = error?.message || "Unable to switch accounts.";
+        status.classList.add("status-error");
+        list.querySelectorAll("button").forEach((item) => { item.disabled = item.dataset.current === "true"; });
+      }
+    };
+    list.appendChild(choice);
+  };
+
+  addChoice({ name: "Personal", detail: "Your personal workspace" });
+  organizations.forEach((organization) => addChoice({
+    id: organization.organization_id,
+    name: organization.name,
+    detail: organization.membership_role === "admin" ? "Organization administrator" : "Organization member",
+  }));
+
+  const cancel = document.createElement("button");
+  cancel.type = "button";
+  cancel.className = "btn account-switcher-cancel";
+  cancel.textContent = "Cancel";
+  cancel.onclick = close;
+  content.append(title, description, list, status, cancel);
+  modal.append(backdrop, content);
+  document.body.appendChild(modal);
 }
 
 async function updateAppName() {

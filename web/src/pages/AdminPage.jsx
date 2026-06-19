@@ -1,10 +1,24 @@
 import { useEffect } from "react";
 import { initAdminPage } from "../pageControllers/adminPageController.js";
+import { api } from "../../scripts/api.js";
 
 export default function AdminPage() {
   useEffect(() => {
-    initAdminPage();
+    let active = true;
+    api.auth.me().then(({ user }) => {
+      if (!active) return;
+      const platformRole = String(user?.platform_role || "user").toLowerCase();
+      if (String(user?.role || "").toLowerCase() === "org_admin" && platformRole === "user") {
+        if (window.__walletlensNavigate) window.__walletlensNavigate("/team");
+        else window.location.href = "/team";
+        return;
+      }
+      initAdminPage();
+    }).catch(() => {
+      if (active) initAdminPage();
+    });
     return () => {
+      active = false;
       window.__walletlensAdminPageInitialized = false;
     };
   }, []);
@@ -74,6 +88,7 @@ export default function AdminPage() {
                     list="adminUserOptions"
                   />
                   <button className="btn btn--primary" id="userSearchBtn" type="button">Find User</button>
+                  <button className="btn btn--primary" id="inviteMemberBtn" type="button" hidden>Invite Member</button>
                   <button className="btn btn--link" id="userClearBtn" type="button" aria-label="Clear selected user data">X</button>
                 </div>
               </div>
@@ -81,6 +96,19 @@ export default function AdminPage() {
               <datalist id="adminUserOptions"></datalist>
       
               <p id="usersStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
+
+              <section id="organizationInvitationsSection" className="admin-invitations is-hidden">
+                <div className="admin-panel-header">
+                  <div><h3>Member Invitations</h3><p className="subtle">Pending and previous invitations for your organization.</p></div>
+                </div>
+                <div className="table-wrap">
+                  <table className="admin-table">
+                    <thead><tr><th>Email</th><th>Status</th><th>Expires</th><th>Actions</th></tr></thead>
+                    <tbody id="organizationInvitationsTbody"><tr><td colSpan="4" className="subtle">No invitations.</td></tr></tbody>
+                  </table>
+                </div>
+                <p id="organizationInvitationsStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
+              </section>
       
               <div className="table-wrap">
                 <table className="admin-table">
@@ -801,6 +829,18 @@ export default function AdminPage() {
                 <button className="btn btn--link" type="button" data-close-modal>Cancel</button>
               </div>
               <p id="adminRecordStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+
+        <div id="inviteMemberModal" className="modal hidden" role="dialog" aria-modal="true" aria-labelledby="inviteMemberTitle">
+          <div className="modal-content admin-modal">
+            <div className="modal-header"><h3 id="inviteMemberTitle">Invite Organization Member</h3><button className="modal-close" type="button" data-close-modal>&times;</button></div>
+            <form id="inviteMemberForm" className="admin-form">
+              <p className="subtle">The recipient will receive a seven-day link to create an organization member account.</p>
+              <label><span>Email address</span><input id="inviteMemberEmail" type="email" autoComplete="email" required /></label>
+              <div className="admin-actions"><button className="btn btn--primary" type="submit">Send Invitation</button><button className="btn btn--link" type="button" data-close-modal>Cancel</button></div>
+              <p id="inviteMemberStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
             </form>
           </div>
         </div>

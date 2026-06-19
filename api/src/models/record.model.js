@@ -66,7 +66,7 @@ export async function createRecord(userId, data) {
 }
 
 export async function listRecords(userId, { type, limit = 200, offset = 0 } = {}) {
-  const where = ["user_id = $1"];
+  const where = ["can_access_organization_resource(user_id, organization_id, $1)"];
   const params = [userId];
   let i = 2;
 
@@ -111,7 +111,7 @@ export async function getRecordById(userId, id) {
     `
     SELECT *
     FROM records
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     LIMIT 1
     `,
     [id, userId]
@@ -162,7 +162,7 @@ export async function updateRecord(userId, id, changes = {}) {
     UPDATE records
     SET ${sets.join(", ")},
         updated_at = now()
-    WHERE id = $${i++} AND user_id = $${i++}
+    WHERE id = $${i++} AND can_access_organization_resource(user_id, organization_id, $${i++})
     RETURNING *
     `,
     values
@@ -175,7 +175,7 @@ export async function deleteRecord(userId, id) {
   const { rows } = await query(
     `
     DELETE FROM records
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     RETURNING id
     `,
     [id, userId]
@@ -429,7 +429,7 @@ export async function deletePlaidRecordsByTransactionIds(userId, plaidTransactio
   const { rowCount } = await query(
     `
     DELETE FROM records
-    WHERE user_id = $1
+    WHERE can_access_organization_resource(user_id, organization_id, $1)
       AND plaid_transaction_id = ANY($2::text[])
     `,
     [userId, ids]
@@ -444,7 +444,7 @@ export async function deletePlaidRecordsByAccountId(userId, linkedPlaidAccountId
   const { rowCount } = await query(
     `
     DELETE FROM records
-    WHERE user_id = $1
+    WHERE can_access_organization_resource(user_id, organization_id, $1)
       AND linked_plaid_account_id = $2
     `,
     [userId, linkedPlaidAccountId]

@@ -1014,6 +1014,23 @@ body.landing-light::before {
 .business-message-error { color: #b91c1c; }
 .business-message-ok { color: #166534; }
 
+.invite-accept-content {
+  width: min(580px, 100%);
+  margin: 0 auto;
+}
+
+.invite-accept-form {
+  display: grid;
+  gap: 1rem;
+}
+
+.invite-accept-form label {
+  display: grid;
+  gap: 0.35rem;
+  color: var(--text);
+  font-weight: 600;
+}
+
 :root[data-theme="dark"] .account-choice-card,
 :root[data-theme="dark"] .business-register-form {
   background: #111418;

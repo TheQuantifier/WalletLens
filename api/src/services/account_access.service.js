@@ -21,11 +21,22 @@ export function computeDefaultAccessExpiresAt(startedAt = new Date()) {
 }
 
 export function getAccountAccessState(userLike = {}) {
-  const expiresAt = userLike?.access_expires_at || userLike?.accessExpiresAt || null;
+  const platformRole = String(userLike?.platform_role || userLike?.platformRole || "").trim().toLowerCase();
+  const role = platformRole && platformRole !== "user"
+    ? platformRole
+    : String(userLike?.role || "").trim().toLowerCase();
+  const organizationScoped = role === "org_user" || role === "org_admin";
+  const subscriptionStatus = String(
+    userLike?.organization_subscription_status || userLike?.organizationSubscriptionStatus || ""
+  ).trim().toLowerCase();
+  const expiresAt = organizationScoped
+    ? userLike?.organization_access_expires_at || userLike?.organizationAccessExpiresAt || null
+    : userLike?.access_expires_at || userLike?.accessExpiresAt || null;
   const expiresMs = expiresAt ? new Date(expiresAt).getTime() : Number.NaN;
   const hasExpiry = Number.isFinite(expiresMs);
   const accessRemainingMs = hasExpiry ? Math.max(0, expiresMs - Date.now()) : null;
-  const accountStatus = hasExpiry && expiresMs <= Date.now() ? "expired" : "active";
+  const subscriptionBlocked = organizationScoped && ["suspended", "canceled"].includes(subscriptionStatus);
+  const accountStatus = subscriptionBlocked || (hasExpiry && expiresMs <= Date.now()) ? "expired" : "active";
 
   return {
     accountStatus,

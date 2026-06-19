@@ -9,6 +9,17 @@ import {
   listUserOptionsAdmin,
   getUserAdmin,
   updateUserAdmin,
+  listOrganizationInvitationsAdmin,
+  inviteOrganizationMemberAdmin,
+  resendOrganizationInvitationAdmin,
+  revokeOrganizationInvitationAdmin,
+  transferOrganizationAdmin,
+  requestOrganizationAdminTransferVerification,
+  requestOrganizationDeletionVerification,
+  deleteOrganizationAdmin,
+  getOrganizationAdmin,
+  updateOrganizationAdmin,
+  removeOrganizationMemberAdmin,
   forceLogoutAllUsersAdmin,
   getAdminStatsController,
   getAdminPermissionsController,
@@ -46,6 +57,17 @@ router.get("/users", requireAdminPermission("users.read"), listUsersAdmin);
 router.get("/users/options", requireAdminPermission("users.read"), listUserOptionsAdmin);
 router.get("/users/:id", requireAdminPermission("users.read"), getUserAdmin);
 router.put("/users/:id", requireAdminPermission("users.write"), updateUserAdmin);
+router.get("/organization/invitations", requireAdminPermission("users.read"), listOrganizationInvitationsAdmin);
+router.post("/organization/invitations", requireAdminPermission("users.write"), inviteOrganizationMemberAdmin);
+router.post("/organization/invitations/:id/resend", requireAdminPermission("users.write"), resendOrganizationInvitationAdmin);
+router.delete("/organization/invitations/:id", requireAdminPermission("users.write"), revokeOrganizationInvitationAdmin);
+router.post("/organization/transfer-admin/verification", requireAdminPermission("users.write"), requestOrganizationAdminTransferVerification);
+router.post("/organization/transfer-admin", requireAdminPermission("users.write"), transferOrganizationAdmin);
+router.get("/organization", requireAdminPermission("users.read"), getOrganizationAdmin);
+router.put("/organization", requireAdminPermission("users.write"), updateOrganizationAdmin);
+router.post("/organization/delete-verification", requireAdminPermission("users.write"), requestOrganizationDeletionVerification);
+router.delete("/organization", requireAdminPermission("users.write"), deleteOrganizationAdmin);
+router.delete("/organization/members/:id", requireAdminPermission("users.write"), removeOrganizationMemberAdmin);
 router.post(
   "/sessions/force-logout-all",
   requireAdminPermission("settings.write"),

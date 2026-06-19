@@ -58,7 +58,7 @@ export async function listReceipts(userId, { limit = 200, offset = 0 } = {}) {
     `
     SELECT *
     FROM receipts
-    WHERE user_id = $1
+    WHERE can_access_organization_resource(user_id, organization_id, $1)
     ORDER BY created_at DESC
     LIMIT $2 OFFSET $3
     `,
@@ -72,7 +72,7 @@ export async function getReceiptById(userId, id) {
     `
     SELECT *
     FROM receipts
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     LIMIT 1
     `,
     [id, userId]
@@ -142,7 +142,7 @@ export async function updateReceiptParsedData(userId, id, patch = {}) {
     UPDATE receipts
     SET ${sets.join(", ")},
         updated_at = now()
-    WHERE id = $${i++} AND user_id = $${i++}
+    WHERE id = $${i++} AND can_access_organization_resource(user_id, organization_id, $${i++})
     RETURNING *
     `,
     values
@@ -157,7 +157,7 @@ export async function setReceiptLinkedRecord(userId, receiptId, recordId) {
     UPDATE receipts
     SET linked_record_id = $1,
         updated_at = now()
-    WHERE id = $2 AND user_id = $3
+    WHERE id = $2 AND can_access_organization_resource(user_id, organization_id, $3)
     RETURNING *
     `,
     [recordId, receiptId, userId]
@@ -170,7 +170,7 @@ export async function deleteReceipt(userId, id) {
   const { rows } = await query(
     `
     DELETE FROM receipts
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     RETURNING id, object_key, linked_record_id
     `,
     [id, userId]

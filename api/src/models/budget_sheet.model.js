@@ -97,7 +97,7 @@ export async function updateBudgetSheet(userId, id, { cadence, period, categorie
     UPDATE budget_sheets
     SET ${sets.join(", ")},
         updated_at = now()
-    WHERE user_id = $${i++} AND id = $${i}
+    WHERE can_access_organization_resource(user_id, organization_id, $${i++}) AND id = $${i}
     RETURNING ${SELECT_FIELDS}
     `,
     values
@@ -110,7 +110,7 @@ export async function getBudgetSheetById(userId, id) {
     `
     SELECT ${SELECT_FIELDS}
     FROM budget_sheets
-    WHERE user_id = $1 AND id = $2
+    WHERE can_access_organization_resource(user_id, organization_id, $1) AND id = $2
     LIMIT 1
     `,
     [userId, id]
@@ -123,7 +123,7 @@ export async function findBudgetSheetByCadencePeriod(userId, cadence, period) {
     `
     SELECT ${SELECT_FIELDS}
     FROM budget_sheets
-    WHERE user_id = $1 AND cadence = $2 AND period = $3
+    WHERE can_access_organization_resource(user_id, organization_id, $1) AND cadence = $2 AND period = $3
     LIMIT 1
     `,
     [userId, cadence, period]
@@ -132,7 +132,7 @@ export async function findBudgetSheetByCadencePeriod(userId, cadence, period) {
 }
 
 export async function listBudgetSheets(userId, { cadence, period, limit = 50 } = {}) {
-  const filters = ["user_id = $1"];
+  const filters = ["can_access_organization_resource(user_id, organization_id, $1)"];
   const values = [userId];
   let i = 2;
 
@@ -164,7 +164,7 @@ export async function deleteBudgetSheet(userId, id) {
   const { rows } = await query(
     `
     DELETE FROM budget_sheets
-    WHERE user_id = $1 AND id = $2
+    WHERE can_access_organization_resource(user_id, organization_id, $1) AND id = $2
     RETURNING ${SELECT_FIELDS}
     `,
     [userId, id]

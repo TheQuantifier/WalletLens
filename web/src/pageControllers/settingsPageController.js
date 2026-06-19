@@ -567,7 +567,9 @@ export function initSettingsPage() {
     } finally {
       if (els.exportAllBtn) {
         els.exportAllBtn.disabled = false;
-        els.exportAllBtn.textContent = "Export Full Account";
+        els.exportAllBtn.textContent = document.body.classList.contains("business-account-context")
+          ? "Export Business Workspace"
+          : "Export Full Account";
       }
     }
   };

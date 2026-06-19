@@ -7,6 +7,7 @@ export function initBudgetingPage() {
   window.__walletlensBudgetingPageInitialized = true;
   const CURRENCY_FALLBACK = "USD";
   let userCustomCategories = { expense: [] };
+  let businessContext = false;
 
   const CADENCE_OPTIONS = [
     { id: "weekly", label: "Weekly", days: 7 },
@@ -32,6 +33,11 @@ export function initBudgetingPage() {
     { name: "Education", budget: null },
     { name: "Giving", budget: null },
     { name: "Savings", budget: null },
+  ];
+  const BUSINESS_BUDGET_CATEGORIES = [
+    "Cost of Goods Sold", "Payroll", "Rent & Lease", "Utilities", "Marketing & Advertising",
+    "Software & Subscriptions", "Insurance", "Professional Services", "Travel", "Business Meals",
+    "Taxes & Fees", "Office Supplies", "Repairs & Maintenance", "Other",
   ];
 
   const CATEGORY_COLUMN_MAP = new Map([
@@ -340,6 +346,7 @@ export function initBudgetingPage() {
         me?.user?.custom_expense_categories ??
         me?.user?.customExpenseCategories ??
         [];
+      businessContext = Boolean(me?.user?.active_organization_id || me?.user?.activeOrganizationId || ["org_user", "org_admin"].includes(String(me?.user?.role || "").toLowerCase()));
       userCustomCategories = { expense: normalizeCategoryList(expList) };
     } catch {
       userCustomCategories = { expense: [] };
@@ -347,7 +354,7 @@ export function initBudgetingPage() {
   };
 
   const getBudgetCategoryNames = () => {
-    const baseNames = BASE_CATEGORIES.map((c) => c.name);
+    const baseNames = businessContext ? BUSINESS_BUDGET_CATEGORIES : BASE_CATEGORIES.map((c) => c.name);
     const baseSet = new Set(baseNames.map((c) => normalizeName(c)));
     const eligibleCustom = (userCustomCategories.expense || []).filter((name) => {
       const key = normalizeName(name);
@@ -380,7 +387,7 @@ export function initBudgetingPage() {
 
   const applySheetToState = (sheet, state) => {
     if (!sheet) return;
-    const baseCategories = BASE_CATEGORIES.map((base) => {
+    const baseCategories = (businessContext ? [] : BASE_CATEGORIES).map((base) => {
       const col = CATEGORY_COLUMN_MAP.get(base.name);
       return {
         name: base.name,
@@ -395,15 +402,25 @@ export function initBudgetingPage() {
         }))
       : [];
 
+    const businessDefaults = businessContext
+      ? BUSINESS_BUDGET_CATEGORIES.map((name) => ({ name, budget: null }))
+      : [];
     const merged = [
+      ...businessDefaults,
       ...baseCategories,
-      ...custom.filter((c) => c.name && isCustomCategory(c.name)),
+      ...custom.filter((c) => c.name && isCustomCategory(c.name) && !businessDefaults.some((base) => normalizeName(base.name) === normalizeName(c.name))),
     ].sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" }));
+
+    custom.forEach((entry) => {
+      const target = merged.find((item) => normalizeName(item.name) === normalizeName(entry.name));
+      if (target) target.budget = entry.budget;
+    });
 
     state.categories = merged.map((c) => ({ ...c }));
   };
 
   const isCustomCategory = (name) => {
+    if (businessContext) return true;
     const baseSet = new Set(BASE_CATEGORIES.map((c) => normalizeName(c.name)));
     return !baseSet.has(normalizeName(name));
   };

@@ -30,7 +30,7 @@ export async function listNetWorthItems(userId) {
     `
     SELECT *
     FROM net_worth_items
-    WHERE user_id = $1
+    WHERE can_access_organization_resource(user_id, organization_id, $1)
     ORDER BY created_at DESC
     `,
     [userId]
@@ -58,7 +58,7 @@ export async function updateNetWorthItem(userId, id, { name, amount }) {
     `
     UPDATE net_worth_items
     SET ${sets.join(", ")}, updated_at = now()
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     RETURNING *
     `,
     values
@@ -70,7 +70,7 @@ export async function deleteNetWorthItem(userId, id) {
   const { rows } = await query(
     `
     DELETE FROM net_worth_items
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     RETURNING *
     `,
     [id, userId]
@@ -83,7 +83,7 @@ export async function getNetWorthItemById(userId, id) {
     `
     SELECT *
     FROM net_worth_items
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     LIMIT 1
     `,
     [id, userId]
@@ -121,7 +121,7 @@ export async function listNetWorthSnapshots(userId, { days = 365 } = {}) {
     `
     select *
     from net_worth_snapshots
-    where user_id = $1
+    where can_access_organization_resource(user_id, organization_id, $1)
       and snapshot_date >= current_date - ($2::int - 1)
     order by snapshot_date asc
     `,
@@ -134,7 +134,7 @@ export async function deleteNetWorthSnapshotsByUser(userId) {
   const { rowCount } = await query(
     `
     delete from net_worth_snapshots
-    where user_id = $1
+    where can_access_organization_resource(user_id, organization_id, $1)
     `,
     [userId]
   );

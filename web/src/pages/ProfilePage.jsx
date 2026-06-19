@@ -20,7 +20,7 @@ export default function ProfilePage() {
           <section className="profile-hero">
             <div className="title-wrap">
               <h1>Profile</h1>
-              <p className="subtle">View and update your personal info</p>
+              <p className="subtle" data-personal-text="View and update your personal info" data-business-text="Manage your login identity for this business workspace">View and update your personal info</p>
             </div>
             <div className="actions" role="group">
               <p id="profileStatus" className="status-banner subtle is-hidden profile-status-inline" aria-live="polite"></p>
@@ -102,7 +102,7 @@ export default function ProfilePage() {
               </div>
             </div>
             {/* IDENTITY + STATS */}
-            <section className="card security">
+            <section className="card security personal-account-only">
               <div className="security-header">
                 <h2>Identity & Stats</h2>
               </div>
@@ -155,6 +155,12 @@ export default function ProfilePage() {
               </div>
             </section>
       
+            <section className="card security business-account-only">
+              <div className="security-header"><h2>Business workspace</h2></div>
+              <p className="subtle">Business details, team access, invitations, and administrator controls are managed separately from your personal profile.</p>
+              <div className="actions"><a className="btn btn--primary org-admin-only is-hidden" href="/team">Manage Team &amp; Organization</a></div>
+            </section>
+
             {/* LINKED ACCOUNTS */}
             <section className="card linked-accounts">
               <div className="section-head">
@@ -200,7 +206,7 @@ export default function ProfilePage() {
             </div>
       
             {/* ACHIEVEMENTS */}
-            <section className="card achievements">
+            <section className="card achievements personal-account-only">
               <div className="section-headline inline">
                 <h2>Achievements</h2>
               </div>
@@ -210,7 +216,7 @@ export default function ProfilePage() {
             </section>
       
             {/* ACTIVITY */}
-            <section className="card activity">
+            <section className="card activity personal-account-only">
               <h2>Recent Activity</h2>
               <div className="table-wrap">
                 <table className="txn-table activity-table">

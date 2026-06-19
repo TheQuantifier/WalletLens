@@ -17,27 +17,39 @@ import {
 
 const SAFE_USER_COLUMNS = `
   id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-  full_name, location, role, organization_id, phone_number, bio, avatar_url,
-  address, employer, income_range, custom_expense_categories, custom_income_categories,
+  full_name, location, role, platform_role, organization_id, active_organization_id, phone_number, bio, avatar_url,
+  address, employer, income_range,
+  CASE WHEN organization_id IS NOT NULL THEN COALESCE((SELECT custom_expense_categories FROM organizations WHERE id = users.organization_id), '[]'::jsonb) ELSE custom_expense_categories END AS custom_expense_categories,
+  CASE WHEN organization_id IS NOT NULL THEN COALESCE((SELECT custom_income_categories FROM organizations WHERE id = users.organization_id), '[]'::jsonb) ELSE custom_income_categories END AS custom_income_categories,
   two_fa_enabled, two_fa_method, two_fa_confirmed_at,
   trial_started_at, access_expires_at,
+  (SELECT subscription_status FROM organizations WHERE id = users.organization_id) AS organization_subscription_status,
+  (SELECT access_expires_at FROM organizations WHERE id = users.organization_id) AS organization_access_expires_at,
   created_at, updated_at
 `;
 
 const AUTH_USER_COLUMNS = `
-  id, username, email, password_hash, google_id, full_name, location, role, phone_number, bio, avatar_url,
-  organization_id,
-  address, employer, income_range, custom_expense_categories, custom_income_categories,
+  id, username, email, password_hash, google_id, full_name, location, role, platform_role, phone_number, bio, avatar_url,
+  organization_id, active_organization_id,
+  address, employer, income_range,
+  CASE WHEN organization_id IS NOT NULL THEN COALESCE((SELECT custom_expense_categories FROM organizations WHERE id = users.organization_id), '[]'::jsonb) ELSE custom_expense_categories END AS custom_expense_categories,
+  CASE WHEN organization_id IS NOT NULL THEN COALESCE((SELECT custom_income_categories FROM organizations WHERE id = users.organization_id), '[]'::jsonb) ELSE custom_income_categories END AS custom_income_categories,
   two_fa_enabled, two_fa_method, two_fa_confirmed_at,
   trial_started_at, access_expires_at,
+  (SELECT subscription_status FROM organizations WHERE id = users.organization_id) AS organization_subscription_status,
+  (SELECT access_expires_at FROM organizations WHERE id = users.organization_id) AS organization_access_expires_at,
   created_at, updated_at
 `;
 
 const LIST_USER_COLUMNS = `
   id, username, email, google_id, (password_hash is not null and password_hash <> '') as has_password,
-  full_name, location, role, organization_id, phone_number, bio, avatar_url,
-  address, employer, income_range, custom_expense_categories, custom_income_categories,
+  full_name, location, role, platform_role, organization_id, active_organization_id, phone_number, bio, avatar_url,
+  address, employer, income_range,
+  CASE WHEN organization_id IS NOT NULL THEN COALESCE((SELECT custom_expense_categories FROM organizations WHERE id = users.organization_id), '[]'::jsonb) ELSE custom_expense_categories END AS custom_expense_categories,
+  CASE WHEN organization_id IS NOT NULL THEN COALESCE((SELECT custom_income_categories FROM organizations WHERE id = users.organization_id), '[]'::jsonb) ELSE custom_income_categories END AS custom_income_categories,
   trial_started_at, access_expires_at,
+  (SELECT subscription_status FROM organizations WHERE id = users.organization_id) AS organization_subscription_status,
+  (SELECT access_expires_at FROM organizations WHERE id = users.organization_id) AS organization_access_expires_at,
   created_at, updated_at
 `;
 
@@ -180,6 +192,7 @@ export async function updateUserById(id, changes = {}) {
     fullName: "full_name",
     location: "location",
     role: "role",
+    platformRole: "platform_role",
     organizationId: "organization_id",
     phoneNumber: "phone_number",
     bio: "bio",

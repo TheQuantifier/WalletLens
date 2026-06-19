@@ -36,6 +36,17 @@ const INCOME_CATEGORIES = [
   "Other",
 ];
 
+const BUSINESS_EXPENSE_CATEGORIES = [
+  "Cost of Goods Sold", "Payroll", "Rent & Lease", "Utilities", "Marketing & Advertising",
+  "Software & Subscriptions", "Insurance", "Professional Services", "Travel", "Business Meals",
+  "Taxes & Fees", "Office Supplies", "Repairs & Maintenance", "Other",
+];
+
+const BUSINESS_INCOME_CATEGORIES = [
+  "Sales Revenue", "Service Revenue", "Subscription Revenue", "Interest Income",
+  "Refunds / Reimbursements", "Other Income",
+];
+
 const BUDGET_COLUMNS = [
   "housing",
   "utilities",
@@ -498,6 +509,7 @@ export default function HomePage() {
     category: "",
     note: "",
   });
+  const isBusiness = Boolean(user?.active_organization_id || user?.activeOrganizationId || ["org_user", "org_admin"].includes(String(user?.role || "").toLowerCase()));
 
   const customCategories = useMemo(
     () => ({
@@ -520,16 +532,20 @@ export default function HomePage() {
   );
 
   const categories = useMemo(() => {
-    const base = form.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const base = form.type === "income"
+      ? (isBusiness ? BUSINESS_INCOME_CATEGORIES : INCOME_CATEGORIES)
+      : (isBusiness ? BUSINESS_EXPENSE_CATEGORIES : EXPENSE_CATEGORIES);
     const custom = customCategories[form.type] || [];
     return [...new Set([...base, ...custom])];
-  }, [customCategories, form.type]);
+  }, [customCategories, form.type, isBusiness]);
 
   const visibleCustomCategories = useMemo(() => {
-    const base = form.type === "income" ? INCOME_CATEGORIES : EXPENSE_CATEGORIES;
+    const base = form.type === "income"
+      ? (isBusiness ? BUSINESS_INCOME_CATEGORIES : INCOME_CATEGORIES)
+      : (isBusiness ? BUSINESS_EXPENSE_CATEGORIES : EXPENSE_CATEGORIES);
     const defaults = new Set(base.map(normalizeCategoryName));
     return (customCategories[form.type] || []).filter((name) => !defaults.has(normalizeCategoryName(name)));
-  }, [customCategories, form.type]);
+  }, [customCategories, form.type, isBusiness]);
 
   const summary = useMemo(() => computeDashboard(records), [records]);
   const focusItems = useMemo(() => buildFocusItems(summary), [summary]);
@@ -857,11 +873,11 @@ export default function HomePage() {
             <div className="hero-metrics" aria-label="Key insights">
               <div className="hero-metric">
                 <span className="label">
-                  Projected savings
+                  {isBusiness ? "Projected cashflow" : "Projected savings"}
                   <span className="info-popover">
                     <button type="button" className="info-popover__trigger" aria-label="Projected savings guidance">i</button>
                     <span className="info-popover__panel" role="tooltip">
-                      Projected savings estimates future savings based on current month income, spending, and the remaining days in the month.
+                      {isBusiness ? "Projected cashflow estimates the month-end operating result from current revenue and expenses." : "Projected savings estimates future savings based on current month income, spending, and the remaining days in the month."}
                     </span>
                   </span>
                 </span>
@@ -904,7 +920,7 @@ export default function HomePage() {
           </div>
 
           <aside className="hero-secondary card" aria-label="Focus summary">
-            <h3>Focus this week</h3>
+            <h3>{isBusiness ? "Business focus" : "Focus this week"}</h3>
             <ul className="focus-list" id="focusList" aria-live="polite">
               {focusItems.map((item) => (
                 <li key={item}>
@@ -915,7 +931,7 @@ export default function HomePage() {
             </ul>
             <div className="focus-foot">
               <a className="btn btn--link" href="/budgeting">
-                Plan your budget &rarr;
+                {isBusiness ? "Plan business spending" : "Plan your budget"} &rarr;
               </a>
             </div>
           </aside>
@@ -924,7 +940,7 @@ export default function HomePage() {
         <section className="net-worth" id="netWorthSection" aria-label="Net worth dashboard">
           <div className="net-worth-header">
             <div>
-              <h2>Net Worth</h2>
+              <h2>{isBusiness ? "Balance Sheet" : "Net Worth"}</h2>
               <div className="net-worth-status">
                 <p className="subtle" id="netWorthUpdated">
                   {netWorthData.asOf ? `Updated ${formatDate(netWorthData.asOf)}` : netWorthData.hasData ? "Tracking started recently" : "No net worth data yet"}
@@ -941,7 +957,7 @@ export default function HomePage() {
           <div className="net-worth-grid" id="netWorthGrid">
             <article className="card net-worth-summary">
               <div className="net-worth-total">
-                <p className="label">Total Net Worth</p>
+                <p className="label">{isBusiness ? "Net Position" : "Total Net Worth"}</p>
                 <p className="value" id="netWorthTotal">{formatMoney(netWorthData.netWorth, netWorthData.currency)}</p>
                 <p className="delta subtle" id="netWorthDelta">
                   {netWorthData.snapshotBacked && netWorthData.trend.length > 1
@@ -986,7 +1002,7 @@ export default function HomePage() {
                   <input
                     type="text"
                     id="assetName"
-                    placeholder="Asset name (e.g., House)"
+                    placeholder={isBusiness ? "Asset name (e.g., Equipment)" : "Asset name (e.g., House)"}
                     value={netWorthForm.asset.name}
                     onChange={(event) => setNetWorthForm((next) => ({ ...next, asset: { ...next.asset, name: event.target.value } }))}
                     required
@@ -1035,7 +1051,7 @@ export default function HomePage() {
                   <input
                     type="text"
                     id="liabilityName"
-                    placeholder="Liability name (e.g., Credit Card)"
+                    placeholder={isBusiness ? "Liability name (e.g., Business Loan)" : "Liability name (e.g., Credit Card)"}
                     value={netWorthForm.liability.name}
                     onChange={(event) => setNetWorthForm((next) => ({ ...next, liability: { ...next.liability, name: event.target.value } }))}
                     required
@@ -1078,19 +1094,19 @@ export default function HomePage() {
 
         <section className="kpis" aria-label="Summary metrics">
           <article className="kpi card kpi--income">
-            <h2>Total Income</h2>
+            <h2>{isBusiness ? "Total Revenue" : "Total Income"}</h2>
             <p className="kpi-value" id="kpiIncome">{formatMoney(summary.totalIncome)}</p>
             <span className="kpi-sub" id="kpiPeriodIncome">This month</span>
           </article>
           <article className="kpi card kpi--spending">
-            <h2>Total Spending</h2>
+            <h2>{isBusiness ? "Total Expenses" : "Total Spending"}</h2>
             <p className="kpi-value negative" id="kpiSpending">{formatMoney(summary.totalSpending)}</p>
             <span className="kpi-sub" id="kpiPeriodSpending">This month</span>
           </article>
           <article className="kpi card kpi--balance">
-            <h2>Net Balance</h2>
+            <h2>{isBusiness ? "Net Cashflow" : "Net Balance"}</h2>
             <p className="kpi-value" id="kpiBalance">{formatMoney(summary.netBalance)}</p>
-            <span className="kpi-sub" id="kpiPeriodBalance">Income - Spending</span>
+            <span className="kpi-sub" id="kpiPeriodBalance">{isBusiness ? "Revenue - Expenses" : "Income - Spending"}</span>
           </article>
         </section>
 

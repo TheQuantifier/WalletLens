@@ -20,7 +20,7 @@ export default function SettingsPage() {
           <section className="profile-hero">
             <div className="title-wrap">
               <h1>Settings</h1>
-              <p className="subtle">Manage your application preferences</p>
+              <p className="subtle" data-personal-text="Manage your application preferences" data-business-text="Manage your user preferences for this business workspace">Manage your application preferences</p>
             </div>
           </section>
       
@@ -142,11 +142,11 @@ export default function SettingsPage() {
               </div>
       
               <div className="settings-row">
-                <label>Export All User Data</label>
+                <label data-personal-text="Export All User Data" data-business-text="Export Business Workspace Data">Export All User Data</label>
                 <div className="settings-actions-inline">
-                  <button className="settings-btn btn--primary" id="exportAllDataBtn" type="button">Export Full Account</button>
+                  <button className="settings-btn btn--primary" id="exportAllDataBtn" type="button" data-personal-text="Export Full Account" data-business-text="Export Business Workspace">Export Full Account</button>
                 </div>
-                <p className="subtle">Includes personal info, records, receipts, budgets, recurring schedules, rules, net worth, achievements, and activity.</p>
+                <p className="subtle" data-personal-text="Includes personal info, records, receipts, budgets, recurring schedules, rules, net worth, achievements, and activity." data-business-text="Includes organization records, receipts, budgets, recurring schedules, rules, balance-sheet data, and activity available to you.">Includes personal info, records, receipts, budgets, recurring schedules, rules, net worth, achievements, and activity.</p>
                 <p id="exportAllStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
               </div>
             </section>
@@ -180,9 +180,17 @@ export default function SettingsPage() {
                   </div>
                 </div>
       
-                <div className="settings-row">
+                <div className="settings-row personal-account-only">
                   <label>Delete Account</label>
                   <button className="settings-btn btn--danger" id="deleteAccountBtn" type="button">Delete</button>
+                </div>
+
+                <div className="settings-row business-account-only">
+                  <label>Business Account</label>
+                  <div className="settings-actions-inline">
+                    <a className="settings-btn btn--primary org-admin-only is-hidden" href="/team">Manage Organization</a>
+                    <span className="subtle">Personal account deletion is available after switching to Personal.</span>
+                  </div>
                 </div>
       
                 <div className="settings-row">

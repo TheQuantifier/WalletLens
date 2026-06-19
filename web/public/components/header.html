@@ -47,6 +47,7 @@
           <li><button role="menuitem" class="mobile-nav-link" data-href="/reports">Reports</button></li>
           <li><button role="menuitem" class="mobile-nav-link" data-href="/about">About</button></li>
           <li class="admin-only is-hidden"><button role="menuitem" class="mobile-nav-link" data-href="/admin">Admin</button></li>
+          <li class="org-admin-only is-hidden"><button role="menuitem" class="mobile-nav-link" data-href="/team">Team</button></li>
         </ul>
       </div>
 
@@ -98,6 +99,14 @@
             <button class="menu-btn" data-href="/admin">
               Admin
             </button>
+          </li>
+          <li class="org-admin-only is-hidden"><button class="menu-btn" data-href="/team">Team &amp; Organization</button></li>
+
+          <li class="account-switch-menu-item">
+            <button id="switchAccountBtn" class="menu-btn" type="button">Switch account</button>
+          </li>
+          <li>
+            <button id="addAccountBtn" class="menu-btn" type="button">Add account</button>
           </li>
 
           <!-- Logout -->

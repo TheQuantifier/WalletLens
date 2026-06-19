@@ -17,8 +17,8 @@ export default function BudgetingPage() {
         <main className="main main--budgeting">
           <section className="budget-hero">
             <div>
-              <h1>Budgeting</h1>
-              <p className="subtle">Plan your spend, track actuals, and move unused funds to savings or another category.</p>
+              <h1 data-personal-text="Budgeting" data-business-text="Operating Budgets">Budgeting</h1>
+              <p className="subtle" data-personal-text="Plan your spend, track actuals, and move unused funds to savings or another category." data-business-text="Plan organization expenses, compare actuals, and manage category allocations.">Plan your spend, track actuals, and move unused funds to savings or another category.</p>
             </div>
             <div className="budget-hero-meta">
               <div className="budget-selector">

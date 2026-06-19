@@ -22,6 +22,10 @@ const els = {
   usersPrevPage: document.getElementById("usersPrevPage"),
   usersNextPage: document.getElementById("usersNextPage"),
   usersPageInfo: document.getElementById("usersPageInfo"),
+  inviteMemberBtn: document.getElementById("inviteMemberBtn"),
+  invitationsSection: document.getElementById("organizationInvitationsSection"),
+  invitationsTbody: document.getElementById("organizationInvitationsTbody"),
+  invitationsStatus: document.getElementById("organizationInvitationsStatus"),
   userDataSections: document.getElementById("userDataSections"),
   achievementsPanel: document.getElementById("achievementsPanel"),
   achievementsPanelBody: document.getElementById("achievementsPanelBody"),
@@ -139,6 +143,10 @@ const els = {
   userAccountStatus: document.getElementById("adminUserAccountStatus"),
   userAccessExpiresAt: document.getElementById("adminUserAccessExpiresAt"),
   userStatus: document.getElementById("adminUserStatus"),
+  inviteMemberModal: document.getElementById("inviteMemberModal"),
+  inviteMemberForm: document.getElementById("inviteMemberForm"),
+  inviteMemberEmail: document.getElementById("inviteMemberEmail"),
+  inviteMemberStatus: document.getElementById("inviteMemberStatus"),
 
   recordModal: document.getElementById("adminRecordModal"),
   recordForm: document.getElementById("adminRecordForm"),
@@ -165,6 +173,7 @@ const state = {
   usersTotal: 0,
   userOptions: [],
   users: [],
+  organizationInvitations: [],
   records: [],
   receipts: [],
   budgetSheets: [],
@@ -494,6 +503,9 @@ function applyPermissionVisibility() {
   setReadOnlyBadge(els.supportPanel, "support_admin", canSupportRead && !canSupportWrite);
   setReadOnlyBadge(els.systemHealthPanel, "admin", canHealthRead && !canHealthWrite);
   applyScopedUserRoleOptions();
+  const canManageOrganization = state.currentRole === "org_admin" && hasPermission("users.write");
+  if (els.inviteMemberBtn) els.inviteMemberBtn.hidden = !canManageOrganization;
+  els.invitationsSection?.classList.toggle("is-hidden", state.currentRole !== "org_admin");
   syncNotificationScopeControls();
 }
 
@@ -941,6 +953,7 @@ function renderUsers() {
               ? `<td>
             ${canViewUserData ? `<button class="btn btn--link" data-action="view-user" data-id="${user.id}">View Data</button>` : ""}
             ${canUsersWrite ? `<button class="btn btn--link" data-action="edit-user" data-id="${user.id}">Edit</button>` : ""}
+            ${state.currentRole === "org_admin" && user.role === "org_user" ? `<button class="btn btn--link" data-action="make-org-admin" data-id="${user.id}">Make Admin</button>` : ""}
           </td>`
               : ""
           }
@@ -949,6 +962,63 @@ function renderUsers() {
     )
     .join("");
   renderUsersPager();
+}
+
+function renderOrganizationInvitations() {
+  if (!els.invitationsTbody) return;
+  if (!state.organizationInvitations.length) {
+    els.invitationsTbody.innerHTML = `<tr><td colspan="4" class="subtle">No invitations.</td></tr>`;
+    return;
+  }
+  els.invitationsTbody.innerHTML = state.organizationInvitations.map((invitation) => {
+    const expired = new Date(invitation.expires_at).getTime() <= Date.now();
+    const status = invitation.accepted_at ? "Accepted" : invitation.revoked_at ? "Revoked" : expired ? "Expired" : "Pending";
+    const action = status === "Pending"
+      ? `<button class="btn btn--link" data-action="revoke-org-invitation" data-id="${invitation.id}">Revoke</button>`
+      : "—";
+    return `<tr><td>${escapeHtml(invitation.email || "")}</td><td>${status}</td><td>${formatDateTime(invitation.expires_at)}</td><td>${action}</td></tr>`;
+  }).join("");
+}
+
+async function loadOrganizationInvitations() {
+  if (state.currentRole !== "org_admin") return;
+  try {
+    const { invitations } = await api.admin.listOrganizationInvitations();
+    state.organizationInvitations = invitations || [];
+    renderOrganizationInvitations();
+  } catch (err) {
+    setStatus(els.invitationsStatus, err.message || "Failed to load invitations.", "error");
+  }
+}
+
+async function sendOrganizationInvitation(event) {
+  event.preventDefault();
+  const email = String(els.inviteMemberEmail?.value || "").trim();
+  if (!email) return;
+  setStatus(els.inviteMemberStatus, "Sending invitation...");
+  try {
+    await api.admin.inviteOrganizationMember(email);
+    setStatus(els.inviteMemberStatus, "Invitation sent.", "ok");
+    els.inviteMemberForm?.reset();
+    await loadOrganizationInvitations();
+    closeModal(els.inviteMemberModal);
+  } catch (err) {
+    setStatus(els.inviteMemberStatus, err.message || "Failed to send invitation.", "error");
+  }
+}
+
+async function transferOrganizationAdministrator(targetUserId) {
+  const user = state.users.find((item) => item.id === targetUserId);
+  if (!user) return;
+  const confirmed = window.confirm(`Make ${getUserLabel(user)} the organization administrator? Your account will become a regular organization member.`);
+  if (!confirmed) return;
+  setStatus(els.usersStatus, "Reassigning organization administrator...");
+  try {
+    await api.admin.transferOrganizationAdmin(targetUserId);
+    window.location.href = "/home";
+  } catch (err) {
+    setStatus(els.usersStatus, err.message || "Failed to reassign administrator.", "error");
+  }
 }
 
 function renderUserOptions() {
@@ -2445,6 +2515,12 @@ function bindEvents() {
   if (els.userForm) {
     els.userForm.addEventListener("submit", saveUser);
   }
+  els.inviteMemberBtn?.addEventListener("click", () => {
+    setStatus(els.inviteMemberStatus, "");
+    openModal(els.inviteMemberModal);
+    els.inviteMemberEmail?.focus();
+  });
+  els.inviteMemberForm?.addEventListener("submit", sendOrganizationInvitation);
 
   if (els.recordForm) {
     els.recordForm.addEventListener("submit", saveRecord);
@@ -2597,6 +2673,17 @@ function bindEvents() {
       }
       const user = state.users.find((u) => u.id === id);
       openUserModal(user);
+    }
+
+    if (action === "make-org-admin") {
+      transferOrganizationAdministrator(id);
+    }
+
+    if (action === "revoke-org-invitation") {
+      if (!window.confirm("Revoke this invitation?")) return;
+      api.admin.revokeOrganizationInvitation(id)
+        .then(() => loadOrganizationInvitations())
+        .catch((err) => setStatus(els.invitationsStatus, err.message || "Failed to revoke invitation.", "error"));
     }
 
     if (action === "view-user") {
@@ -2756,6 +2843,7 @@ async function init() {
   const initialLoads = [];
   if (hasPermission("health.read")) initialLoads.push(loadStats(), loadSystemHealth());
   if (hasPermission("users.read")) initialLoads.push(loadUserOptions(), loadUsers({ resetPage: true, evaluateSelection: false }));
+  if (state.currentRole === "org_admin") initialLoads.push(loadOrganizationInvitations());
   if (hasPermission("settings.read")) initialLoads.push(loadSettings());
   if (hasPermission("notifications.read")) initialLoads.push(loadNotificationHistory());
   if (hasPermission("audit.read")) initialLoads.push(loadAuditLog());

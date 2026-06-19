@@ -1,7 +1,7 @@
 import { query } from "../config/db.js";
 
 export async function listRecurringSchedules(userId, { active } = {}) {
-  const where = ["user_id = $1"];
+  const where = ["can_access_organization_resource(user_id, organization_id, $1)"];
   const params = [userId];
 
   if (active !== undefined) {
@@ -27,7 +27,7 @@ export async function getRecurringScheduleById(userId, id) {
     `
     SELECT *
     FROM recurring_schedules
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     LIMIT 1
     `,
     [id, userId]
@@ -109,7 +109,7 @@ export async function updateRecurringSchedule(userId, id, changes = {}) {
     UPDATE recurring_schedules
     SET ${sets.join(", ")},
         updated_at = now()
-    WHERE id = $${params.length - 1} AND user_id = $${params.length}
+    WHERE id = $${params.length - 1} AND can_access_organization_resource(user_id, organization_id, $${params.length})
     RETURNING *
     `,
     params
@@ -122,7 +122,7 @@ export async function deleteRecurringSchedule(userId, id) {
   const { rows } = await query(
     `
     DELETE FROM recurring_schedules
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     RETURNING id
     `,
     [id, userId]

@@ -18,7 +18,7 @@ function mapRuleRow(row) {
 
 export async function listRulesByUser(userId, { enabledOnly = false } = {}) {
   const params = [userId];
-  let where = "user_id = $1";
+  let where = "can_access_organization_resource(user_id, organization_id, $1)";
   if (enabledOnly) {
     where += " AND enabled = true";
   }
@@ -41,7 +41,7 @@ export async function getRuleById(userId, id) {
     `
     SELECT *
     FROM rules
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     LIMIT 1
     `,
     [id, userId]
@@ -98,7 +98,7 @@ export async function updateRule(userId, id, changes = {}) {
     UPDATE rules
     SET ${sets.join(", ")},
         updated_at = now()
-    WHERE id = $${i++} AND user_id = $${i++}
+    WHERE id = $${i++} AND can_access_organization_resource(user_id, organization_id, $${i++})
     RETURNING *
     `,
     values
@@ -111,7 +111,7 @@ export async function deleteRule(userId, id) {
   const { rows } = await query(
     `
     DELETE FROM rules
-    WHERE id = $1 AND user_id = $2
+    WHERE id = $1 AND can_access_organization_resource(user_id, organization_id, $2)
     RETURNING id
     `,
     [id, userId]

@@ -17,7 +17,17 @@ import {
   updateUserById,
   updateUserPasswordHash,
 } from "../models/user.model.js";
-import { createOrganization } from "../models/organization.model.js";
+import { createOrganization, updateOrganizationById } from "../models/organization.model.js";
+import {
+  acceptOrganizationInvitation,
+  findInvitationByTokenHash,
+} from "../models/organization_invitation.model.js";
+import {
+  clearActiveOrganization,
+  listUserOrganizations,
+  setActiveOrganization,
+  upsertOrganizationMembership,
+} from "../models/organization_membership.model.js";
 import {
   createSession,
   enforceMaxActiveSessionsForUser,
@@ -292,22 +302,28 @@ function parseOauthState(rawState) {
   }
 }
 
-function setOauthStateCookie(res, value) {
-  const isProd = env.nodeEnv === "production";
+function useSecureOauthCookie(req) {
+  try {
+    return new URL(getRequestOrigin(req)).protocol === "https:";
+  } catch {
+    return Boolean(req?.secure);
+  }
+}
+
+function setOauthStateCookie(req, res, value) {
   res.cookie("oauth_state", value, {
     httpOnly: true,
-    secure: isProd,
+    secure: useSecureOauthCookie(req),
     sameSite: "lax",
     path: "/api/auth/google",
     maxAge: 10 * 60 * 1000,
   });
 }
 
-function clearOauthStateCookie(res) {
-  const isProd = env.nodeEnv === "production";
+function clearOauthStateCookie(req, res) {
   res.cookie("oauth_state", "", {
     httpOnly: true,
-    secure: isProd,
+    secure: useSecureOauthCookie(req),
     sameSite: "lax",
     path: "/api/auth/google",
     expires: new Date(0),
@@ -451,7 +467,7 @@ export const googleStart = asyncHandler(async (req, res) => {
   const nonce = crypto.randomUUID();
   const state = createOauthState({ nonce, mode, returnTo });
 
-  setOauthStateCookie(res, nonce);
+  setOauthStateCookie(req, res, nonce);
 
   const authUrl = appendUrlParams("https://accounts.google.com/o/oauth2/v2/auth", {
     client_id: env.googleClientId,
@@ -491,7 +507,7 @@ export const googleCallback = asyncHandler(async (req, res) => {
   }
 
   const nonceFromCookie = String(req.cookies?.oauth_state || "");
-  clearOauthStateCookie(res);
+  clearOauthStateCookie(req, res);
 
   if (!decodedState?.nonce || !nonceFromCookie || decodedState.nonce !== nonceFromCookie) {
     return failRedirect("OAuth state mismatch. Please try again.");
@@ -696,7 +712,7 @@ export const login = asyncHandler(async (req, res) => {
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-export function validateBusinessRegistration(body = {}) {
+export function validateBusinessDetails(body = {}) {
   const value = (key, max = 200) => String(body[key] || "").trim().slice(0, max);
   const data = {
     businessName: value("businessName"),
@@ -710,19 +726,12 @@ export function validateBusinessRegistration(body = {}) {
     region: value("region", 100),
     postalCode: value("postalCode", 30),
     country: value("country", 100),
-    adminFullName: value("adminFullName"),
-    adminEmail: value("adminEmail").toLowerCase(),
-    password: String(body.password || ""),
   };
-
-  if (!data.businessName || !data.businessEmail || !data.adminFullName || !data.adminEmail || !data.password) {
-    return { ok: false, message: "Business name, business email, administrator details, and password are required" };
+  if (!data.businessName || !data.businessEmail) {
+    return { ok: false, message: "Business name and business email are required" };
   }
-  if (!EMAIL_PATTERN.test(data.businessEmail) || !EMAIL_PATTERN.test(data.adminEmail)) {
-    return { ok: false, message: "Enter valid business and administrator email addresses" };
-  }
-  if (data.password.length < 8) {
-    return { ok: false, message: "Password must be at least 8 characters long" };
+  if (!EMAIL_PATTERN.test(data.businessEmail)) {
+    return { ok: false, message: "Enter a valid business email address" };
   }
   if (data.website) {
     try {
@@ -734,6 +743,57 @@ export function validateBusinessRegistration(body = {}) {
     }
   }
   return { ok: true, data };
+}
+
+export function validateBusinessRegistration(body = {}) {
+  const businessValidation = validateBusinessDetails(body);
+  if (!businessValidation.ok) return businessValidation;
+  const value = (key, max = 200) => String(body[key] || "").trim().slice(0, max);
+  const data = {
+    ...businessValidation.data,
+    adminFullName: value("adminFullName"),
+    adminEmail: value("adminEmail").toLowerCase(),
+    password: String(body.password || ""),
+  };
+
+  if (!data.adminFullName || !data.adminEmail || !data.password) {
+    return { ok: false, message: "Administrator details and password are required" };
+  }
+  if (!EMAIL_PATTERN.test(data.adminEmail)) {
+    return { ok: false, message: "Enter a valid administrator email address" };
+  }
+  if (data.password.length < 8) {
+    return { ok: false, message: "Password must be at least 8 characters long" };
+  }
+  return { ok: true, data };
+}
+
+async function createUniqueUsernameWithExecutor(base, executor) {
+  const normalizedBase = String(base || "user")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]/g, "")
+    .slice(0, 24) || "user";
+  let candidate = normalizedBase;
+  let suffix = 1;
+  while (true) {
+    const { rows } = await executor(`SELECT 1 FROM users WHERE lower(username) = $1 LIMIT 1`, [candidate]);
+    if (!rows.length) return candidate;
+    suffix += 1;
+    candidate = `${normalizedBase}${suffix}`;
+  }
+}
+
+function invitationTokenHash(token) {
+  return crypto.createHash("sha256").update(String(token || "")).digest("hex");
+}
+
+export function isInvitationAvailable(invitation) {
+  return Boolean(
+    invitation &&
+    !invitation.accepted_at &&
+    !invitation.revoked_at &&
+    new Date(invitation.expires_at).getTime() > Date.now()
+  );
 }
 
 export const registerBusiness = asyncHandler(async (req, res) => {
@@ -773,6 +833,14 @@ export const registerBusiness = asyncHandler(async (req, res) => {
       organizationId: organization.id,
       executor,
     });
+    await upsertOrganizationMembership({
+      organizationId: organization.id,
+      userId: user.id,
+      membershipRole: "admin",
+      invitedBy: user.id,
+      executor,
+    });
+    await setActiveOrganization(user.id, organization.id, executor);
     return { organization, user };
   });
 
@@ -784,6 +852,181 @@ export const registerBusiness = asyncHandler(async (req, res) => {
   const token = createToken(user.id, session.id);
   setTokenCookie(res, token);
   res.status(201).json({ organization, user, token });
+});
+
+export const createAdditionalBusiness = asyncHandler(async (req, res) => {
+  const validation = validateBusinessDetails(req.body);
+  if (!validation.ok) return res.status(400).json({ message: validation.message });
+  const data = validation.data;
+  const organization = await withTransaction(async (executor) => {
+    const organization = await createOrganization({
+      name: data.businessName,
+      businessType: data.businessType,
+      industry: data.industry,
+      email: data.businessEmail,
+      phoneNumber: data.businessPhone,
+      website: data.website,
+      address: data.address,
+      city: data.city,
+      region: data.region,
+      postalCode: data.postalCode,
+      country: data.country,
+      executor,
+    });
+    await upsertOrganizationMembership({
+      organizationId: organization.id,
+      userId: req.user.id,
+      membershipRole: "admin",
+      invitedBy: req.user.id,
+      executor,
+    });
+    await setActiveOrganization(req.user.id, organization.id, executor);
+    return organization;
+  });
+  await logActivity({
+    userId: req.user.id,
+    action: "organization_create",
+    entityType: "organization",
+    entityId: organization.id,
+    metadata: { organizationName: organization.name },
+    req,
+  });
+  const user = await findUserById(req.user.id);
+  res.status(201).json({ organization, user });
+});
+
+export const getOrganizationInvitation = asyncHandler(async (req, res) => {
+  const token = String(req.params.token || "").trim();
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
+    return res.status(404).json({ message: "Invitation not found." });
+  }
+  const invitation = await findInvitationByTokenHash(invitationTokenHash(token));
+  if (!isInvitationAvailable(invitation)) {
+    return res.status(410).json({ message: "This invitation is invalid, expired, or no longer available." });
+  }
+  const { rows: existingUsers } = await query(`SELECT id FROM users WHERE lower(email) = $1 LIMIT 1`, [String(invitation.email).toLowerCase()]);
+  res.json({
+    invitation: {
+      email: invitation.email,
+      organizationName: invitation.organization_name,
+      expiresAt: invitation.expires_at,
+      hasExistingAccount: Boolean(existingUsers[0]),
+    },
+  });
+});
+
+export const acceptOrganizationMemberInvitation = asyncHandler(async (req, res) => {
+  const token = String(req.params.token || "").trim();
+  const fullName = String(req.body?.fullName || "").trim();
+  const password = String(req.body?.password || "");
+  if (!/^[a-f0-9]{64}$/i.test(token)) {
+    return res.status(404).json({ message: "Invitation not found." });
+  }
+  if (!fullName || fullName.length > 200) {
+    return res.status(400).json({ message: "Full name is required." });
+  }
+  if (password.length < 8) {
+    return res.status(400).json({ message: "Password must be at least 8 characters long." });
+  }
+  const passwordHash = await bcrypt.hash(password, await bcrypt.genSalt(12));
+  const tokenHash = invitationTokenHash(token);
+
+  const { user, invitation } = await withTransaction(async (executor) => {
+    const invitation = await findInvitationByTokenHash(tokenHash, executor, { forUpdate: true });
+    if (!isInvitationAvailable(invitation)) {
+      const error = new Error("This invitation is invalid, expired, or no longer available.");
+      error.status = 410;
+      throw error;
+    }
+    const { rows: existingRows } = await executor(
+      `SELECT id FROM users WHERE lower(email) = $1 LIMIT 1`,
+      [String(invitation.email).toLowerCase()]
+    );
+    if (existingRows[0]) {
+      const error = new Error("An account with this email already exists.");
+      error.status = 400;
+      throw error;
+    }
+    const username = await createUniqueUsernameWithExecutor(
+      String(invitation.email).split("@")[0],
+      executor
+    );
+    const user = await createUser({
+      email: invitation.email,
+      username,
+      passwordHash,
+      fullName,
+      role: "org_user",
+      organizationId: invitation.organization_id,
+      executor,
+    });
+    await upsertOrganizationMembership({
+      organizationId: invitation.organization_id,
+      userId: user.id,
+      membershipRole: "member",
+      invitedBy: invitation.invited_by,
+      executor,
+    });
+    await setActiveOrganization(user.id, invitation.organization_id, executor);
+    await acceptOrganizationInvitation(invitation.id, executor);
+    return { user, invitation };
+  });
+
+  const { session } = await createSessionWithPolicy({
+    userId: user.id,
+    userAgent: req.get("user-agent") || "",
+    ipAddress: getRequestIp(req),
+  });
+  const authToken = createToken(user.id, session.id);
+  setTokenCookie(res, authToken);
+  await logActivity({
+    userId: user.id,
+    action: "organization_invitation_accept",
+    entityType: "organization_invitation",
+    entityId: invitation.id,
+    metadata: { organizationId: invitation.organization_id },
+    req,
+  });
+  res.status(201).json({ user, token: authToken });
+});
+
+export const acceptExistingOrganizationInvitation = asyncHandler(async (req, res) => {
+  const token = String(req.params.token || "").trim();
+  if (!/^[a-f0-9]{64}$/i.test(token)) return res.status(404).json({ message: "Invitation not found." });
+  const invitation = await withTransaction(async (executor) => {
+    const invitation = await findInvitationByTokenHash(invitationTokenHash(token), executor, { forUpdate: true });
+    if (!isInvitationAvailable(invitation)) {
+      const error = new Error("This invitation is invalid, expired, or no longer available."); error.status = 410; throw error;
+    }
+    if (String(invitation.email).toLowerCase() !== String(req.user.email).toLowerCase()) {
+      const error = new Error("Sign in with the email address that received this invitation."); error.status = 403; throw error;
+    }
+    await upsertOrganizationMembership({ organizationId: invitation.organization_id, userId: req.user.id,
+      membershipRole: "member", invitedBy: invitation.invited_by, executor });
+    await setActiveOrganization(req.user.id, invitation.organization_id, executor);
+    await acceptOrganizationInvitation(invitation.id, executor);
+    return invitation;
+  });
+  const user = await findUserById(req.user.id);
+  res.json({ user, organizationId: invitation.organization_id });
+});
+
+export const listMyOrganizations = asyncHandler(async (req, res) => {
+  const organizations = await listUserOrganizations(req.user.id);
+  res.json({ organizations, activeOrganizationId: req.user.active_organization_id || req.user.organization_id || null });
+});
+
+export const switchActiveOrganization = asyncHandler(async (req, res) => {
+  const organizationId = String(req.body?.organizationId || "").trim();
+  if (!organizationId) {
+    await clearActiveOrganization(req.user.id);
+    const user = await findUserById(req.user.id);
+    return res.json({ user, active: { organizationId: null, membershipRole: null, effectiveRole: user.platform_role || "user" } });
+  }
+  const active = await setActiveOrganization(req.user.id, organizationId);
+  if (!active) return res.status(404).json({ message: "Active organization membership not found." });
+  const user = await findUserById(req.user.id);
+  res.json({ user, active });
 });
 
 /* =====================================================
@@ -981,13 +1224,28 @@ export const updateMe = asyncHandler(async (req, res) => {
     }
   }
 
-  const updated = await updateUserById(userId, updates);
+  const organizationCategoryUpdates = {};
+  if (req.user.organization_id) {
+    if (updates.customExpenseCategories !== undefined) {
+      organizationCategoryUpdates.customExpenseCategories = updates.customExpenseCategories;
+      delete updates.customExpenseCategories;
+    }
+    if (updates.customIncomeCategories !== undefined) {
+      organizationCategoryUpdates.customIncomeCategories = updates.customIncomeCategories;
+      delete updates.customIncomeCategories;
+    }
+    if (Object.keys(organizationCategoryUpdates).length) {
+      await updateOrganizationById(req.user.organization_id, organizationCategoryUpdates);
+    }
+  }
+  await updateUserById(userId, updates);
+  const updated = await findUserById(userId);
   await logActivity({
     userId,
     action: "profile_update",
     entityType: "user",
     entityId: userId,
-    metadata: { fields: Object.keys(updates) },
+    metadata: { fields: [...Object.keys(updates), ...Object.keys(organizationCategoryUpdates)] },
     req,
   });
   res.json({ user: updated });
@@ -1304,6 +1562,23 @@ export const logoutAll = asyncHandler(async (req, res) => {
 ===================================================== */
 export const deleteMe = asyncHandler(async (req, res) => {
   const userId = req.user.id;
+  const { rows: membershipRows } = await query(
+    `SELECT membership_role, count(*)::int AS membership_count
+     FROM organization_memberships WHERE user_id = $1 AND status = 'active'
+     GROUP BY membership_role`,
+    [userId]
+  );
+  const activeMembershipCount = membershipRows.reduce((total, row) => total + Number(row.membership_count || 0), 0);
+  const administeredOrganizationCount = membershipRows
+    .filter((row) => row.membership_role === "admin")
+    .reduce((total, row) => total + Number(row.membership_count || 0), 0);
+  if (activeMembershipCount > 0) {
+    return res.status(400).json({
+      message: administeredOrganizationCount > 0
+        ? "Transfer or delete every organization you administer before deleting your account. An administrator must also remove any remaining memberships."
+        : "An organization administrator must remove your memberships before you can delete your account.",
+    });
+  }
 
   // 1) Fetch receipt object keys so we can delete R2 files (continue on error)
   const { rows: receiptRows } = await query(
@@ -1321,18 +1596,20 @@ export const deleteMe = asyncHandler(async (req, res) => {
     }
   }
 
-  // 2) Delete the user. records/receipts cascade via FK ON DELETE CASCADE
-  await query(`DELETE FROM users WHERE id = $1`, [userId]);
-
-  // 3) Clear auth cookie
-  clearTokenCookie(res);
-
+  // 2) Write the deletion audit while the user still exists. The user reference is
+  // anonymized by ON DELETE SET NULL when the account is removed.
   await logActivity({
     userId,
     action: "account_delete",
     entityType: "user",
-    entityId: userId,
+    metadata: { method: "self_service" },
     req,
   });
+
+  // 3) Delete the user. Personal records/receipts cascade via FK ON DELETE CASCADE.
+  await query(`DELETE FROM users WHERE id = $1`, [userId]);
+
+  // 4) Clear auth cookie
+  clearTokenCookie(res);
   res.json({ message: "Account and all associated data have been deleted" });
 });

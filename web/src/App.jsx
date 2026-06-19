@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import AboutPage from "./pages/AboutPage.jsx";
+import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
 import BudgetingPage from "./pages/BudgetingPage.jsx";
 import CareersPage from "./pages/CareersPage.jsx";
@@ -19,6 +20,7 @@ import ReportsPage from "./pages/ReportsPage.jsx";
 import RulesPage from "./pages/RulesPage.jsx";
 import SettingsPage from "./pages/SettingsPage.jsx";
 import TermsPage from "./pages/TermsPage.jsx";
+import TeamPage from "./pages/TeamPage.jsx";
 import TimeoutPage from "./pages/TimeoutPage.jsx";
 import UploadPage from "./pages/UploadPage.jsx";
 
@@ -29,6 +31,7 @@ const ROUTES = {
   "/register": { title: "WalletLens - Register", Page: RegisterPage },
   "/registerwho": { title: "WalletLens - Choose Account Type", Page: RegisterWhoPage },
   "/registerbusiness": { title: "WalletLens - Business Registration", Page: RegisterBusinessPage },
+  "/acceptinvite": { title: "WalletLens - Accept Invitation", Page: AcceptInvitePage },
   "/home": { title: "WalletLens - Home", Page: HomePage },
   "/upload": { title: "WalletLens - Upload", Page: UploadPage },
   "/records": { title: "WalletLens - Records", Page: RecordsPage },
@@ -39,6 +42,7 @@ const ROUTES = {
   "/profile": { title: "WalletLens - Profile", Page: ProfilePage },
   "/settings": { title: "WalletLens - Settings", Page: SettingsPage },
   "/admin": { title: "WalletLens - Admin", Page: AdminPage },
+  "/team": { title: "WalletLens - Team", Page: TeamPage },
   "/about": { title: "WalletLens - About", Page: AboutPage },
   "/careers": { title: "WalletLens - Careers", Page: CareersPage },
   "/help": { title: "WalletLens - Help", Page: HelpPage },
@@ -109,7 +113,7 @@ export default function App() {
 
   useEffect(() => {
     document.title = route.title;
-    const landingRoutes = new Set(["/", "/index", "/login", "/register", "/registerwho", "/registerbusiness", "/timeout", "/expired"]);
+    const landingRoutes = new Set(["/", "/index", "/login", "/register", "/registerwho", "/registerbusiness", "/acceptinvite", "/timeout", "/expired"]);
     document.body.classList.toggle("landing-light", landingRoutes.has(path));
     window.setTimeout(() => {
       document.dispatchEvent(new CustomEvent("walletlens:template-ready"));

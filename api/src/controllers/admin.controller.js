@@ -1,9 +1,29 @@
 // src/controllers/admin.controller.js
 import asyncHandler from "../middleware/async.js";
-import { query } from "../config/db.js";
+import { query, withTransaction } from "../config/db.js";
 import bcrypt from "bcryptjs";
+import crypto from "crypto";
 import fs from "fs/promises";
 import env from "../config/env.js";
+import { sendEmail } from "../services/email.service.js";
+import { deleteObject } from "../services/r2.service.js";
+import {
+  createOrganizationInvitation,
+  findOrganizationInvitationById,
+  listOrganizationInvitations,
+  rotateOrganizationInvitation,
+  revokeOrganizationInvitation,
+  revokePendingInvitationByEmail,
+  updateInvitationDelivery,
+} from "../models/organization_invitation.model.js";
+import { findOrganizationById, updateOrganizationById } from "../models/organization.model.js";
+import { clearActiveOrganization, setActiveOrganization } from "../models/organization_membership.model.js";
+import {
+  clearTwoFaCodes,
+  createTwoFaCode,
+  deleteTwoFaCodeById,
+  findValidTwoFaCode,
+} from "../models/twofa.model.js";
 import {
   listUsers,
   findUserById,
@@ -14,7 +34,7 @@ import {
   computeDefaultAccessExpiresAt,
   isAdminRoleType,
 } from "../services/account_access.service.js";
-import { revokeAllActiveSessions } from "../models/session.model.js";
+import { revokeAllActiveSessions, revokeAllSessionsForUser } from "../models/session.model.js";
 import {
   listRecordsAdmin,
   getRecordByIdAdmin,
@@ -67,16 +87,69 @@ function getActorOrganizationId(req) {
   return String(req.user?.organization_id || req.user?.organizationId || "").trim();
 }
 
+function getActorAdminRole(req) {
+  const platformRole = String(req.user?.platform_role || "").trim().toLowerCase();
+  return platformRole && platformRole !== "user" ? platformRole : String(req.user?.role || "").trim().toLowerCase();
+}
+
+const INVITATION_EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function requireOrganizationAdmin(req, res) {
+  const organizationId = getActorOrganizationId(req);
+  if (!isOrgAdminRole(getActorAdminRole(req)) || !organizationId) {
+    res.status(403).json({ message: "Organization administrator access is required." });
+    return "";
+  }
+  return organizationId;
+}
+
+function hashInvitationToken(token) {
+  return crypto.createHash("sha256").update(String(token)).digest("hex");
+}
+
+function invitationFrontendUrl(req, token) {
+  const requestOrigin = String(req.get("origin") || "").trim();
+  const fallbackOrigin = env.clientOrigins?.[0] || "http://localhost:5173";
+  let origin = fallbackOrigin;
+  try {
+    const parsed = new URL(requestOrigin);
+    if (["http:", "https:"].includes(parsed.protocol)) origin = parsed.origin;
+  } catch {
+    // Use configured frontend origin.
+  }
+  const url = new URL("/acceptinvite", origin);
+  url.searchParams.set("token", token);
+  return url.toString();
+}
+
+async function deliverOrganizationInvitation({ req, invitation, token, organizationName }) {
+  const acceptUrl = invitationFrontendUrl(req, token);
+  const customMessage = String(invitation.custom_message || "").trim();
+  const text = [
+    `${req.user.full_name || req.user.email} invited you to join ${organizationName} on <AppName>.`,
+    customMessage,
+    `Accept the invitation: ${acceptUrl}`,
+    "This invitation expires in 7 days.",
+  ].filter(Boolean).join("\n\n");
+  try {
+    await sendEmail({ to: invitation.email, subject: `Invitation to join ${organizationName}`, text });
+    await updateInvitationDelivery(invitation.id, "sent");
+  } catch (error) {
+    await updateInvitationDelivery(invitation.id, "failed", String(error?.message || "Email delivery failed").slice(0, 500));
+    throw error;
+  }
+}
+
 function getScopedUserRoleFilter(req) {
-  return isOrgAdminRole(req.user?.role) ? [ORG_USER_ROLE] : [];
+  return isOrgAdminRole(getActorAdminRole(req)) ? [ORG_USER_ROLE] : [];
 }
 
 function getScopedOrganizationIdFilter(req) {
-  return isOrgAdminRole(req.user?.role) ? getActorOrganizationId(req) : "";
+  return isOrgAdminRole(getActorAdminRole(req)) ? getActorOrganizationId(req) : "";
 }
 
 async function assertOrgScopedUserAccess(req, userId) {
-  if (!isOrgAdminRole(req.user?.role)) {
+  if (!isOrgAdminRole(getActorAdminRole(req))) {
     return { allowed: true, user: null };
   }
 
@@ -94,7 +167,12 @@ async function assertOrgScopedUserAccess(req, userId) {
     return { allowed: false, status: 404, message: "User not found" };
   }
 
-  if (!isOrgUserRole(user.role) || String(user.organization_id || "").trim() !== actorOrganizationId) {
+  const { rows: membershipRows } = await query(
+    `SELECT membership_role FROM organization_memberships
+     WHERE organization_id = $1 AND user_id = $2 AND status = 'active' LIMIT 1`,
+    [actorOrganizationId, userId]
+  );
+  if (membershipRows[0]?.membership_role !== "member") {
     return {
       allowed: false,
       status: 403,
@@ -106,7 +184,7 @@ async function assertOrgScopedUserAccess(req, userId) {
 }
 
 async function assertOrgScopedSupportTicketAccess(req, ticketId) {
-  if (!isOrgAdminRole(req.user?.role)) {
+  if (!isOrgAdminRole(getActorAdminRole(req))) {
     return { allowed: true };
   }
 
@@ -461,7 +539,7 @@ export const listUserOptionsAdmin = asyncHandler(async (_req, res) => {
   const params = [];
   const where = [];
   let i = 1;
-  if (isOrgAdminRole(_req.user?.role)) {
+  if (isOrgAdminRole(getActorAdminRole(_req))) {
     const actorOrganizationId = getActorOrganizationId(_req);
     if (!actorOrganizationId) {
       return res.json({ users: [] });
@@ -486,6 +564,432 @@ export const listUserOptionsAdmin = asyncHandler(async (_req, res) => {
     params
   );
   res.json({ users: rows });
+});
+
+export const listOrganizationInvitationsAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const invitations = await listOrganizationInvitations(organizationId);
+  res.json({ invitations });
+});
+
+export const inviteOrganizationMemberAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const email = String(req.body?.email || "").toLowerCase().trim();
+  const customMessage = String(req.body?.message || "").trim();
+  if (!INVITATION_EMAIL_PATTERN.test(email)) {
+    return res.status(400).json({ message: "Enter a valid email address." });
+  }
+  if (customMessage.length > 1000) {
+    return res.status(400).json({ message: "Invitation message cannot exceed 1000 characters." });
+  }
+  const { rows: existingRows } = await query(
+    `SELECT u.id, m.status AS membership_status
+     FROM users u LEFT JOIN organization_memberships m
+       ON m.user_id = u.id AND m.organization_id = $2
+     WHERE lower(u.email) = $1 LIMIT 1`,
+    [email, organizationId]
+  );
+  if (existingRows[0]?.membership_status === "active") {
+    return res.status(400).json({ message: "This user is already a member of the organization." });
+  }
+
+  const token = crypto.randomBytes(32).toString("hex");
+  const tokenHash = hashInvitationToken(token);
+  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+  const invitation = await withTransaction(async (executor) => {
+    await revokePendingInvitationByEmail(organizationId, email, executor);
+    return createOrganizationInvitation({
+      organizationId,
+      email,
+      tokenHash,
+      invitedBy: req.user.id,
+      expiresAt,
+      customMessage,
+      executor,
+    });
+  });
+
+  const { rows: organizationRows } = await query(`SELECT name FROM organizations WHERE id = $1 LIMIT 1`, [organizationId]);
+  const organizationName = organizationRows[0]?.name || "your organization";
+  await deliverOrganizationInvitation({ req, invitation, token, organizationName });
+
+  await logActivity({
+    userId: req.user.id,
+    action: "organization_member_invite",
+    entityType: "organization_invitation",
+    entityId: invitation.id,
+    metadata: { organizationId, email },
+    req,
+  });
+  res.status(201).json({ invitation });
+});
+
+export const resendOrganizationInvitationAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const existing = await findOrganizationInvitationById(req.params.id, organizationId);
+  if (!existing || existing.accepted_at) {
+    return res.status(404).json({ message: "Invitation is not available for resend." });
+  }
+  const token = crypto.randomBytes(32).toString("hex");
+  const invitation = await rotateOrganizationInvitation(
+    existing.id,
+    organizationId,
+    hashInvitationToken(token),
+    new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  );
+  const organization = await findOrganizationById(organizationId);
+  await deliverOrganizationInvitation({ req, invitation, token, organizationName: organization?.name || "your organization" });
+  res.json({ invitation: await findOrganizationInvitationById(invitation.id, organizationId) });
+});
+
+export const getOrganizationAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const organization = await findOrganizationById(organizationId);
+  const { rows: members } = await query(
+    `SELECT u.id, u.username, u.email, u.full_name, u.phone_number, u.avatar_url, u.created_at,
+       CASE WHEN m.membership_role = 'admin' THEN 'org_admin' ELSE 'org_user' END AS role
+     FROM organization_memberships m JOIN users u ON u.id = m.user_id
+     WHERE m.organization_id = $1 AND m.status = 'active'
+     ORDER BY CASE WHEN m.membership_role = 'admin' THEN 0 ELSE 1 END, lower(u.full_name), lower(u.email)`,
+    [organizationId]
+  );
+  res.json({ organization, members });
+});
+
+export const updateOrganizationAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const body = req.body || {};
+  const text = (key, max = 300) => String(body[key] || "").trim().slice(0, max);
+  const fiscalYearStartMonth = Number(body.fiscalYearStartMonth);
+  if (!Number.isInteger(fiscalYearStartMonth) || fiscalYearStartMonth < 1 || fiscalYearStartMonth > 12) {
+    return res.status(400).json({ message: "Fiscal year start month must be between 1 and 12." });
+  }
+  const defaultCurrency = text("defaultCurrency", 3).toUpperCase();
+  if (!/^[A-Z]{3}$/.test(defaultCurrency)) {
+    return res.status(400).json({ message: "Default currency must be a three-letter currency code." });
+  }
+  const organization = await updateOrganizationById(organizationId, {
+    name: text("name", 200), businessType: text("businessType", 100), industry: text("industry", 100),
+    email: text("email", 200).toLowerCase(), phoneNumber: text("phoneNumber", 50),
+    website: text("website", 500), address: text("address"), city: text("city", 100),
+    region: text("region", 100), postalCode: text("postalCode", 30), country: text("country", 100),
+    logoUrl: text("logoUrl", 500), defaultCurrency, timezone: text("timezone", 100) || "UTC",
+    fiscalYearStartMonth,
+  });
+  res.json({ organization });
+});
+
+export const removeOrganizationMemberAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const memberId = String(req.params.id || "").trim();
+  const disposition = String(req.body?.disposition || "retain").trim().toLowerCase();
+  const transferToUserId = String(req.body?.transferToUserId || "").trim();
+  if (!['retain', 'transfer', 'archive'].includes(disposition)) {
+    return res.status(400).json({ message: "Invalid member data disposition." });
+  }
+  const result = await withTransaction(async (executor) => {
+    const { rows } = await executor(
+      `SELECT u.id, u.username, u.email, u.full_name, u.active_organization_id,
+         m.membership_role, m.organization_id
+       FROM organization_memberships m JOIN users u ON u.id = m.user_id
+       WHERE m.user_id = $1 AND m.organization_id = $2 AND m.status = 'active' FOR UPDATE OF m, u`,
+      [memberId, organizationId]
+    );
+    const member = rows[0];
+    if (!member || member.membership_role !== "member") {
+      const error = new Error("Organization member not found."); error.status = 404; throw error;
+    }
+    let ownerUserId = null;
+    if (disposition === "transfer") {
+      const { rows: targetRows } = await executor(
+        `SELECT user_id AS id FROM organization_memberships
+         WHERE user_id = $1 AND organization_id = $2 AND status = 'active' LIMIT 1`,
+        [transferToUserId, organizationId]
+      );
+      if (!targetRows[0] || transferToUserId === memberId) {
+        const error = new Error("Select another active organization member for the transfer."); error.status = 400; throw error;
+      }
+      ownerUserId = transferToUserId;
+    }
+    const resourceTables = ['records', 'receipts', 'budget_sheets', 'rules', 'recurring_schedules', 'plaid_items', 'plaid_accounts', 'net_worth_items', 'net_worth_snapshots', 'receipt_jobs'];
+    const operationalResources = new Set(['plaid_items', 'plaid_accounts', 'receipt_jobs']);
+    for (const table of resourceTables) {
+      await executor(
+        `UPDATE ${table} SET organization_owner_user_id = $1 WHERE organization_id = $2 AND organization_owner_user_id = $3`,
+        [ownerUserId, organizationId, memberId]
+      );
+      await executor(
+        `UPDATE ${table} SET user_id = $1 WHERE organization_id = $2 AND user_id = $3`,
+        [operationalResources.has(table) ? req.user.id : null, organizationId, memberId]
+      );
+    }
+    await executor(
+      `INSERT INTO organization_member_archives
+       (organization_id, user_id, archived_by, member_snapshot, disposition, transferred_to)
+       VALUES ($1, $2, $3, $4::jsonb, $5, $6)`,
+      [organizationId, memberId, req.user.id, JSON.stringify(member), disposition, ownerUserId]
+    );
+    await executor(
+      `UPDATE organization_memberships SET status = $1, removed_at = now(), updated_at = now()
+       WHERE organization_id = $2 AND user_id = $3`,
+      [disposition === "archive" ? "archived" : "removed", organizationId, memberId]
+    );
+    if (member.active_organization_id === organizationId) {
+      const { rows: remaining } = await executor(
+        `SELECT organization_id FROM organization_memberships
+         WHERE user_id = $1 AND status = 'active' ORDER BY created_at LIMIT 1`,
+        [memberId]
+      );
+      if (remaining[0]) await setActiveOrganization(memberId, remaining[0].organization_id, executor);
+      else await clearActiveOrganization(memberId, executor);
+    }
+    return member;
+  });
+  await revokeAllSessionsForUser(memberId);
+  await logActivity({ userId: req.user.id, action: "organization_member_remove", entityType: "user",
+    entityId: memberId, metadata: { organizationId, disposition, transferToUserId: transferToUserId || null }, req });
+  res.json({ message: `${result.full_name || result.email} was removed from the organization.` });
+});
+
+export const revokeOrganizationInvitationAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const revoked = await revokeOrganizationInvitation(req.params.id, organizationId);
+  if (!revoked) return res.status(404).json({ message: "Pending invitation not found." });
+  res.json({ message: "Invitation revoked." });
+});
+
+export const transferOrganizationAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const targetUserId = String(req.body?.targetUserId || "").trim();
+  if (!targetUserId || targetUserId === req.user.id) {
+    return res.status(400).json({ message: "Select another organization member." });
+  }
+
+  const actorAuth = await findUserAuthById(req.user.id);
+  const credential = String(req.body?.credential || "").trim();
+  if (!actorAuth) return res.status(403).json({ message: "Current administrator could not be verified." });
+  if (actorAuth.two_fa_enabled) {
+    const match = credential ? await findValidTwoFaCode({
+      userId: req.user.id,
+      purpose: "organization_admin_transfer",
+      codeHash: crypto.createHmac("sha256", env.jwtSecret).update(credential).digest("hex"),
+    }) : null;
+    if (!match) return res.status(400).json({ message: "Enter the valid administrator transfer code." });
+    await deleteTwoFaCodeById(match.id);
+  } else if (actorAuth.password_hash) {
+    if (!credential || !(await bcrypt.compare(credential, actorAuth.password_hash))) {
+      return res.status(400).json({ message: "Enter your current password to reassign the administrator." });
+    }
+  } else {
+    return res.status(400).json({ message: "Enable two-factor authentication before reassigning the administrator." });
+  }
+
+  const result = await withTransaction(async (executor) => {
+    const { rows } = await executor(
+      `SELECT m.user_id AS id, m.membership_role, m.organization_id, u.email, u.full_name,
+         u.active_organization_id
+       FROM organization_memberships m JOIN users u ON u.id = m.user_id
+       WHERE m.organization_id = $1 AND m.user_id = ANY($2::uuid[]) AND m.status = 'active'
+       FOR UPDATE OF m, u`,
+      [organizationId, [req.user.id, targetUserId]]
+    );
+    const actor = rows.find((row) => row.id === req.user.id);
+    const target = rows.find((row) => row.id === targetUserId);
+    if (!actor || actor.membership_role !== "admin") {
+      const error = new Error("Current organization administrator could not be verified.");
+      error.status = 403;
+      throw error;
+    }
+    if (!target || target.membership_role !== "member") {
+      const error = new Error("The new administrator must be a member of the same organization.");
+      error.status = 400;
+      throw error;
+    }
+    await executor(`UPDATE organization_memberships SET membership_role = 'member', updated_at = now() WHERE organization_id = $1 AND user_id = $2`, [organizationId, req.user.id]);
+    await executor(`UPDATE organization_memberships SET membership_role = 'admin', updated_at = now() WHERE organization_id = $1 AND user_id = $2`, [organizationId, targetUserId]);
+    if (actor.active_organization_id === organizationId) {
+      await executor(`UPDATE users SET role = 'org_user', updated_at = now() WHERE id = $1`, [req.user.id]);
+    }
+    if (target.active_organization_id === organizationId) {
+      await executor(`UPDATE users SET role = 'org_admin', updated_at = now() WHERE id = $1`, [targetUserId]);
+    }
+    return { targetUserId, target };
+  });
+
+  const organization = await findOrganizationById(organizationId);
+  const organizationName = organization?.name || "your organization";
+  await Promise.allSettled([
+    sendEmail({ to: actorAuth.email, subject: `Administrator changed for ${organizationName}`, text: `You reassigned the administrator role for ${organizationName} to ${result.target.full_name || result.target.email}. You remain a member of the organization.` }),
+    sendEmail({ to: result.target.email, subject: `You are now the administrator for ${organizationName}`, text: `You are now the organization administrator for ${organizationName}.` }),
+  ]);
+
+  await logActivity({
+    userId: req.user.id,
+    action: "organization_admin_transfer",
+    entityType: "user",
+    entityId: result.targetUserId,
+    metadata: { organizationId, previousAdminUserId: req.user.id },
+    req,
+  });
+  res.json({ message: "Organization administrator reassigned.", targetUserId: result.targetUserId });
+});
+
+export const requestOrganizationAdminTransferVerification = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const actor = await findUserAuthById(req.user.id);
+  if (!actor) return res.status(403).json({ message: "Current administrator could not be verified." });
+  if (!actor.two_fa_enabled) {
+    if (!actor.password_hash) {
+      return res.status(400).json({ message: "Enable two-factor authentication before reassigning the administrator." });
+    }
+    return res.json({ method: "password", message: "Enter your current password to continue." });
+  }
+  const code = String(crypto.randomInt(100000, 1000000));
+  const purpose = "organization_admin_transfer";
+  await clearTwoFaCodes(req.user.id, purpose);
+  await createTwoFaCode({
+    userId: req.user.id,
+    purpose,
+    codeHash: crypto.createHmac("sha256", env.jwtSecret).update(code).digest("hex"),
+    expiresAt: new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000),
+  });
+  await sendEmail({
+    to: actor.email,
+    subject: "Verify administrator reassignment",
+    text: `Your administrator reassignment code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+  });
+  res.json({ method: "two_factor", message: "A verification code was sent to your email." });
+});
+
+export const requestOrganizationDeletionVerification = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const actor = await findUserAuthById(req.user.id);
+  if (!actor) return res.status(403).json({ message: "Current administrator could not be verified." });
+  if (!actor.two_fa_enabled) {
+    if (!actor.password_hash) {
+      return res.status(400).json({ message: "Enable two-factor authentication before deleting the organization." });
+    }
+    return res.json({ method: "password", message: "Enter your current password to continue." });
+  }
+  const code = String(crypto.randomInt(100000, 1000000));
+  const purpose = "organization_delete";
+  await clearTwoFaCodes(req.user.id, purpose);
+  await createTwoFaCode({
+    userId: req.user.id,
+    purpose,
+    codeHash: crypto.createHmac("sha256", env.jwtSecret).update(code).digest("hex"),
+    expiresAt: new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000),
+  });
+  await sendEmail({
+    to: actor.email,
+    subject: "Verify organization deletion",
+    text: `Your organization deletion code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+  });
+  res.json({ method: "two_factor", message: "A verification code was sent to your email." });
+});
+
+export const deleteOrganizationAdmin = asyncHandler(async (req, res) => {
+  const organizationId = requireOrganizationAdmin(req, res);
+  if (!organizationId) return;
+  const credential = String(req.body?.credential || "").trim();
+  const confirmationName = String(req.body?.confirmationName || "").trim();
+  const actor = await findUserAuthById(req.user.id);
+  const organization = await findOrganizationById(organizationId);
+  if (!actor || !organization) return res.status(404).json({ message: "Organization not found." });
+  if (confirmationName !== organization.name) {
+    return res.status(400).json({ message: "Enter the organization name exactly as shown." });
+  }
+  if (actor.two_fa_enabled) {
+    const match = credential ? await findValidTwoFaCode({
+      userId: req.user.id,
+      purpose: "organization_delete",
+      codeHash: crypto.createHmac("sha256", env.jwtSecret).update(credential).digest("hex"),
+    }) : null;
+    if (!match) return res.status(400).json({ message: "Enter the valid organization deletion code." });
+    await deleteTwoFaCodeById(match.id);
+  } else if (actor.password_hash) {
+    if (!credential || !(await bcrypt.compare(credential, actor.password_hash))) {
+      return res.status(400).json({ message: "Enter your current password to delete the organization." });
+    }
+  } else {
+    return res.status(400).json({ message: "Enable two-factor authentication before deleting the organization." });
+  }
+
+  const deletion = await withTransaction(async (executor) => {
+    const { rows: adminRows } = await executor(
+      `SELECT membership_role FROM organization_memberships
+       WHERE organization_id = $1 AND user_id = $2 AND status = 'active' FOR UPDATE`,
+      [organizationId, req.user.id]
+    );
+    if (adminRows[0]?.membership_role !== "admin") {
+      const error = new Error("Only the current organization administrator can delete this organization.");
+      error.status = 403;
+      throw error;
+    }
+    const { rows: affectedUsers } = await executor(
+      `SELECT u.id, u.active_organization_id
+       FROM users u LEFT JOIN organization_memberships m
+         ON m.user_id = u.id AND m.organization_id = $1
+       WHERE u.organization_id = $1 OR u.active_organization_id = $1 OR m.user_id IS NOT NULL
+       FOR UPDATE OF u`,
+      [organizationId]
+    );
+    for (const affectedUser of affectedUsers) {
+      if (affectedUser.active_organization_id === organizationId) {
+        const { rows: fallbackRows } = await executor(
+          `SELECT organization_id FROM organization_memberships
+           WHERE user_id = $1 AND organization_id <> $2 AND status = 'active'
+           ORDER BY created_at LIMIT 1`,
+          [affectedUser.id, organizationId]
+        );
+        if (fallbackRows[0]) await setActiveOrganization(affectedUser.id, fallbackRows[0].organization_id, executor);
+        else await clearActiveOrganization(affectedUser.id, executor);
+      } else {
+        const restored = affectedUser.active_organization_id
+          ? await setActiveOrganization(affectedUser.id, affectedUser.active_organization_id, executor)
+          : null;
+        if (!restored) await clearActiveOrganization(affectedUser.id, executor);
+      }
+    }
+    const { rows: receiptRows } = await executor(
+      `SELECT object_key FROM receipts WHERE organization_id = $1 AND object_key IS NOT NULL`,
+      [organizationId]
+    );
+    const resourceTables = [
+      "receipt_jobs", "receipts", "records", "budget_sheets", "rules", "recurring_schedules",
+      "plaid_accounts", "plaid_items", "net_worth_items", "net_worth_snapshots",
+    ];
+    for (const table of resourceTables) {
+      await executor(`DELETE FROM ${table} WHERE organization_id = $1`, [organizationId]);
+    }
+    const { rowCount } = await executor(`DELETE FROM organizations WHERE id = $1`, [organizationId]);
+    if (!rowCount) {
+      const error = new Error("Organization not found."); error.status = 404; throw error;
+    }
+    return { objectKeys: receiptRows.map((row) => row.object_key), affectedUserIds: affectedUsers.map((user) => user.id) };
+  });
+
+  await Promise.allSettled(deletion.objectKeys.map((key) => deleteObject({ key })));
+  await logActivity({
+    userId: req.user.id,
+    action: "organization_delete",
+    entityType: "organization",
+    entityId: organizationId,
+    metadata: { organizationName: organization.name, affectedUsers: deletion.affectedUserIds.length },
+    req,
+  });
+  const user = await findUserById(req.user.id);
+  res.json({ message: `${organization.name} was permanently deleted.`, user });
 });
 
 export const getUserAdmin = asyncHandler(async (req, res) => {
@@ -521,7 +1025,7 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
     "customIncomeCategories",
   ];
 
-  if (isFullAdminRole(req.user?.role)) {
+  if (isFullAdminRole(getActorAdminRole(req))) {
     allowedFields.push("accessExpiresAt");
   }
 
@@ -558,7 +1062,7 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Invalid role" });
   }
 
-  if (req.body?.accessExpiresAt !== undefined && !isFullAdminRole(req.user?.role)) {
+  if (req.body?.accessExpiresAt !== undefined && !isFullAdminRole(getActorAdminRole(req))) {
     return res.status(403).json({ message: "Only full admins can change account expiry." });
   }
 
@@ -575,12 +1079,12 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
     }
   }
 
-  if (isOrgAdminRole(req.user?.role) && updates.role !== undefined && updates.role !== ORG_USER_ROLE) {
+  if (isOrgAdminRole(getActorAdminRole(req)) && updates.role !== undefined && updates.role !== ORG_USER_ROLE) {
     return res.status(403).json({
       message: "Org-admin can only manage users with role org_user.",
     });
   }
-  if (isOrgAdminRole(req.user?.role)) {
+  if (isOrgAdminRole(getActorAdminRole(req))) {
     const actorOrganizationId = getActorOrganizationId(req);
     if (!actorOrganizationId) {
       return res.status(403).json({ message: "Org-admin access requires an organization ID." });
@@ -591,6 +1095,16 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
       });
     }
     updates.organizationId = actorOrganizationId;
+  }
+
+  if (isFullAdminRole(getActorAdminRole(req)) && updates.role !== undefined) {
+    if (isOrganizationScopedRole(updates.role)) {
+      return res.status(400).json({ message: "Organization roles must be changed from Team & Organization." });
+    }
+    updates.platformRole = updates.role;
+    if (currentUser.active_organization_id || currentUser.organization_id) {
+      delete updates.role;
+    }
   }
 
   const effectiveRole = String(updates.role ?? currentUser.role ?? "").trim().toLowerCase();
@@ -785,8 +1299,8 @@ export const deleteRecordAdminController = asyncHandler(async (req, res) => {
 
 export const getAdminStatsController = asyncHandler(async (_req, res) => {
   const organizationId = getScopedOrganizationIdFilter(_req);
-  const scopedToOrganization = isOrgAdminRole(_req.user?.role) && organizationId;
-  if (isOrgAdminRole(_req.user?.role) && !organizationId) {
+  const scopedToOrganization = isOrgAdminRole(getActorAdminRole(_req)) && organizationId;
+  if (isOrgAdminRole(getActorAdminRole(_req)) && !organizationId) {
     return res.json({ stats: { total_users: 0, total_records: 0, total_receipts: 0 } });
   }
   const { rows } = await query(
@@ -821,7 +1335,7 @@ export const getAdminStatsController = asyncHandler(async (_req, res) => {
 });
 
 export const getAdminPermissionsController = asyncHandler(async (req, res) => {
-  const role = String(req.user?.role || "").trim();
+  const role = getActorAdminRole(req);
   const settings = await getAppSettings();
   const overrides = sanitizeRolePermissionOverrides(settings?.admin_role_permissions);
   const effective = buildEffectiveRolePermissionsMap(overrides);
@@ -938,7 +1452,7 @@ export const listAuditLogAdmin = asyncHandler(async (req, res) => {
   } else if (scope === "users") {
     where.push(`u.role IN ('user', 'org_user')`);
   }
-  if (isOrgAdminRole(req.user?.role)) {
+  if (isOrgAdminRole(getActorAdminRole(req))) {
     const actorOrganizationId = getActorOrganizationId(req);
     if (!actorOrganizationId) {
       return res.json({ auditLog: [] });
