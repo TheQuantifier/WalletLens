@@ -956,13 +956,18 @@ function applyAccountContext(user) {
 
 async function updateOrganizationSwitcher() {
   const button = document.getElementById("switchAccountBtn");
+  const switchItem = button?.closest(".account-switch-menu-item");
   const addButton = document.getElementById("addAccountBtn");
   if (addButton) addButton.onclick = openAddAccountModal;
   if (!button) return;
   try {
     const { organizations = [], activeOrganizationId } = await api.auth.listOrganizations();
+    const hasBusinessAccounts = organizations.length > 0;
+    switchItem?.classList.toggle("is-hidden", !hasBusinessAccounts);
+    button.disabled = !hasBusinessAccounts;
     button.onclick = () => openAccountSwitcher(organizations, activeOrganizationId || null);
   } catch {
+    switchItem?.classList.add("is-hidden");
     button.disabled = true;
   }
 }

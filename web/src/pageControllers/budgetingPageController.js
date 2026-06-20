@@ -188,7 +188,38 @@ export function initBudgetingPage() {
     return `${left}–${right}`;
   };
 
-  const buildPeriodOptions = (cadenceId) => {
+  const buildPeriodOptionFromKey = (cadenceId, periodKey) => {
+    const cadence = CADENCE_LOOKUP.get(cadenceId);
+    const key = String(periodKey || "");
+    if (!cadence) return null;
+
+    if (cadence.days) {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(key)) return null;
+      const [year, month, day] = key.split("-").map(Number);
+      const start = new Date(year, month - 1, day);
+      if (formatDateKey(start) !== key) return null;
+      const end = new Date(start);
+      end.setDate(end.getDate() + cadence.days - 1);
+      end.setHours(23, 59, 59, 999);
+      return { start, end, label: formatRangeLabel(start, end), key };
+    }
+
+    if (!/^\d{4}-\d{2}$/.test(key)) return null;
+    const [year, month] = key.split("-").map(Number);
+    const start = new Date(year, month - 1, 1);
+    if (formatMonthKey(start) !== key) return null;
+    const span = cadence.months || 1;
+    const end = new Date(start.getFullYear(), start.getMonth() + span, 0, 23, 59, 59, 999);
+    const label =
+      span === 1
+        ? start.toLocaleDateString(undefined, { month: "long", year: "numeric" })
+        : span === 12
+          ? String(start.getFullYear())
+          : formatMonthSpanLabel(start, end);
+    return { start, end, label, key };
+  };
+
+  const buildPeriodOptions = (cadenceId, selectedKey) => {
     const cadence = CADENCE_LOOKUP.get(cadenceId) || CADENCE_LOOKUP.get("monthly");
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -226,9 +257,15 @@ export function initBudgetingPage() {
           key: formatDateKey(start),
         });
       }
-      return options
+      const filtered = options
         .filter((opt) => opt.end >= today)
         .sort((a, b) => a.start.getTime() - b.start.getTime());
+      const savedPeriod = buildPeriodOptionFromKey(cadenceId, selectedKey);
+      if (savedPeriod && !filtered.some((option) => option.key === savedPeriod.key)) {
+        filtered.push(savedPeriod);
+        filtered.sort((a, b) => a.start.getTime() - b.start.getTime());
+      }
+      return filtered;
     }
 
     const span = cadence.months || 1;
@@ -254,9 +291,15 @@ export function initBudgetingPage() {
         key: formatMonthKey(start),
       });
     }
-    return options
+    const filtered = options
       .filter((opt) => opt.end >= today)
       .sort((a, b) => a.start.getTime() - b.start.getTime());
+    const savedPeriod = buildPeriodOptionFromKey(cadenceId, selectedKey);
+    if (savedPeriod && !filtered.some((option) => option.key === savedPeriod.key)) {
+      filtered.push(savedPeriod);
+      filtered.sort((a, b) => a.start.getTime() - b.start.getTime());
+    }
+    return filtered;
   };
 
   const getCadenceLabel = (cadenceId) =>
@@ -275,7 +318,7 @@ export function initBudgetingPage() {
   };
 
   const getPeriodLabel = (cadenceId, periodKey) => {
-    const options = buildPeriodOptions(cadenceId);
+    const options = buildPeriodOptions(cadenceId, periodKey);
     const match = options.find((opt) => opt.key === periodKey);
     return match ? match.label : periodKey;
   };
@@ -326,7 +369,7 @@ export function initBudgetingPage() {
 
   const populatePeriodSelect = (selectEl, cadenceId, selectedKey) => {
     if (!selectEl) return null;
-    const options = buildPeriodOptions(cadenceId);
+    const options = buildPeriodOptions(cadenceId, selectedKey);
     selectEl.innerHTML = "";
     options.forEach((opt) => {
       const option = document.createElement("option");
@@ -710,7 +753,7 @@ export function initBudgetingPage() {
     let budgetEntries = [];
 
     const setPeriodOptions = (cadenceId, selectedKey) => {
-      periodOptions = buildPeriodOptions(cadenceId);
+      periodOptions = buildPeriodOptions(cadenceId, selectedKey);
       const selected = periodOptions.find((p) => p.key === selectedKey) || periodOptions[0];
       return selected;
     };

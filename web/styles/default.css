@@ -637,10 +637,10 @@ header {
   background: rgba(176,0,32,0.1);
 }
 
-.account-switch-menu-item {
-  margin-top: 0.25rem;
-  padding-top: 0.25rem;
-  border-top: 1px solid var(--border);
+.account-actions-separator {
+  height: 1px;
+  margin: 0.3rem 0.65rem;
+  background: var(--border);
 }
 
 .business-account-only {
