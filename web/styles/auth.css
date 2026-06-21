@@ -380,6 +380,24 @@ body.landing-light {
   text-align: left;
 }
 
+.business-legal-backdrop {
+  border: 0;
+  background: transparent;
+}
+
+.business-legal-modal-body {
+  padding: 0;
+  overflow: hidden;
+}
+
+.business-legal-modal-body iframe {
+  display: block;
+  width: 100%;
+  height: min(60vh, 560px);
+  border: 0;
+  background: var(--card-bg);
+}
+
 .nf-contact-modal-content {
   width: min(560px, 100%);
   max-height: min(90vh, 720px);

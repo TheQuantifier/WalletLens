@@ -580,7 +580,7 @@ export default function RegisterPage() {
           </div>
         </div>
       
-        <template id="termsTemplate">
+        <div id="termsTemplate" hidden>
           <section className="legal-hero">
             <h1>Terms of Service</h1>
             <p className="lead">Effective Date: February 8, 2026</p>
@@ -697,9 +697,9 @@ export default function RegisterPage() {
               </p>
             </article>
           </section>
-        </template>
+        </div>
       
-        <template id="privacyTemplate">
+        <div id="privacyTemplate" hidden>
           <section className="legal-hero">
             <h1>Privacy Policy</h1>
             <p className="lead">Effective Date: February 8, 2026</p>
@@ -779,7 +779,7 @@ export default function RegisterPage() {
               </p>
             </article>
           </section>
-        </template>
+        </div>
       
         <div id="contactModal" className="nf-modal hidden" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
           <div className="nf-modal-backdrop" data-contact-close="true"></div>

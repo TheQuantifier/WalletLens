@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { api } from "../../scripts/api.js";
 
 const initialForm = {
@@ -17,10 +17,47 @@ export default function RegisterBusinessPage() {
   const [message, setMessage] = useState("");
   const [error, setError] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [legalStep, setLegalStep] = useState(null);
+  const [legalFlowActive, setLegalFlowActive] = useState(false);
+
+  useEffect(() => {
+    document.body.style.overflow = legalStep ? "hidden" : "";
+    return () => { document.body.style.overflow = ""; };
+  }, [legalStep]);
 
   const update = (event) => {
     const { name, value, type, checked } = event.target;
     setForm((current) => ({ ...current, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const openLegalDocument = (event, kind) => {
+    event.preventDefault();
+    setLegalFlowActive(false);
+    setLegalStep(kind);
+  };
+
+  const startLegalFlow = () => {
+    setForm((current) => ({ ...current, agree: false }));
+    setLegalFlowActive(true);
+    setLegalStep("terms");
+  };
+
+  const closeLegal = () => {
+    setLegalStep(null);
+    setLegalFlowActive(false);
+  };
+
+  const acceptLegalStep = () => {
+    if (!legalFlowActive) {
+      closeLegal();
+      return;
+    }
+    if (legalStep === "terms") {
+      setLegalStep("privacy");
+      return;
+    }
+    setForm((current) => ({ ...current, agree: true }));
+    closeLegal();
   };
 
   const submit = async (event) => {
@@ -75,13 +112,33 @@ export default function RegisterBusinessPage() {
                 <label>Password<input className="nf-input" type="password" name="password" value={form.password} onChange={update} autoComplete="new-password" minLength="8" required /></label>
                 <label>Confirm password<input className="nf-input" type="password" name="confirmPassword" value={form.confirmPassword} onChange={update} autoComplete="new-password" minLength="8" required /></label>
               </div></fieldset>
-              <label className="business-consent"><input type="checkbox" name="agree" checked={form.agree} onChange={update} required /><span>I agree to the <a href="/terms">Terms</a> and <a href="/privacy">Privacy Policy</a>.</span></label>
+              <label className="business-consent"><input type="checkbox" name="agree" checked={form.agree} onChange={(event) => event.target.checked ? startLegalFlow() : setForm((current) => ({ ...current, agree: false }))} required /><span>I agree to the <a href="/terms" onClick={(event) => openLegalDocument(event, "terms")}>Terms</a> and <a href="/privacy" onClick={(event) => openLegalDocument(event, "privacy")}>Privacy Policy</a>.</span></label>
               <button className="nf-btn" type="submit" disabled={submitting}>{submitting ? "Creating..." : "Create Business Account"}</button>
               {message && <p className={`form-message ${error ? "business-message-error" : "business-message-ok"}`} aria-live="polite">{message}</p>}
             </form>
           </div>
         </section>
       </main>
+      {legalStep && (
+        <div className="nf-modal" role="dialog" aria-modal="true" aria-labelledby="businessLegalModalTitle">
+          <button type="button" className="nf-modal-backdrop business-legal-backdrop" aria-label="Close legal document" onClick={closeLegal}></button>
+          <div className="nf-modal-content" role="document">
+            <div className="nf-modal-header">
+              <h2 id="businessLegalModalTitle">{legalStep === "terms" ? "Terms of Service" : "Privacy Policy"}</h2>
+              <button type="button" className="nf-modal-close" onClick={closeLegal}>Close</button>
+            </div>
+            <div className="nf-modal-body business-legal-modal-body">
+              <iframe title={legalStep === "terms" ? "Terms of Service" : "Privacy Policy"} src={`/${legalStep}?embedded=1`} />
+            </div>
+            {legalFlowActive && (
+              <div className="nf-modal-footer">
+                <button type="button" className="nf-modal-action-disagree" onClick={closeLegal}>Disagree</button>
+                <button type="button" className="nf-modal-action-agree" onClick={acceptLegalStep}>{legalStep === "terms" ? "Agree & Continue" : "Agree"}</button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       <footer className="nf-footer"><div className="nf-footer-inner"><p>© {new Date().getFullYear()} &lt;AppName&gt;. All rights reserved.</p><nav className="nf-legal"><a href="/privacy">Privacy</a><span className="sep">•</span><a href="/terms">Terms</a></nav></div></footer>
     </>
   );
