@@ -2,6 +2,14 @@ import { useEffect } from "react";
 
 export default function PrivacyPage() {
   const embedded = new URLSearchParams(window.location.search).get("embedded") === "1";
+  const goBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.location.assign("/");
+  };
+
   useEffect(() => {
     document.body.classList.add("legal-page");
     return () => document.body.classList.remove("legal-page");
@@ -11,7 +19,7 @@ export default function PrivacyPage() {
     <>
       <main className="main main--legal">
           <section className="legal-hero">
-            {!embedded && <button type="button" className="legal-back-btn" id="legalGoBackBtn">Go Back</button>}
+            {!embedded && <button type="button" className="legal-back-btn" id="legalGoBackBtn" onClick={goBack}>Go Back</button>}
             <h1>Privacy Policy</h1>
             <p className="lead">
               Effective Date: February 8, 2026
