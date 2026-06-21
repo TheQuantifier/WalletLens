@@ -1252,7 +1252,14 @@ export default function HomePage() {
       <div id="footer"></div>
 
       {modalOpen && (
-        <div className="modal" id="addTxnModal" role="dialog" aria-modal="true" aria-labelledby="modalTitle">
+        <div
+          className="modal"
+          id="addTxnModal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="modalTitle"
+          onMouseDown={(event) => event.target === event.currentTarget && setModalOpen(false)}
+        >
           <div className="modal-content card">
             <h2 id="modalTitle">Add New Transaction</h2>
             <form className="txn-form" id="txnForm" onSubmit={handleSubmit}>
@@ -1332,7 +1339,14 @@ export default function HomePage() {
       )}
 
       {customCategoryOpen && (
-        <div className="modal" id="customCategoryModal" role="dialog" aria-modal="true" aria-labelledby="customCategoryTitle">
+        <div
+          className="modal"
+          id="customCategoryModal"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="customCategoryTitle"
+          onMouseDown={(event) => event.target === event.currentTarget && closeCustomCategoryModal()}
+        >
           <div className="modal-content card">
             <h2 id="customCategoryTitle">Add Custom Category</h2>
             <p className="subtle">Enter a name to add a custom category.</p>

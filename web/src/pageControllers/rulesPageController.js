@@ -415,6 +415,12 @@ export function initRulesPage() {
   });
 
   ruleCancelBtn?.addEventListener("click", () => hideModal());
+  ruleModal?.addEventListener("click", (event) => {
+    if (event.target === ruleModal) hideModal();
+  });
+  rulesOnboardingModal?.addEventListener("click", (event) => {
+    if (event.target === rulesOnboardingModal) hideOnboarding();
+  });
   btnCreateRule?.addEventListener("click", openCreate);
   btnCreateRuleEmpty?.addEventListener("click", openCreate);
   btnRulesHelp?.addEventListener("click", openOnboarding);

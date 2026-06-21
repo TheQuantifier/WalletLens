@@ -803,6 +803,9 @@ export function initRecurringPage() {
   });
 
   recurringCancelBtn?.addEventListener("click", () => hideModal());
+  recurringModal?.addEventListener("click", (event) => {
+    if (event.target === recurringModal) hideModal();
+  });
   btnCreateRecurring?.addEventListener("click", openCreate);
   btnCreateRecurringEmpty?.addEventListener("click", openCreate);
 

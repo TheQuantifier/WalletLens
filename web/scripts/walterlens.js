@@ -4145,6 +4145,11 @@ export function initWalterLens() {
 
   fab.addEventListener("click", () => togglePanel());
   closeBtn.addEventListener("click", () => togglePanel(false));
+  document.addEventListener("click", (event) => {
+    if (panel.classList.contains("is-open") && !root.contains(event.target)) {
+      togglePanel(false);
+    }
+  });
   sendBtn.addEventListener("click", () => {
     enqueueMessage(input.value);
     input.value = "";

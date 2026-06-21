@@ -638,6 +638,20 @@ export default function RecordsPage() {
     return () => window.clearTimeout(t);
   }, [status]);
 
+  useEffect(() => {
+    const closeRecordMenus = (event) => {
+      const clickedMenu = event.target.closest?.(".actions-menu-wrap details");
+      const selectedAction = event.target.closest?.(".actions-dropdown button");
+
+      document.querySelectorAll(".actions-menu-wrap details[open]").forEach((menu) => {
+        if (menu !== clickedMenu || selectedAction) menu.removeAttribute("open");
+      });
+    };
+
+    document.addEventListener("click", closeRecordMenus);
+    return () => document.removeEventListener("click", closeRecordMenus);
+  }, []);
+
   const visibleRecords = useMemo(() => {
     const byType = {
       expense: records.filter((record) => record.type === "expense"),

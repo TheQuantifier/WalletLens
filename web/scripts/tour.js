@@ -441,6 +441,7 @@ function showWelcomeModal(startIndex) {
     clearTourState();
   };
 
+  overlay.addEventListener("click", skip);
   modal.querySelector(".app-tour-welcome-skip")?.addEventListener("click", skip);
   modal.querySelector(".app-tour-welcome-close")?.addEventListener("click", skip);
 }
