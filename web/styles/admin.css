@@ -332,13 +332,38 @@
   grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.6fr);
 }
 
-.admin-maintenance-editor {
+.admin-maintenance-select-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.admin-maintenance-select-row .btn {
+  white-space: nowrap;
+}
+
+.admin-maintenance-summary {
   display: grid;
   gap: var(--space-3);
   padding: var(--space-3);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   background: var(--surface);
+}
+
+.admin-maintenance-label {
+  display: block;
+  margin-bottom: 0.25rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.admin-maintenance-message-text {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .admin-checklist-dropdown {
@@ -390,6 +415,23 @@
 .admin-checklist-grid .checkbox-row {
   align-items: center;
   font-size: 0.9rem;
+}
+
+.admin-checklist-grid--modal {
+  max-height: 300px;
+  overflow: auto;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.admin-page-pill {
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-size: 0.9rem;
+  font-weight: 600;
 }
 
 @media (max-width: 900px) {

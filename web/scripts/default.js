@@ -1175,6 +1175,7 @@ function normalizeMaintenancePageIds(value) {
 function shouldDisplayMaintenanceBanner(pageIds) {
   if (!Array.isArray(pageIds)) return true;
   const normalized = normalizeMaintenancePageIds(pageIds);
+  if (!normalized.length) return true;
   return normalized.includes(getCurrentPageToken());
 }
 
@@ -1190,9 +1191,14 @@ function applyMaintenanceBanner(enabled, message, pageIds = []) {
   banner.id = "maintenanceBanner";
   banner.className = "maintenance-banner";
   banner.textContent = text;
-  const header = document.getElementById("header");
+  const injectedHeader = document.getElementById("header");
+  const publicHeader = document.querySelector(".nf-header");
+  const root = document.getElementById("root");
+  const header = injectedHeader || publicHeader;
   if (header && header.parentNode) {
     header.insertAdjacentElement("afterend", banner);
+  } else if (root && root.parentNode) {
+    root.insertAdjacentElement("beforebegin", banner);
   } else if (!existing && document.body) {
     document.body.insertBefore(banner, document.body.firstChild);
   }

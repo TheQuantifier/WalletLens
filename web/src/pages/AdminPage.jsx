@@ -419,40 +419,27 @@ export default function AdminPage() {
                     </label>
                     <label className="settings-item">
                       <span>Saved Maintenance Message</span>
-                      <select id="maintenanceMessageSelect"></select>
+                      <div className="admin-maintenance-select-row">
+                        <select id="maintenanceMessageSelect"></select>
+                        <button className="btn" id="maintenanceMessageNewBtn" type="button">+ Add New</button>
+                      </div>
                     </label>
                   </div>
-                  <div className="admin-maintenance-editor">
-                    <label className="settings-item">
-                      <span>Message Name</span>
-                      <input id="maintenanceMessageTitleInput" type="text" maxLength="80" placeholder="Privacy policy update" />
-                    </label>
-                    <label className="settings-item">
-                      <span>Maintenance Banner Text</span>
-                      <input id="maintenanceModeBannerTextInput" type="text" maxLength="500" placeholder="Please be aware: Maintenance is underway." />
-                    </label>
-                    <details className="admin-checklist-dropdown" id="maintenancePagesDropdown">
+                  <div className="admin-maintenance-summary">
+                    <div>
+                      <span className="admin-maintenance-label">Banner Text</span>
+                      <p id="maintenanceSelectedText" className="admin-maintenance-message-text subtle">No message selected.</p>
+                    </div>
+                    <details className="admin-checklist-dropdown" id="maintenanceSelectedPagesDropdown">
                       <summary>
                         <span id="maintenancePagesSummary">All pages selected</span>
                       </summary>
                       <div className="admin-checklist-dropdown-menu">
-                        <div className="admin-checklist-actions">
-                          <button className="btn btn--link" id="maintenancePagesSelectAllBtn" type="button">Select All</button>
-                          <button className="btn btn--link" id="maintenancePagesClearBtn" type="button">Clear</button>
-                        </div>
-                        <div className="admin-checklist-grid" id="maintenancePagesChecklist">
-                          {MAINTENANCE_PAGE_OPTIONS.map(([value, label]) => (
-                            <label className="checkbox-row" key={value}>
-                              <input type="checkbox" data-maintenance-page-id={value} defaultChecked />
-                              <span>{label}</span>
-                            </label>
-                          ))}
-                        </div>
+                        <div className="admin-checklist-grid" id="maintenanceSelectedPagesList"></div>
                       </div>
                     </details>
                     <div className="admin-actions admin-maintenance-actions">
-                      <button className="btn" id="maintenanceMessageNewBtn" type="button">New Message</button>
-                      <button className="btn btn--primary" id="maintenanceMessageSaveBtn" type="button">Save Message</button>
+                      <button className="btn" id="maintenanceMessageEditBtn" type="button">Edit Message</button>
                       <button className="btn" id="maintenanceMessageDefaultBtn" type="button">Set Default</button>
                       <button className="btn btn--danger" id="maintenanceMessageDeleteBtn" type="button">Delete</button>
                     </div>
@@ -904,6 +891,45 @@ export default function AdminPage() {
               <label><span>Email address</span><input id="inviteMemberEmail" type="email" autoComplete="email" required /></label>
               <div className="admin-actions"><button className="btn btn--primary" type="submit">Send Invitation</button><button className="btn btn--link" type="button" data-close-modal>Cancel</button></div>
               <p id="inviteMemberStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
+            </form>
+          </div>
+        </div>
+
+        <div id="maintenanceMessageModal" className="modal hidden" role="dialog" aria-modal="true" aria-labelledby="maintenanceMessageModalTitle">
+          <div className="modal-content admin-modal">
+            <div className="modal-header">
+              <h3 id="maintenanceMessageModalTitle">Maintenance Message</h3>
+              <button className="modal-close" type="button" data-close-modal>&times;</button>
+            </div>
+            <form id="maintenanceMessageForm" className="admin-form">
+              <label>
+                <span>Message Name</span>
+                <input id="maintenanceMessageTitleInput" type="text" maxLength="80" placeholder="Privacy policy update" />
+              </label>
+              <label>
+                <span>Maintenance Banner Text</span>
+                <input id="maintenanceModeBannerTextInput" type="text" maxLength="500" placeholder="Please be aware: Maintenance is underway." />
+              </label>
+              <div className="settings-item-head">
+                <span>Pages Selected</span>
+                <p className="subtle">Select where this message should appear.</p>
+              </div>
+              <div className="admin-checklist-actions">
+                <button className="btn btn--link" id="maintenancePagesSelectAllBtn" type="button">Select All</button>
+                <button className="btn btn--link" id="maintenancePagesClearBtn" type="button">Clear</button>
+              </div>
+              <div className="admin-checklist-grid admin-checklist-grid--modal" id="maintenancePagesChecklist">
+                {MAINTENANCE_PAGE_OPTIONS.map(([value, label]) => (
+                  <label className="checkbox-row" key={value}>
+                    <input type="checkbox" data-maintenance-page-id={value} defaultChecked />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+              <div className="admin-actions">
+                <button className="btn btn--primary" id="maintenanceMessageSaveBtn" type="submit">Save Message</button>
+                <button className="btn btn--link" type="button" data-close-modal>Cancel</button>
+              </div>
             </form>
           </div>
         </div>

@@ -51,7 +51,7 @@ function normalizeMaintenancePageIds(value) {
   const cleaned = value
     .map((id) => String(id || "").trim().toLowerCase())
     .filter((id) => MAINTENANCE_PAGE_ID_SET.has(id));
-  return Array.from(new Set(cleaned));
+  return cleaned.length ? Array.from(new Set(cleaned)) : [...MAINTENANCE_PAGE_IDS];
 }
 
 function sanitizeMaintenanceMessages(value) {

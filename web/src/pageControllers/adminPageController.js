@@ -107,13 +107,20 @@ const els = {
   defaultDataExportFormatInput: document.getElementById("defaultDataExportFormatInput"),
   maintenanceModeEnabledInput: document.getElementById("maintenanceModeEnabledInput"),
   maintenanceMessageSelect: document.getElementById("maintenanceMessageSelect"),
+  maintenanceMessageEditBtn: document.getElementById("maintenanceMessageEditBtn"),
   maintenanceMessageTitleInput: document.getElementById("maintenanceMessageTitleInput"),
   maintenanceModeBannerTextInput: document.getElementById("maintenanceModeBannerTextInput"),
   maintenanceMessageNewBtn: document.getElementById("maintenanceMessageNewBtn"),
   maintenanceMessageSaveBtn: document.getElementById("maintenanceMessageSaveBtn"),
   maintenanceMessageDefaultBtn: document.getElementById("maintenanceMessageDefaultBtn"),
   maintenanceMessageDeleteBtn: document.getElementById("maintenanceMessageDeleteBtn"),
+  maintenanceMessageModal: document.getElementById("maintenanceMessageModal"),
+  maintenanceMessageForm: document.getElementById("maintenanceMessageForm"),
+  maintenanceMessageModalTitle: document.getElementById("maintenanceMessageModalTitle"),
+  maintenanceSelectedText: document.getElementById("maintenanceSelectedText"),
+  maintenanceSelectedPagesDropdown: document.getElementById("maintenanceSelectedPagesDropdown"),
   maintenancePagesSummary: document.getElementById("maintenancePagesSummary"),
+  maintenanceSelectedPagesList: document.getElementById("maintenanceSelectedPagesList"),
   maintenancePagesChecklist: document.getElementById("maintenancePagesChecklist"),
   maintenancePagesSelectAllBtn: document.getElementById("maintenancePagesSelectAllBtn"),
   maintenancePagesClearBtn: document.getElementById("maintenancePagesClearBtn"),
@@ -192,6 +199,7 @@ const state = {
   maintenanceMessages: [],
   maintenanceDefaultMessageId: "",
   selectedMaintenanceMessageId: "",
+  maintenanceModalMessageId: "",
   notificationsHistory: [],
   auditLog: [],
   supportTickets: [],
@@ -236,6 +244,32 @@ const MAINTENANCE_PAGE_IDS = [
   "expired",
 ];
 const MAINTENANCE_PAGE_ID_SET = new Set(MAINTENANCE_PAGE_IDS);
+const MAINTENANCE_PAGE_LABELS = {
+  index: "Landing",
+  login: "Login",
+  register: "Register",
+  registerwho: "Account Type",
+  registerbusiness: "Business Registration",
+  acceptinvite: "Accept Invite",
+  home: "Home",
+  upload: "Upload",
+  records: "Records",
+  recurring: "Recurring",
+  rules: "Rules",
+  budgeting: "Budgeting",
+  reports: "Reports",
+  profile: "Profile",
+  settings: "Settings",
+  admin: "Admin",
+  team: "Team",
+  about: "About",
+  careers: "Careers",
+  help: "Help",
+  privacy: "Privacy Policy",
+  terms: "Terms",
+  timeout: "Timeout",
+  expired: "Expired",
+};
 
 const ROLE_PERMISSIONS = {
   user: new Set([]),
@@ -2303,17 +2337,40 @@ function setMaintenancePageCheckboxes(pageIds) {
   inputs.forEach((input) => {
     input.checked = selected.has(String(input.dataset.maintenancePageId || ""));
   });
-  updateMaintenancePagesSummary();
 }
 
-function updateMaintenancePagesSummary() {
+function updateMaintenanceSelectedSummary() {
+  const message = getSelectedMaintenanceMessage();
+  if (els.maintenanceSelectedText) {
+    els.maintenanceSelectedText.textContent = message?.text || "No message selected.";
+  }
   if (!els.maintenancePagesSummary) return;
-  const inputs = els.maintenancePagesChecklist?.querySelectorAll("[data-maintenance-page-id]") || [];
-  const selectedCount = Array.from(inputs).filter((input) => input.checked).length;
+  const pageIds = normalizeMaintenancePageIds(message?.pageIds);
+  const selectedCount = pageIds.length;
   if (selectedCount >= MAINTENANCE_PAGE_IDS.length) {
     els.maintenancePagesSummary.textContent = "All pages selected";
+  } else if (selectedCount === 0) {
+    els.maintenancePagesSummary.textContent = "No pages selected";
   } else {
     els.maintenancePagesSummary.textContent = `${selectedCount} page${selectedCount === 1 ? "" : "s"} selected`;
+  }
+
+  if (els.maintenanceSelectedPagesList) {
+    els.maintenanceSelectedPagesList.innerHTML = "";
+    const visiblePageIds = pageIds.length ? pageIds : [];
+    if (!visiblePageIds.length) {
+      const empty = document.createElement("p");
+      empty.className = "subtle";
+      empty.textContent = "This message is not assigned to any pages.";
+      els.maintenanceSelectedPagesList.appendChild(empty);
+    } else {
+      visiblePageIds.forEach((pageId) => {
+        const item = document.createElement("div");
+        item.className = "admin-page-pill";
+        item.textContent = MAINTENANCE_PAGE_LABELS[pageId] || pageId;
+        els.maintenanceSelectedPagesList.appendChild(item);
+      });
+    }
   }
 }
 
@@ -2354,6 +2411,10 @@ function syncMaintenanceEditorFromSelected() {
     els.maintenanceModeBannerTextInput.value = message?.text || "";
   }
   setMaintenancePageCheckboxes(message?.pageIds || MAINTENANCE_PAGE_IDS);
+  updateMaintenanceSelectedSummary();
+  if (els.maintenanceMessageEditBtn) {
+    els.maintenanceMessageEditBtn.disabled = !message;
+  }
   if (els.maintenanceMessageDefaultBtn) {
     els.maintenanceMessageDefaultBtn.disabled = !message || message.id === state.maintenanceDefaultMessageId;
   }
@@ -2383,7 +2444,7 @@ function loadMaintenanceMessagesFromSettings(settings) {
   syncMaintenanceEditorFromSelected();
 }
 
-function upsertCurrentMaintenanceMessage({ requireText = false } = {}) {
+function upsertCurrentMaintenanceMessage({ requireText = false, closeAfterSave = false } = {}) {
   const title = String(els.maintenanceMessageTitleInput?.value || "").trim() || "Maintenance message";
   const text = String(els.maintenanceModeBannerTextInput?.value || "").trim();
   if (!text) {
@@ -2398,7 +2459,7 @@ function upsertCurrentMaintenanceMessage({ requireText = false } = {}) {
     return false;
   }
 
-  const selectedId = state.selectedMaintenanceMessageId || createMaintenanceMessageId();
+  const selectedId = state.maintenanceModalMessageId || createMaintenanceMessageId();
   const next = {
     id: selectedId,
     title: title.slice(0, 80),
@@ -2415,20 +2476,36 @@ function upsertCurrentMaintenanceMessage({ requireText = false } = {}) {
     state.maintenanceDefaultMessageId = next.id;
   }
   state.selectedMaintenanceMessageId = next.id;
+  state.maintenanceModalMessageId = "";
   renderMaintenanceMessageSelect();
   syncMaintenanceEditorFromSelected();
+  if (closeAfterSave) {
+    closeModal(els.maintenanceMessageModal);
+  }
   return true;
 }
 
-function resetMaintenanceEditorForNewMessage() {
-  state.selectedMaintenanceMessageId = "";
-  if (els.maintenanceMessageSelect) els.maintenanceMessageSelect.value = "";
-  if (els.maintenanceMessageTitleInput) els.maintenanceMessageTitleInput.value = "";
-  if (els.maintenanceModeBannerTextInput) els.maintenanceModeBannerTextInput.value = "";
-  setMaintenancePageCheckboxes(MAINTENANCE_PAGE_IDS);
-  if (els.maintenanceMessageDefaultBtn) els.maintenanceMessageDefaultBtn.disabled = true;
-  if (els.maintenanceMessageDeleteBtn) els.maintenanceMessageDeleteBtn.disabled = true;
+function openMaintenanceMessageModal({ mode = "edit" } = {}) {
+  const isNew = mode === "new";
+  state.maintenanceModalMessageId = "";
+  if (isNew) {
+    if (els.maintenanceMessageTitleInput) els.maintenanceMessageTitleInput.value = "";
+    if (els.maintenanceModeBannerTextInput) els.maintenanceModeBannerTextInput.value = "";
+    setMaintenancePageCheckboxes(MAINTENANCE_PAGE_IDS);
+  } else {
+    state.selectedMaintenanceMessageId =
+      els.maintenanceMessageSelect?.value || state.selectedMaintenanceMessageId || state.maintenanceDefaultMessageId;
+    state.maintenanceModalMessageId = state.selectedMaintenanceMessageId;
+    syncMaintenanceEditorFromSelected();
+  }
+  if (els.maintenanceMessageModalTitle) {
+    els.maintenanceMessageModalTitle.textContent = isNew
+      ? "Add Maintenance Message"
+      : "Edit Maintenance Message";
+  }
   setStatus(els.maintenanceMessageStatus, "");
+  openModal(els.maintenanceMessageModal);
+  window.setTimeout(() => els.maintenanceMessageTitleInput?.focus(), 0);
 }
 
 function submitSettingsForm() {
@@ -2591,14 +2668,18 @@ async function saveSettings(event) {
     setStatus(els.settingsStatus, "Default export format must be CSV or JSON.", "error");
     return;
   }
-  if (!upsertCurrentMaintenanceMessage({ requireText: Boolean(els.maintenanceModeEnabledInput?.checked) })) {
+  if (!state.maintenanceDefaultMessageId && state.maintenanceMessages.length) {
+    state.maintenanceDefaultMessageId = state.maintenanceMessages[0].id;
+  }
+  const defaultMaintenanceMessage =
+    state.maintenanceMessages.find((message) => message.id === state.maintenanceDefaultMessageId) ||
+    state.maintenanceMessages[0] ||
+    null;
+  if (els.maintenanceModeEnabledInput?.checked && !defaultMaintenanceMessage?.text) {
+    setStatus(els.settingsStatus, "Select or add a default maintenance message before enabling maintenance mode.", "error");
     return;
   }
-  const maintenanceModeBannerText = String(els.maintenanceModeBannerTextInput?.value || "");
-  if (maintenanceModeBannerText.length > 500) {
-    setStatus(els.settingsStatus, "Maintenance banner text cannot exceed 500 characters.", "error");
-    return;
-  }
+  const maintenanceModeBannerText = defaultMaintenanceMessage?.text || "";
 
   setStatus(els.settingsStatus, "Saving settings...");
   try {
@@ -2626,10 +2707,6 @@ async function saveSettings(event) {
     sessionStorage.setItem("appName", appName);
     localStorage.setItem("sessionTimeoutMinutes", String(timeout));
     window.dispatchEvent(new CustomEvent("appName:updated", { detail: { appName } }));
-    const defaultMaintenanceMessage =
-      state.maintenanceMessages.find((message) => message.id === state.maintenanceDefaultMessageId) ||
-      state.maintenanceMessages[0] ||
-      null;
     window.dispatchEvent(new CustomEvent("maintenanceSettings:updated", {
       detail: {
         enabled: Boolean(els.maintenanceModeEnabledInput?.checked),
@@ -2778,7 +2855,7 @@ function bindEvents() {
   }
   els.maintenancePagesChecklist?.addEventListener("change", (event) => {
     if (event.target?.matches?.("[data-maintenance-page-id]")) {
-      updateMaintenancePagesSummary();
+      // Modal checkboxes are saved into the selected message when the form is submitted.
     }
   });
   els.maintenancePagesSelectAllBtn?.addEventListener("click", () => {
@@ -2789,16 +2866,18 @@ function bindEvents() {
     inputs.forEach((input) => {
       input.checked = false;
     });
-    updateMaintenancePagesSummary();
   });
-  els.maintenanceMessageNewBtn?.addEventListener("click", resetMaintenanceEditorForNewMessage);
-  els.maintenanceMessageSaveBtn?.addEventListener("click", () => {
-    if (!upsertCurrentMaintenanceMessage({ requireText: true })) return;
+  els.maintenanceMessageNewBtn?.addEventListener("click", () => openMaintenanceMessageModal({ mode: "new" }));
+  els.maintenanceMessageEditBtn?.addEventListener("click", () => openMaintenanceMessageModal({ mode: "edit" }));
+  els.maintenanceMessageForm?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    if (!upsertCurrentMaintenanceMessage({ requireText: true, closeAfterSave: true })) return;
     setStatus(els.maintenanceMessageStatus, "Saving maintenance message...");
     submitSettingsForm();
   });
   els.maintenanceMessageDefaultBtn?.addEventListener("click", () => {
-    if (!upsertCurrentMaintenanceMessage({ requireText: true })) return;
+    const message = getSelectedMaintenanceMessage();
+    if (!message) return;
     state.maintenanceDefaultMessageId = state.selectedMaintenanceMessageId;
     renderMaintenanceMessageSelect();
     syncMaintenanceEditorFromSelected();
@@ -2822,6 +2901,13 @@ function bindEvents() {
     syncMaintenanceEditorFromSelected();
     setStatus(els.maintenanceMessageStatus, "Deleting maintenance message...");
     submitSettingsForm();
+  });
+  document.addEventListener("click", (event) => {
+    document.querySelectorAll(".admin-checklist-dropdown[open]").forEach((dropdown) => {
+      if (!dropdown.contains(event.target)) {
+        dropdown.removeAttribute("open");
+      }
+    });
   });
   if (els.forceLogoutAllSessionsBtn) {
     els.forceLogoutAllSessionsBtn.addEventListener("click", forceLogoutAllUsers);
