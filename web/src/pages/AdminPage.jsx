@@ -2,6 +2,33 @@ import { useEffect } from "react";
 import { initAdminPage } from "../pageControllers/adminPageController.js";
 import { api } from "../../scripts/api.js";
 
+const MAINTENANCE_PAGE_OPTIONS = [
+  ["index", "Landing"],
+  ["login", "Login"],
+  ["register", "Register"],
+  ["registerwho", "Account Type"],
+  ["registerbusiness", "Business Registration"],
+  ["acceptinvite", "Accept Invite"],
+  ["home", "Home"],
+  ["upload", "Upload"],
+  ["records", "Records"],
+  ["recurring", "Recurring"],
+  ["rules", "Rules"],
+  ["budgeting", "Budgeting"],
+  ["reports", "Reports"],
+  ["profile", "Profile"],
+  ["settings", "Settings"],
+  ["admin", "Admin"],
+  ["team", "Team"],
+  ["about", "About"],
+  ["careers", "Careers"],
+  ["help", "Help"],
+  ["privacy", "Privacy Policy"],
+  ["terms", "Terms"],
+  ["timeout", "Timeout"],
+  ["expired", "Expired"],
+];
+
 export default function AdminPage() {
   useEffect(() => {
     let active = true;
@@ -391,9 +418,45 @@ export default function AdminPage() {
                       </div>
                     </label>
                     <label className="settings-item">
-                      <span>Maintenance Banner Text</span>
-                      <input id="maintenanceModeBannerTextInput" type="text" placeholder="Please be aware: Maintenance is underway." />
+                      <span>Saved Maintenance Message</span>
+                      <select id="maintenanceMessageSelect"></select>
                     </label>
+                  </div>
+                  <div className="admin-maintenance-editor">
+                    <label className="settings-item">
+                      <span>Message Name</span>
+                      <input id="maintenanceMessageTitleInput" type="text" maxLength="80" placeholder="Privacy policy update" />
+                    </label>
+                    <label className="settings-item">
+                      <span>Maintenance Banner Text</span>
+                      <input id="maintenanceModeBannerTextInput" type="text" maxLength="500" placeholder="Please be aware: Maintenance is underway." />
+                    </label>
+                    <details className="admin-checklist-dropdown" id="maintenancePagesDropdown">
+                      <summary>
+                        <span id="maintenancePagesSummary">All pages selected</span>
+                      </summary>
+                      <div className="admin-checklist-dropdown-menu">
+                        <div className="admin-checklist-actions">
+                          <button className="btn btn--link" id="maintenancePagesSelectAllBtn" type="button">Select All</button>
+                          <button className="btn btn--link" id="maintenancePagesClearBtn" type="button">Clear</button>
+                        </div>
+                        <div className="admin-checklist-grid" id="maintenancePagesChecklist">
+                          {MAINTENANCE_PAGE_OPTIONS.map(([value, label]) => (
+                            <label className="checkbox-row" key={value}>
+                              <input type="checkbox" data-maintenance-page-id={value} defaultChecked />
+                              <span>{label}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    </details>
+                    <div className="admin-actions admin-maintenance-actions">
+                      <button className="btn" id="maintenanceMessageNewBtn" type="button">New Message</button>
+                      <button className="btn btn--primary" id="maintenanceMessageSaveBtn" type="button">Save Message</button>
+                      <button className="btn" id="maintenanceMessageDefaultBtn" type="button">Set Default</button>
+                      <button className="btn btn--danger" id="maintenanceMessageDeleteBtn" type="button">Delete</button>
+                    </div>
+                    <p id="maintenanceMessageStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
                   </div>
       
                   <div className="admin-actions">

@@ -106,7 +106,18 @@ const els = {
   ocrRetryLimitInput: document.getElementById("ocrRetryLimitInput"),
   defaultDataExportFormatInput: document.getElementById("defaultDataExportFormatInput"),
   maintenanceModeEnabledInput: document.getElementById("maintenanceModeEnabledInput"),
+  maintenanceMessageSelect: document.getElementById("maintenanceMessageSelect"),
+  maintenanceMessageTitleInput: document.getElementById("maintenanceMessageTitleInput"),
   maintenanceModeBannerTextInput: document.getElementById("maintenanceModeBannerTextInput"),
+  maintenanceMessageNewBtn: document.getElementById("maintenanceMessageNewBtn"),
+  maintenanceMessageSaveBtn: document.getElementById("maintenanceMessageSaveBtn"),
+  maintenanceMessageDefaultBtn: document.getElementById("maintenanceMessageDefaultBtn"),
+  maintenanceMessageDeleteBtn: document.getElementById("maintenanceMessageDeleteBtn"),
+  maintenancePagesSummary: document.getElementById("maintenancePagesSummary"),
+  maintenancePagesChecklist: document.getElementById("maintenancePagesChecklist"),
+  maintenancePagesSelectAllBtn: document.getElementById("maintenancePagesSelectAllBtn"),
+  maintenancePagesClearBtn: document.getElementById("maintenancePagesClearBtn"),
+  maintenanceMessageStatus: document.getElementById("maintenanceMessageStatus"),
   forceLogoutAllSessionsBtn: document.getElementById("forceLogoutAllSessionsBtn"),
   achievementKeyInput: document.getElementById("achievementKeyInput"),
   achievementKeyStatus: document.getElementById("achievementKeyStatus"),
@@ -178,6 +189,9 @@ const state = {
   receipts: [],
   budgetSheets: [],
   settingsAchievements: [],
+  maintenanceMessages: [],
+  maintenanceDefaultMessageId: "",
+  selectedMaintenanceMessageId: "",
   notificationsHistory: [],
   auditLog: [],
   supportTickets: [],
@@ -194,6 +208,34 @@ const state = {
     records: { key: "", dir: "" },
   },
 };
+
+const MAINTENANCE_PAGE_IDS = [
+  "index",
+  "login",
+  "register",
+  "registerwho",
+  "registerbusiness",
+  "acceptinvite",
+  "home",
+  "upload",
+  "records",
+  "recurring",
+  "rules",
+  "budgeting",
+  "reports",
+  "profile",
+  "settings",
+  "admin",
+  "team",
+  "about",
+  "careers",
+  "help",
+  "privacy",
+  "terms",
+  "timeout",
+  "expired",
+];
+const MAINTENANCE_PAGE_ID_SET = new Set(MAINTENANCE_PAGE_IDS);
 
 const ROLE_PERMISSIONS = {
   user: new Set([]),
@@ -2214,6 +2256,189 @@ async function deleteRecord(id) {
   }
 }
 
+function normalizeMaintenancePageIds(value) {
+  if (!Array.isArray(value)) return [...MAINTENANCE_PAGE_IDS];
+  const cleaned = value
+    .map((pageId) => String(pageId || "").trim().toLowerCase())
+    .filter((pageId) => MAINTENANCE_PAGE_ID_SET.has(pageId));
+  return Array.from(new Set(cleaned));
+}
+
+function normalizeMaintenanceMessages(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .map((item) => {
+      const source = item && typeof item === "object" && !Array.isArray(item) ? item : {};
+      const id = String(source.id || "").trim();
+      const text = String(source.text || "").trim();
+      if (!id || !text || seen.has(id)) return null;
+      seen.add(id);
+      return {
+        id,
+        title: String(source.title || "Maintenance message").trim().slice(0, 80) || "Maintenance message",
+        text: text.slice(0, 500),
+        pageIds: normalizeMaintenancePageIds(source.pageIds),
+      };
+    })
+    .filter(Boolean);
+}
+
+function createMaintenanceMessageId() {
+  if (window.crypto?.randomUUID) return window.crypto.randomUUID();
+  return `maintenance-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function getSelectedMaintenancePageIds() {
+  const inputs = els.maintenancePagesChecklist?.querySelectorAll("[data-maintenance-page-id]") || [];
+  const selected = Array.from(inputs)
+    .filter((input) => input.checked)
+    .map((input) => String(input.dataset.maintenancePageId || ""));
+  return normalizeMaintenancePageIds(selected);
+}
+
+function setMaintenancePageCheckboxes(pageIds) {
+  const selected = new Set(normalizeMaintenancePageIds(pageIds));
+  const inputs = els.maintenancePagesChecklist?.querySelectorAll("[data-maintenance-page-id]") || [];
+  inputs.forEach((input) => {
+    input.checked = selected.has(String(input.dataset.maintenancePageId || ""));
+  });
+  updateMaintenancePagesSummary();
+}
+
+function updateMaintenancePagesSummary() {
+  if (!els.maintenancePagesSummary) return;
+  const inputs = els.maintenancePagesChecklist?.querySelectorAll("[data-maintenance-page-id]") || [];
+  const selectedCount = Array.from(inputs).filter((input) => input.checked).length;
+  if (selectedCount >= MAINTENANCE_PAGE_IDS.length) {
+    els.maintenancePagesSummary.textContent = "All pages selected";
+  } else {
+    els.maintenancePagesSummary.textContent = `${selectedCount} page${selectedCount === 1 ? "" : "s"} selected`;
+  }
+}
+
+function getSelectedMaintenanceMessage() {
+  const selectedId = state.selectedMaintenanceMessageId || state.maintenanceDefaultMessageId;
+  return state.maintenanceMessages.find((message) => message.id === selectedId) || null;
+}
+
+function renderMaintenanceMessageSelect() {
+  if (!els.maintenanceMessageSelect) return;
+  els.maintenanceMessageSelect.innerHTML = "";
+  if (!state.maintenanceMessages.length) {
+    const option = document.createElement("option");
+    option.value = "";
+    option.textContent = "No saved messages";
+    els.maintenanceMessageSelect.appendChild(option);
+    return;
+  }
+  state.maintenanceMessages.forEach((message) => {
+    const option = document.createElement("option");
+    option.value = message.id;
+    option.textContent =
+      message.id === state.maintenanceDefaultMessageId
+        ? `${message.title} (default)`
+        : message.title;
+    els.maintenanceMessageSelect.appendChild(option);
+  });
+  els.maintenanceMessageSelect.value =
+    state.selectedMaintenanceMessageId || state.maintenanceDefaultMessageId || state.maintenanceMessages[0]?.id || "";
+}
+
+function syncMaintenanceEditorFromSelected() {
+  const message = getSelectedMaintenanceMessage();
+  if (els.maintenanceMessageTitleInput) {
+    els.maintenanceMessageTitleInput.value = message?.title || "";
+  }
+  if (els.maintenanceModeBannerTextInput) {
+    els.maintenanceModeBannerTextInput.value = message?.text || "";
+  }
+  setMaintenancePageCheckboxes(message?.pageIds || MAINTENANCE_PAGE_IDS);
+  if (els.maintenanceMessageDefaultBtn) {
+    els.maintenanceMessageDefaultBtn.disabled = !message || message.id === state.maintenanceDefaultMessageId;
+  }
+  if (els.maintenanceMessageDeleteBtn) {
+    els.maintenanceMessageDeleteBtn.disabled = !message;
+  }
+}
+
+function loadMaintenanceMessagesFromSettings(settings) {
+  let messages = normalizeMaintenanceMessages(settings?.maintenance_mode_messages);
+  const legacyText = String(settings?.maintenance_mode_banner_text || "").trim();
+  if (!messages.length && legacyText) {
+    messages = [{
+      id: "legacy-maintenance-message",
+      title: "Maintenance message",
+      text: legacyText.slice(0, 500),
+      pageIds: [...MAINTENANCE_PAGE_IDS],
+    }];
+  }
+  state.maintenanceMessages = messages;
+  const rawDefaultId = String(settings?.maintenance_mode_default_message_id || "").trim();
+  state.maintenanceDefaultMessageId = messages.some((message) => message.id === rawDefaultId)
+    ? rawDefaultId
+    : messages[0]?.id || "";
+  state.selectedMaintenanceMessageId = state.maintenanceDefaultMessageId || messages[0]?.id || "";
+  renderMaintenanceMessageSelect();
+  syncMaintenanceEditorFromSelected();
+}
+
+function upsertCurrentMaintenanceMessage({ requireText = false } = {}) {
+  const title = String(els.maintenanceMessageTitleInput?.value || "").trim() || "Maintenance message";
+  const text = String(els.maintenanceModeBannerTextInput?.value || "").trim();
+  if (!text) {
+    if (requireText) {
+      setStatus(els.maintenanceMessageStatus || els.settingsStatus, "Maintenance message text is required.", "error");
+      return false;
+    }
+    return true;
+  }
+  if (text.length > 500) {
+    setStatus(els.maintenanceMessageStatus || els.settingsStatus, "Maintenance banner text cannot exceed 500 characters.", "error");
+    return false;
+  }
+
+  const selectedId = state.selectedMaintenanceMessageId || createMaintenanceMessageId();
+  const next = {
+    id: selectedId,
+    title: title.slice(0, 80),
+    text,
+    pageIds: getSelectedMaintenancePageIds(),
+  };
+  const index = state.maintenanceMessages.findIndex((message) => message.id === selectedId);
+  if (index >= 0) {
+    state.maintenanceMessages = state.maintenanceMessages.map((message, i) => (i === index ? next : message));
+  } else {
+    state.maintenanceMessages = [...state.maintenanceMessages, next];
+  }
+  if (!state.maintenanceDefaultMessageId) {
+    state.maintenanceDefaultMessageId = next.id;
+  }
+  state.selectedMaintenanceMessageId = next.id;
+  renderMaintenanceMessageSelect();
+  syncMaintenanceEditorFromSelected();
+  return true;
+}
+
+function resetMaintenanceEditorForNewMessage() {
+  state.selectedMaintenanceMessageId = "";
+  if (els.maintenanceMessageSelect) els.maintenanceMessageSelect.value = "";
+  if (els.maintenanceMessageTitleInput) els.maintenanceMessageTitleInput.value = "";
+  if (els.maintenanceModeBannerTextInput) els.maintenanceModeBannerTextInput.value = "";
+  setMaintenancePageCheckboxes(MAINTENANCE_PAGE_IDS);
+  if (els.maintenanceMessageDefaultBtn) els.maintenanceMessageDefaultBtn.disabled = true;
+  if (els.maintenanceMessageDeleteBtn) els.maintenanceMessageDeleteBtn.disabled = true;
+  setStatus(els.maintenanceMessageStatus, "");
+}
+
+function submitSettingsForm() {
+  if (els.settingsForm?.requestSubmit) {
+    els.settingsForm.requestSubmit();
+  } else {
+    els.settingsForm?.dispatchEvent(new Event("submit", { cancelable: true, bubbles: true }));
+  }
+}
+
 async function loadSettings() {
   if (!hasPermission("settings.read")) return;
   setStatus(els.settingsStatus, "");
@@ -2291,9 +2516,7 @@ async function loadSettings() {
     if (els.maintenanceModeEnabledInput) {
       els.maintenanceModeEnabledInput.checked = Boolean(settings?.maintenance_mode_enabled);
     }
-    if (els.maintenanceModeBannerTextInput) {
-      els.maintenanceModeBannerTextInput.value = String(settings?.maintenance_mode_banner_text || "");
-    }
+    loadMaintenanceMessagesFromSettings(settings);
     state.settingsAchievements = Array.isArray(settings?.achievements_catalog)
       ? settings.achievements_catalog
       : [];
@@ -2368,6 +2591,9 @@ async function saveSettings(event) {
     setStatus(els.settingsStatus, "Default export format must be CSV or JSON.", "error");
     return;
   }
+  if (!upsertCurrentMaintenanceMessage({ requireText: Boolean(els.maintenanceModeEnabledInput?.checked) })) {
+    return;
+  }
   const maintenanceModeBannerText = String(els.maintenanceModeBannerTextInput?.value || "");
   if (maintenanceModeBannerText.length > 500) {
     setStatus(els.settingsStatus, "Maintenance banner text cannot exceed 500 characters.", "error");
@@ -2393,11 +2619,25 @@ async function saveSettings(event) {
       defaultDataExportFormat,
       maintenanceModeEnabled: Boolean(els.maintenanceModeEnabledInput?.checked),
       maintenanceModeBannerText,
+      maintenanceModeMessages: state.maintenanceMessages,
+      maintenanceModeDefaultMessageId: state.maintenanceDefaultMessageId,
       achievementsCatalog: state.settingsAchievements,
     });
     sessionStorage.setItem("appName", appName);
     localStorage.setItem("sessionTimeoutMinutes", String(timeout));
     window.dispatchEvent(new CustomEvent("appName:updated", { detail: { appName } }));
+    const defaultMaintenanceMessage =
+      state.maintenanceMessages.find((message) => message.id === state.maintenanceDefaultMessageId) ||
+      state.maintenanceMessages[0] ||
+      null;
+    window.dispatchEvent(new CustomEvent("maintenanceSettings:updated", {
+      detail: {
+        enabled: Boolean(els.maintenanceModeEnabledInput?.checked),
+        text: defaultMaintenanceMessage?.text || maintenanceModeBannerText,
+        pageIds: defaultMaintenanceMessage?.pageIds || MAINTENANCE_PAGE_IDS,
+      },
+    }));
+    setStatus(els.maintenanceMessageStatus, "Maintenance messages saved.", "ok");
     setStatus(els.settingsStatus, "Settings updated.", "ok");
   } catch (err) {
     console.error(err);
@@ -2529,6 +2769,60 @@ function bindEvents() {
   if (els.settingsForm) {
     els.settingsForm.addEventListener("submit", saveSettings);
   }
+  if (els.maintenanceMessageSelect) {
+    els.maintenanceMessageSelect.addEventListener("change", () => {
+      state.selectedMaintenanceMessageId = els.maintenanceMessageSelect.value;
+      syncMaintenanceEditorFromSelected();
+      setStatus(els.maintenanceMessageStatus, "");
+    });
+  }
+  els.maintenancePagesChecklist?.addEventListener("change", (event) => {
+    if (event.target?.matches?.("[data-maintenance-page-id]")) {
+      updateMaintenancePagesSummary();
+    }
+  });
+  els.maintenancePagesSelectAllBtn?.addEventListener("click", () => {
+    setMaintenancePageCheckboxes(MAINTENANCE_PAGE_IDS);
+  });
+  els.maintenancePagesClearBtn?.addEventListener("click", () => {
+    const inputs = els.maintenancePagesChecklist?.querySelectorAll("[data-maintenance-page-id]") || [];
+    inputs.forEach((input) => {
+      input.checked = false;
+    });
+    updateMaintenancePagesSummary();
+  });
+  els.maintenanceMessageNewBtn?.addEventListener("click", resetMaintenanceEditorForNewMessage);
+  els.maintenanceMessageSaveBtn?.addEventListener("click", () => {
+    if (!upsertCurrentMaintenanceMessage({ requireText: true })) return;
+    setStatus(els.maintenanceMessageStatus, "Saving maintenance message...");
+    submitSettingsForm();
+  });
+  els.maintenanceMessageDefaultBtn?.addEventListener("click", () => {
+    if (!upsertCurrentMaintenanceMessage({ requireText: true })) return;
+    state.maintenanceDefaultMessageId = state.selectedMaintenanceMessageId;
+    renderMaintenanceMessageSelect();
+    syncMaintenanceEditorFromSelected();
+    setStatus(els.maintenanceMessageStatus, "Saving default maintenance message...");
+    submitSettingsForm();
+  });
+  els.maintenanceMessageDeleteBtn?.addEventListener("click", () => {
+    const message = getSelectedMaintenanceMessage();
+    if (!message) return;
+    const confirmed = window.confirm("Delete this saved maintenance message?");
+    if (!confirmed) return;
+    state.maintenanceMessages = state.maintenanceMessages.filter((item) => item.id !== message.id);
+    if (state.maintenanceDefaultMessageId === message.id) {
+      state.maintenanceDefaultMessageId = state.maintenanceMessages[0]?.id || "";
+    }
+    if (!state.maintenanceMessages.length && els.maintenanceModeEnabledInput) {
+      els.maintenanceModeEnabledInput.checked = false;
+    }
+    state.selectedMaintenanceMessageId = state.maintenanceDefaultMessageId;
+    renderMaintenanceMessageSelect();
+    syncMaintenanceEditorFromSelected();
+    setStatus(els.maintenanceMessageStatus, "Deleting maintenance message...");
+    submitSettingsForm();
+  });
   if (els.forceLogoutAllSessionsBtn) {
     els.forceLogoutAllSessionsBtn.addEventListener("click", forceLogoutAllUsers);
   }

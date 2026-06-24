@@ -42,6 +42,7 @@ let inactivityMonitorStarted = false;
 let inactivityTimedOut = false;
 const MAINTENANCE_MODE_ENABLED_KEY = "maintenanceModeEnabled";
 const MAINTENANCE_MODE_BANNER_TEXT_KEY = "maintenanceModeBannerText";
+const MAINTENANCE_MODE_PAGE_IDS_KEY = "maintenanceModePageIds";
 const DEFAULT_EXPORT_FORMAT_KEY = "defaultDataExportFormat";
 
 /**
@@ -1112,13 +1113,16 @@ async function updateAppName() {
   const cached = sessionStorage.getItem("appName");
   const cachedMaintenanceEnabled = sessionStorage.getItem(MAINTENANCE_MODE_ENABLED_KEY);
   const cachedMaintenanceText = sessionStorage.getItem(MAINTENANCE_MODE_BANNER_TEXT_KEY) || "";
+  const cachedMaintenancePageIds = readMaintenancePageIds(
+    sessionStorage.getItem(MAINTENANCE_MODE_PAGE_IDS_KEY)
+  );
   if (cached) {
     const nameEl = document.getElementById("appName");
     if (nameEl) nameEl.textContent = cached;
     applyAppName(cached);
   }
   if (cachedMaintenanceEnabled === "true") {
-    applyMaintenanceBanner(true, cachedMaintenanceText);
+    applyMaintenanceBanner(true, cachedMaintenanceText, cachedMaintenancePageIds);
   }
 
   try {
@@ -1127,6 +1131,9 @@ async function updateAppName() {
     const timeoutMinutes = Number(data?.sessionTimeoutMinutes);
     const maintenanceModeEnabled = Boolean(data?.maintenanceModeEnabled);
     const maintenanceModeBannerText = String(data?.maintenanceModeBannerText || "").trim();
+    const maintenanceModePageIds = Array.isArray(data?.maintenanceModePageIds)
+      ? normalizeMaintenancePageIds(data.maintenanceModePageIds)
+      : null;
     const defaultDataExportFormat = String(data?.defaultDataExportFormat || "csv").toLowerCase() === "json"
       ? "json"
       : "csv";
@@ -1135,6 +1142,7 @@ async function updateAppName() {
     sessionStorage.setItem("appName", nextName);
     sessionStorage.setItem(MAINTENANCE_MODE_ENABLED_KEY, String(maintenanceModeEnabled));
     sessionStorage.setItem(MAINTENANCE_MODE_BANNER_TEXT_KEY, maintenanceModeBannerText);
+    sessionStorage.setItem(MAINTENANCE_MODE_PAGE_IDS_KEY, JSON.stringify(maintenanceModePageIds));
     localStorage.setItem(DEFAULT_EXPORT_FORMAT_KEY, defaultDataExportFormat);
     if (Number.isFinite(timeoutMinutes) && timeoutMinutes >= 1) {
       localStorage.setItem(
@@ -1142,16 +1150,37 @@ async function updateAppName() {
         String(Math.min(MAX_SESSION_TIMEOUT_MINUTES, Math.floor(timeoutMinutes)))
       );
     }
-    applyMaintenanceBanner(maintenanceModeEnabled, maintenanceModeBannerText);
+    applyMaintenanceBanner(maintenanceModeEnabled, maintenanceModeBannerText, maintenanceModePageIds);
     applyAppName(nextName);
   } catch {
     // ignore public settings failure
   }
 }
 
-function applyMaintenanceBanner(enabled, message) {
+function readMaintenancePageIds(raw) {
+  try {
+    return JSON.parse(raw || "null");
+  } catch {
+    return null;
+  }
+}
+
+function normalizeMaintenancePageIds(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(value.map((pageId) => String(pageId || "").trim().toLowerCase()).filter(Boolean))
+  );
+}
+
+function shouldDisplayMaintenanceBanner(pageIds) {
+  if (!Array.isArray(pageIds)) return true;
+  const normalized = normalizeMaintenancePageIds(pageIds);
+  return normalized.includes(getCurrentPageToken());
+}
+
+function applyMaintenanceBanner(enabled, message, pageIds = []) {
   const existing = document.getElementById("maintenanceBanner");
-  if (!enabled) {
+  if (!enabled || !shouldDisplayMaintenanceBanner(pageIds)) {
     if (existing) existing.remove();
     return;
   }
@@ -1161,13 +1190,11 @@ function applyMaintenanceBanner(enabled, message) {
   banner.id = "maintenanceBanner";
   banner.className = "maintenance-banner";
   banner.textContent = text;
-  if (!existing) {
-    const header = document.getElementById("header");
-    if (header && header.parentNode) {
-      header.insertAdjacentElement("afterend", banner);
-    } else if (document.body) {
-      document.body.insertBefore(banner, document.body.firstChild);
-    }
+  const header = document.getElementById("header");
+  if (header && header.parentNode) {
+    header.insertAdjacentElement("afterend", banner);
+  } else if (!existing && document.body) {
+    document.body.insertBefore(banner, document.body.firstChild);
   }
 }
 
@@ -1242,6 +1269,16 @@ window.addEventListener("appName:updated", (event) => {
     sessionStorage.setItem("appName", nextName);
     applyAppName(nextName);
   }
+});
+
+window.addEventListener("maintenanceSettings:updated", (event) => {
+  const enabled = Boolean(event?.detail?.enabled);
+  const text = String(event?.detail?.text || "");
+  const pageIds = normalizeMaintenancePageIds(event?.detail?.pageIds);
+  sessionStorage.setItem(MAINTENANCE_MODE_ENABLED_KEY, String(enabled));
+  sessionStorage.setItem(MAINTENANCE_MODE_BANNER_TEXT_KEY, text);
+  sessionStorage.setItem(MAINTENANCE_MODE_PAGE_IDS_KEY, JSON.stringify(pageIds));
+  applyMaintenanceBanner(enabled, text, pageIds);
 });
 
 window.addEventListener("avatar:updated", (event) => {

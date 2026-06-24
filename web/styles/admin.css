@@ -332,8 +332,72 @@
   grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.6fr);
 }
 
+.admin-maintenance-editor {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.admin-checklist-dropdown {
+  position: relative;
+}
+
+.admin-checklist-dropdown summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 42px;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.admin-checklist-dropdown-menu {
+  position: absolute;
+  left: 0;
+  top: calc(100% + 0.35rem);
+  z-index: 30;
+  width: min(560px, 92vw);
+  max-height: 360px;
+  overflow: auto;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+}
+
+.admin-checklist-actions,
+.admin-maintenance-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.admin-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(170px, 1fr));
+  gap: 0.35rem 0.75rem;
+  margin-top: var(--space-2);
+}
+
+.admin-checklist-grid .checkbox-row {
+  align-items: center;
+  font-size: 0.9rem;
+}
+
 @media (max-width: 900px) {
   .admin-settings-inline-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .admin-checklist-grid {
     grid-template-columns: 1fr;
   }
 }

@@ -18,11 +18,86 @@ import { sanitizeSystemHealthControls } from "../services/system_health_controls
 import { clearRuntimeAppSettingsCache } from "../services/app_settings_runtime.service.js";
 import { clearAdminPermissionsCache } from "../middleware/require_admin_permission.js";
 
+const MAINTENANCE_PAGE_IDS = Object.freeze([
+  "index",
+  "login",
+  "register",
+  "registerwho",
+  "registerbusiness",
+  "acceptinvite",
+  "home",
+  "upload",
+  "records",
+  "recurring",
+  "rules",
+  "budgeting",
+  "reports",
+  "profile",
+  "settings",
+  "admin",
+  "team",
+  "about",
+  "careers",
+  "help",
+  "privacy",
+  "terms",
+  "timeout",
+  "expired",
+]);
+const MAINTENANCE_PAGE_ID_SET = new Set(MAINTENANCE_PAGE_IDS);
+
+function normalizeMaintenancePageIds(value) {
+  if (!Array.isArray(value)) return [...MAINTENANCE_PAGE_IDS];
+  const cleaned = value
+    .map((id) => String(id || "").trim().toLowerCase())
+    .filter((id) => MAINTENANCE_PAGE_ID_SET.has(id));
+  return Array.from(new Set(cleaned));
+}
+
+function sanitizeMaintenanceMessages(value) {
+  if (!Array.isArray(value)) return [];
+  const seen = new Set();
+  return value
+    .map((item) => {
+      const source = item && typeof item === "object" && !Array.isArray(item) ? item : {};
+      const id = String(source.id || "").trim().slice(0, 80);
+      const text = String(source.text || "").trim();
+      if (!id || !text || seen.has(id)) return null;
+      seen.add(id);
+      return {
+        id,
+        title: String(source.title || "Maintenance message").trim().slice(0, 80) || "Maintenance message",
+        text: text.slice(0, 500),
+        pageIds: normalizeMaintenancePageIds(source.pageIds),
+      };
+    })
+    .filter(Boolean)
+    .slice(0, 25);
+}
+
+function getSelectedMaintenanceMessage(settings) {
+  const messages = sanitizeMaintenanceMessages(settings?.maintenance_mode_messages);
+  const defaultId = String(settings?.maintenance_mode_default_message_id || "").trim();
+  const selected = messages.find((message) => message.id === defaultId) || messages[0] || null;
+  if (selected) return selected;
+
+  const legacyText = String(settings?.maintenance_mode_banner_text || "").trim();
+  if (!legacyText) return null;
+  return {
+    id: "legacy",
+    title: "Maintenance message",
+    text: legacyText.slice(0, 500),
+    pageIds: [...MAINTENANCE_PAGE_IDS],
+  };
+}
+
 export const getPublic = asyncHandler(async (_req, res) => {
   const settings = await getAppSettings();
   const timeout = Number(settings?.session_timeout_minutes);
   const maintenanceModeEnabled = Boolean(settings?.maintenance_mode_enabled);
-  const maintenanceModeBannerText = String(settings?.maintenance_mode_banner_text || "").trim();
+  const selectedMaintenanceMessage = getSelectedMaintenanceMessage(settings);
+  const maintenanceModeBannerText = String(selectedMaintenanceMessage?.text || "").trim();
+  const maintenanceModePageIds = normalizeMaintenancePageIds(selectedMaintenanceMessage?.pageIds);
   const defaultDataExportFormat = String(settings?.default_data_export_format || "csv").toLowerCase() === "json"
     ? "json"
     : "csv";
@@ -31,6 +106,7 @@ export const getPublic = asyncHandler(async (_req, res) => {
     sessionTimeoutMinutes: Number.isFinite(timeout) ? timeout : 15,
     maintenanceModeEnabled,
     maintenanceModeBannerText,
+    maintenanceModePageIds,
     defaultDataExportFormat,
     supportEmail: process.env.SUPPORT_EMAIL || "support.wisewallet@manuswebworks.org",
   });
@@ -43,6 +119,9 @@ export const getAdmin = asyncHandler(async (_req, res) => {
     settings.achievements_catalog = sanitizeAchievementsCatalog(catalogRows);
     settings.admin_role_permissions = sanitizeRolePermissionOverrides(settings.admin_role_permissions);
     settings.system_health_controls = sanitizeSystemHealthControls(settings.system_health_controls);
+    settings.maintenance_mode_messages = sanitizeMaintenanceMessages(settings.maintenance_mode_messages);
+    const selectedMaintenanceMessage = getSelectedMaintenanceMessage(settings);
+    settings.maintenance_mode_default_message_id = selectedMaintenanceMessage?.id || "";
     const effective = buildEffectiveRolePermissionsMap(settings.admin_role_permissions);
     settings.admin_role_permissions_effective = Object.fromEntries(
       Object.entries(effective).map(([role, permissions]) => [role, [...permissions]])
@@ -69,6 +148,8 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     defaultDataExportFormat,
     maintenanceModeEnabled,
     maintenanceModeBannerText,
+    maintenanceModeMessages,
+    maintenanceModeDefaultMessageId,
     adminRolePermissions,
     systemHealthControls,
     achievementsCatalog,
@@ -89,6 +170,8 @@ export const updateAdmin = asyncHandler(async (req, res) => {
   const hasDefaultDataExportFormat = defaultDataExportFormat !== undefined;
   const hasMaintenanceModeEnabled = maintenanceModeEnabled !== undefined;
   const hasMaintenanceModeBannerText = maintenanceModeBannerText !== undefined;
+  const hasMaintenanceModeMessages = maintenanceModeMessages !== undefined;
+  const hasMaintenanceModeDefaultMessageId = maintenanceModeDefaultMessageId !== undefined;
   const hasAdminRolePermissions = adminRolePermissions !== undefined;
   const hasSystemHealthControls = systemHealthControls !== undefined;
   const hasAchievementsCatalog = achievementsCatalog !== undefined;
@@ -110,6 +193,8 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     !hasDefaultDataExportFormat &&
     !hasMaintenanceModeEnabled &&
     !hasMaintenanceModeBannerText &&
+    !hasMaintenanceModeMessages &&
+    !hasMaintenanceModeDefaultMessageId &&
     !hasAdminRolePermissions &&
     !hasSystemHealthControls &&
     !hasAchievementsCatalog
@@ -253,6 +338,39 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     }
   }
 
+  let normalizedMaintenanceMessages = null;
+  if (hasMaintenanceModeMessages) {
+    if (!Array.isArray(maintenanceModeMessages)) {
+      return res.status(400).json({ message: "maintenanceModeMessages must be an array" });
+    }
+    normalizedMaintenanceMessages = sanitizeMaintenanceMessages(maintenanceModeMessages);
+    if (maintenanceModeMessages.length && !normalizedMaintenanceMessages.length) {
+      return res.status(400).json({
+        message: "maintenanceModeMessages must include at least one valid message",
+      });
+    }
+  }
+
+  let normalizedMaintenanceDefaultMessageId = null;
+  let selectedMaintenanceText = null;
+  if (hasMaintenanceModeMessages || hasMaintenanceModeDefaultMessageId) {
+    const currentSettings = hasMaintenanceModeMessages ? null : await getAppSettings();
+    const effectiveMessages = hasMaintenanceModeMessages
+      ? normalizedMaintenanceMessages
+      : sanitizeMaintenanceMessages(currentSettings?.maintenance_mode_messages);
+    normalizedMaintenanceDefaultMessageId = String(maintenanceModeDefaultMessageId || "").trim();
+    if (!normalizedMaintenanceDefaultMessageId && effectiveMessages.length) {
+      normalizedMaintenanceDefaultMessageId = effectiveMessages[0].id;
+    }
+    const selected = effectiveMessages.find((message) => message.id === normalizedMaintenanceDefaultMessageId);
+    if (effectiveMessages.length && !selected) {
+      return res.status(400).json({
+        message: "maintenanceModeDefaultMessageId must match a saved maintenance message",
+      });
+    }
+    selectedMaintenanceText = selected?.text || "";
+  }
+
   let normalizedCatalog = null;
   if (hasAchievementsCatalog) {
     if (!Array.isArray(achievementsCatalog)) {
@@ -290,6 +408,8 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     hasDefaultDataExportFormat ||
     hasMaintenanceModeEnabled ||
     hasMaintenanceModeBannerText ||
+    hasMaintenanceModeMessages ||
+    hasMaintenanceModeDefaultMessageId ||
     hasAdminRolePermissions ||
     hasSystemHealthControls;
   const updated = needsAppSettingsUpdate
@@ -313,9 +433,16 @@ export const updateAdmin = asyncHandler(async (req, res) => {
           ? String(defaultDataExportFormat).trim().toLowerCase()
           : null,
         maintenanceModeEnabled: hasMaintenanceModeEnabled ? maintenanceModeEnabled : null,
-        maintenanceModeBannerText: hasMaintenanceModeBannerText
+        maintenanceModeBannerText: selectedMaintenanceText !== null
+          ? selectedMaintenanceText
+          : hasMaintenanceModeBannerText
           ? String(maintenanceModeBannerText)
           : null,
+        maintenanceModeMessages: hasMaintenanceModeMessages ? normalizedMaintenanceMessages : undefined,
+        maintenanceModeDefaultMessageId:
+          hasMaintenanceModeMessages || hasMaintenanceModeDefaultMessageId
+            ? normalizedMaintenanceDefaultMessageId
+            : null,
         adminRolePermissions: hasAdminRolePermissions ? normalizedAdminRolePermissions : null,
         systemHealthControls: hasSystemHealthControls ? normalizedSystemHealthControls : null,
         updatedBy: req.user.id,
@@ -332,6 +459,9 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     updated.achievements_catalog = achievementsCatalogSanitized;
     updated.admin_role_permissions = sanitizeRolePermissionOverrides(updated.admin_role_permissions);
     updated.system_health_controls = sanitizeSystemHealthControls(updated.system_health_controls);
+    updated.maintenance_mode_messages = sanitizeMaintenanceMessages(updated.maintenance_mode_messages);
+    const selectedMaintenanceMessage = getSelectedMaintenanceMessage(updated);
+    updated.maintenance_mode_default_message_id = selectedMaintenanceMessage?.id || "";
     const effective = buildEffectiveRolePermissionsMap(updated.admin_role_permissions);
     updated.admin_role_permissions_effective = Object.fromEntries(
       Object.entries(effective).map(([role, permissions]) => [role, [...permissions]])
@@ -360,6 +490,10 @@ export const updateAdmin = asyncHandler(async (req, res) => {
       defaultDataExportFormat: updated?.default_data_export_format,
       maintenanceModeEnabled: updated?.maintenance_mode_enabled,
       maintenanceModeBannerText: updated?.maintenance_mode_banner_text,
+      maintenanceModeDefaultMessageId: updated?.maintenance_mode_default_message_id,
+      maintenanceModeMessageCount: Array.isArray(updated?.maintenance_mode_messages)
+        ? updated.maintenance_mode_messages.length
+        : null,
       adminRolePermissions: updated?.admin_role_permissions,
       systemHealthControls: updated?.system_health_controls,
       achievementsCatalogCount: Array.isArray(achievementsCatalogSanitized)
