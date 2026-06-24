@@ -17,6 +17,7 @@ import "../styles/rules.css";
 import "../styles/settings.css";
 import "../styles/upload.css";
 import "../styles/team.css";
+import "../scripts/default.js";
 import App from "./App.jsx";
 
 window.__WALLETLENS_REACT_SPA__ = true;
