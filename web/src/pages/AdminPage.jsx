@@ -409,39 +409,39 @@ export default function AdminPage() {
                   </label>
       
                   <h3 className="admin-settings-subtitle">System Operations</h3>
-                  <div className="admin-settings-inline-grid admin-settings-inline-grid--maintenance">
-                    <label className="settings-item">
+                  <div className="admin-maintenance-panel">
+                    <label className="settings-item admin-maintenance-toggle">
                       <span>Maintenance Mode</span>
                       <div className="checkbox-row">
                         <input id="maintenanceModeEnabledInput" type="checkbox" />
-                        <span><span className="subtle">Please be aware: Maintenance is underway.</span></span>
+                        <span><span className="subtle">Show the selected banner across its assigned pages.</span></span>
                       </div>
                     </label>
-                    <label className="settings-item">
-                      <span>Saved Maintenance Message</span>
+                    <div className="settings-item admin-maintenance-picker">
+                      <div className="settings-item-head">
+                        <span>Maintenance Message</span>
+                        <p className="subtle">Choose the active saved message or add a targeted one.</p>
+                      </div>
                       <div className="admin-maintenance-select-row">
                         <select id="maintenanceMessageSelect"></select>
                         <button className="btn" id="maintenanceMessageNewBtn" type="button">+ Add New</button>
                       </div>
-                    </label>
-                  </div>
-                  <div className="admin-maintenance-summary">
-                    <div>
-                      <span className="admin-maintenance-label">Banner Text</span>
-                      <p id="maintenanceSelectedText" className="admin-maintenance-message-text subtle">No message selected.</p>
-                    </div>
-                    <details className="admin-checklist-dropdown" id="maintenanceSelectedPagesDropdown">
-                      <summary>
-                        <span id="maintenancePagesSummary">All pages selected</span>
-                      </summary>
-                      <div className="admin-checklist-dropdown-menu">
-                        <div className="admin-checklist-grid" id="maintenanceSelectedPagesList"></div>
+                      <div className="admin-maintenance-preview">
+                        <p id="maintenanceSelectedText" className="admin-maintenance-message-text subtle">No message selected.</p>
+                        <details className="admin-checklist-dropdown" id="maintenanceSelectedPagesDropdown">
+                          <summary>
+                            <span id="maintenancePagesSummary">All pages selected</span>
+                          </summary>
+                          <div className="admin-checklist-dropdown-menu">
+                            <div className="admin-checklist-grid" id="maintenanceSelectedPagesList"></div>
+                          </div>
+                        </details>
                       </div>
-                    </details>
-                    <div className="admin-actions admin-maintenance-actions">
-                      <button className="btn" id="maintenanceMessageEditBtn" type="button">Edit Message</button>
-                      <button className="btn" id="maintenanceMessageDefaultBtn" type="button">Set Default</button>
-                      <button className="btn btn--danger" id="maintenanceMessageDeleteBtn" type="button">Delete</button>
+                      <div className="admin-actions admin-maintenance-actions">
+                        <button className="btn" id="maintenanceMessageEditBtn" type="button">Edit</button>
+                        <button className="btn" id="maintenanceMessageDefaultBtn" type="button">Make Default</button>
+                        <button className="btn btn--danger" id="maintenanceMessageDeleteBtn" type="button">Delete</button>
+                      </div>
                     </div>
                     <p id="maintenanceMessageStatus" className="status-banner subtle is-hidden" aria-live="polite"></p>
                   </div>
@@ -903,15 +903,15 @@ export default function AdminPage() {
             </div>
             <form id="maintenanceMessageForm" className="admin-form">
               <label>
-                <span>Message Name</span>
+                <span>Name</span>
                 <input id="maintenanceMessageTitleInput" type="text" maxLength="80" placeholder="Privacy policy update" />
               </label>
               <label>
-                <span>Maintenance Banner Text</span>
+                <span>Banner Text</span>
                 <input id="maintenanceModeBannerTextInput" type="text" maxLength="500" placeholder="Please be aware: Maintenance is underway." />
               </label>
               <div className="settings-item-head">
-                <span>Pages Selected</span>
+                <span>Pages</span>
                 <p className="subtle">Select where this message should appear.</p>
               </div>
               <div className="admin-checklist-actions">

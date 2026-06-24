@@ -328,8 +328,23 @@
   padding-top: 0;
 }
 
-.admin-settings-inline-grid--maintenance {
-  grid-template-columns: minmax(220px, 0.9fr) minmax(280px, 1.6fr);
+.admin-maintenance-panel {
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.admin-maintenance-toggle {
+  border-bottom: 1px solid var(--border);
+  padding-bottom: var(--space-3);
+}
+
+.admin-maintenance-picker {
+  display: grid;
+  gap: var(--space-2);
 }
 
 .admin-maintenance-select-row {
@@ -339,26 +354,18 @@
   align-items: center;
 }
 
-.admin-maintenance-select-row .btn {
+.admin-maintenance-select-row .btn,
+.admin-maintenance-actions .btn {
   white-space: nowrap;
 }
 
-.admin-maintenance-summary {
+.admin-maintenance-preview {
   display: grid;
-  gap: var(--space-3);
-  padding: var(--space-3);
+  gap: var(--space-2);
+  padding: var(--space-2);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--surface);
-}
-
-.admin-maintenance-label {
-  display: block;
-  margin-bottom: 0.25rem;
-  font-size: 0.78rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  color: var(--muted);
+  background: var(--surface-2);
 }
 
 .admin-maintenance-message-text {
@@ -374,11 +381,11 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  min-height: 42px;
-  padding: 0.55rem 0.75rem;
+  min-height: 38px;
+  padding: 0.45rem 0.65rem;
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
-  background: var(--bg);
+  background: var(--surface);
   cursor: pointer;
   font-weight: 600;
 }
@@ -403,6 +410,10 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--space-2);
+}
+
+.admin-maintenance-actions {
+  justify-content: flex-end;
 }
 
 .admin-checklist-grid {

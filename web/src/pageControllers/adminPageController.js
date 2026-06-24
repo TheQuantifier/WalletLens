@@ -2348,11 +2348,11 @@ function updateMaintenanceSelectedSummary() {
   const pageIds = normalizeMaintenancePageIds(message?.pageIds);
   const selectedCount = pageIds.length;
   if (selectedCount >= MAINTENANCE_PAGE_IDS.length) {
-    els.maintenancePagesSummary.textContent = "All pages selected";
+    els.maintenancePagesSummary.textContent = "Pages: All selected";
   } else if (selectedCount === 0) {
-    els.maintenancePagesSummary.textContent = "No pages selected";
+    els.maintenancePagesSummary.textContent = "Pages: None selected";
   } else {
-    els.maintenancePagesSummary.textContent = `${selectedCount} page${selectedCount === 1 ? "" : "s"} selected`;
+    els.maintenancePagesSummary.textContent = `Pages: ${selectedCount} selected`;
   }
 
   if (els.maintenanceSelectedPagesList) {
