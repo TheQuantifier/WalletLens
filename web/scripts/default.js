@@ -872,23 +872,49 @@ function applyAccountAvatar(avatarUrl, fallbackName) {
   =============================================== */
 
 async function updateHeaderAuthState() {
+  const applyLoggedOutHeader = () => {
+    document.querySelectorAll(".auth-logged-in")
+      .forEach((el) => el.classList.add("hidden"));
+
+    document.querySelectorAll(".auth-logged-out")
+      .forEach((el) => el.classList.remove("hidden"));
+
+    applyAccountAvatar("", "");
+    document.body.classList.remove("business-account-context", "personal-account-context");
+    setAdminVisibility("user");
+    setLogoLinkDestination("/");
+  };
+
   try {
     const cachedUserRaw = sessionStorage.getItem("cachedUser");
+    let hasCachedUser = false;
     if (cachedUserRaw) {
       try {
         const cachedUser = JSON.parse(cachedUserRaw);
+        hasCachedUser = true;
         const nameEl = document.getElementById("headerUserName");
         if (nameEl) {
           nameEl.textContent = cachedUser.fullName || cachedUser.full_name || cachedUser.username || "Account";
         }
+        document.querySelectorAll(".auth-logged-in")
+          .forEach((el) => el.classList.remove("hidden"));
+        document.querySelectorAll(".auth-logged-out")
+          .forEach((el) => el.classList.add("hidden"));
         applyAccountAvatar(
           cachedUser.avatarUrl || cachedUser.avatar_url || "",
           cachedUser.fullName || cachedUser.full_name || cachedUser.username || ""
         );
         applyAccountContext(cachedUser);
+        setAdminVisibility(cachedUser?.platform_role && cachedUser.platform_role !== "user" ? cachedUser.platform_role : cachedUser?.role);
+        setLogoLinkDestination("/about");
       } catch {
         sessionStorage.removeItem("cachedUser");
       }
+    }
+
+    if (isPublicPage()) {
+      if (!hasCachedUser) applyLoggedOutHeader();
+      return;
     }
 
     const { user } = await api.auth.me();
@@ -917,16 +943,7 @@ async function updateHeaderAuthState() {
 
   } catch {
     // Not authenticated
-    document.querySelectorAll(".auth-logged-in")
-      .forEach((el) => el.classList.add("hidden"));
-
-    document.querySelectorAll(".auth-logged-out")
-      .forEach((el) => el.classList.remove("hidden"));
-
-    applyAccountAvatar("", "");
-    document.body.classList.remove("business-account-context", "personal-account-context");
-    setAdminVisibility("user");
-    setLogoLinkDestination("/");
+    applyLoggedOutHeader();
   }
 }
 
@@ -1111,18 +1128,10 @@ function openAccountSwitcher(organizations, activeOrganizationId) {
 
 async function updateAppName() {
   const cached = sessionStorage.getItem("appName");
-  const cachedMaintenanceEnabled = sessionStorage.getItem(MAINTENANCE_MODE_ENABLED_KEY);
-  const cachedMaintenanceText = sessionStorage.getItem(MAINTENANCE_MODE_BANNER_TEXT_KEY) || "";
-  const cachedMaintenancePageIds = readMaintenancePageIds(
-    sessionStorage.getItem(MAINTENANCE_MODE_PAGE_IDS_KEY)
-  );
   if (cached) {
     const nameEl = document.getElementById("appName");
     if (nameEl) nameEl.textContent = cached;
     applyAppName(cached);
-  }
-  if (cachedMaintenanceEnabled === "true") {
-    applyMaintenanceBanner(true, cachedMaintenanceText, cachedMaintenancePageIds);
   }
 
   try {
@@ -1150,18 +1159,9 @@ async function updateAppName() {
         String(Math.min(MAX_SESSION_TIMEOUT_MINUTES, Math.floor(timeoutMinutes)))
       );
     }
-    applyMaintenanceBanner(maintenanceModeEnabled, maintenanceModeBannerText, maintenanceModePageIds);
     applyAppName(nextName);
   } catch {
     // ignore public settings failure
-  }
-}
-
-function readMaintenancePageIds(raw) {
-  try {
-    return JSON.parse(raw || "null");
-  } catch {
-    return null;
   }
 }
 
@@ -1170,38 +1170,6 @@ function normalizeMaintenancePageIds(value) {
   return Array.from(
     new Set(value.map((pageId) => String(pageId || "").trim().toLowerCase()).filter(Boolean))
   );
-}
-
-function shouldDisplayMaintenanceBanner(pageIds) {
-  if (!Array.isArray(pageIds)) return true;
-  const normalized = normalizeMaintenancePageIds(pageIds);
-  if (!normalized.length) return true;
-  return normalized.includes(getCurrentPageToken());
-}
-
-function applyMaintenanceBanner(enabled, message, pageIds = []) {
-  const existing = document.getElementById("maintenanceBanner");
-  if (!enabled || !shouldDisplayMaintenanceBanner(pageIds)) {
-    if (existing) existing.remove();
-    return;
-  }
-
-  const text = String(message || "").trim() || "Please be aware: Maintenance is underway.";
-  const banner = existing || document.createElement("div");
-  banner.id = "maintenanceBanner";
-  banner.className = "maintenance-banner";
-  banner.textContent = text;
-  const injectedHeader = document.getElementById("header");
-  const publicHeader = document.querySelector(".nf-header");
-  const root = document.getElementById("root");
-  const header = injectedHeader || publicHeader;
-  if (header && header.parentNode) {
-    header.insertAdjacentElement("afterend", banner);
-  } else if (root && root.parentNode) {
-    root.insertAdjacentElement("beforebegin", banner);
-  } else if (!existing && document.body) {
-    document.body.insertBefore(banner, document.body.firstChild);
-  }
 }
 
 function applyCachedAppName() {
@@ -1284,7 +1252,6 @@ window.addEventListener("maintenanceSettings:updated", (event) => {
   sessionStorage.setItem(MAINTENANCE_MODE_ENABLED_KEY, String(enabled));
   sessionStorage.setItem(MAINTENANCE_MODE_BANNER_TEXT_KEY, text);
   sessionStorage.setItem(MAINTENANCE_MODE_PAGE_IDS_KEY, JSON.stringify(pageIds));
-  applyMaintenanceBanner(enabled, text, pageIds);
 });
 
 window.addEventListener("avatar:updated", (event) => {

@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
+import { api } from "../scripts/api.js";
 import AboutPage from "./pages/AboutPage.jsx";
 import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
 import AdminPage from "./pages/AdminPage.jsx";
@@ -51,6 +53,9 @@ const ROUTES = {
   "/timeout": { title: "WalletLens - Timeout", Page: TimeoutPage },
   "/expired": { title: "WalletLens - Expired", Page: ExpiredPage },
 };
+const MAINTENANCE_MODE_ENABLED_KEY = "maintenanceModeEnabled";
+const MAINTENANCE_MODE_BANNER_TEXT_KEY = "maintenanceModeBannerText";
+const MAINTENANCE_MODE_PAGE_IDS_KEY = "maintenanceModePageIds";
 
 function normalizePath(pathname) {
   let path = pathname || "/";
@@ -70,15 +75,111 @@ function cleanHref(url) {
   return `${url.pathname}${url.search}${url.hash}`;
 }
 
+function getPageToken(path) {
+  const normalized = normalizePath(path);
+  if (normalized === "/" || normalized === "/index") return "index";
+  return normalized.replace(/^\//, "").toLowerCase();
+}
+
+function normalizeMaintenancePageIds(value) {
+  if (!Array.isArray(value)) return [];
+  return Array.from(
+    new Set(value.map((pageId) => String(pageId || "").trim().toLowerCase()).filter(Boolean))
+  );
+}
+
+function readJsonArray(value) {
+  if (!value) return [];
+  try {
+    const parsed = JSON.parse(value);
+    return normalizeMaintenancePageIds(parsed);
+  } catch {
+    return [];
+  }
+}
+
+function readCachedMaintenanceSettings() {
+  return {
+    enabled: sessionStorage.getItem(MAINTENANCE_MODE_ENABLED_KEY) === "true",
+    text: String(sessionStorage.getItem(MAINTENANCE_MODE_BANNER_TEXT_KEY) || "").trim(),
+    pageIds: readJsonArray(sessionStorage.getItem(MAINTENANCE_MODE_PAGE_IDS_KEY)),
+  };
+}
+
+function toMaintenanceSettings(data) {
+  return {
+    enabled: Boolean(data?.maintenanceModeEnabled),
+    text: String(data?.maintenanceModeBannerText || "").trim(),
+    pageIds: normalizeMaintenancePageIds(data?.maintenanceModePageIds),
+  };
+}
+
+function cacheMaintenanceSettings(settings) {
+  sessionStorage.setItem(MAINTENANCE_MODE_ENABLED_KEY, String(Boolean(settings.enabled)));
+  sessionStorage.setItem(MAINTENANCE_MODE_BANNER_TEXT_KEY, settings.text || "");
+  sessionStorage.setItem(MAINTENANCE_MODE_PAGE_IDS_KEY, JSON.stringify(normalizeMaintenancePageIds(settings.pageIds)));
+}
+
+function shouldShowMaintenanceBanner(settings, path) {
+  if (!settings?.enabled) return false;
+  if (!settings?.text) return false;
+  const pageIds = normalizeMaintenancePageIds(settings.pageIds);
+  if (!pageIds.length) return true;
+  return pageIds.includes(getPageToken(path));
+}
+
+function ensureMaintenanceBannerHost() {
+  if (!document.body) return null;
+
+  let host = document.getElementById("maintenanceBannerHost");
+  if (!host) {
+    host = document.createElement("div");
+    host.id = "maintenanceBannerHost";
+    host.className = "maintenance-banner-host";
+  }
+
+  const header = document.querySelector("header.nf-header") || document.querySelector("#header");
+  if (header?.parentNode) {
+    const headerStyle = window.getComputedStyle(header);
+    const headerOffset = headerStyle.position === "fixed"
+      ? `${Math.ceil(header.getBoundingClientRect().height)}px`
+      : "0px";
+    host.style.setProperty("--maintenance-header-offset", headerOffset);
+    header.insertAdjacentElement("afterend", host);
+    return host;
+  }
+
+  host.style.setProperty("--maintenance-header-offset", "0px");
+  const main = document.querySelector("main");
+  if (main?.parentNode) {
+    main.parentNode.insertBefore(host, main);
+    return host;
+  }
+
+  const root = document.getElementById("root");
+  if (root) {
+    root.insertBefore(host, root.firstChild);
+    return host;
+  }
+
+  document.body.insertBefore(host, document.body.firstChild);
+  return host;
+}
+
 export default function App() {
   const [locationState, setLocationState] = useState(() => ({
     path: normalizePath(window.location.pathname),
     search: window.location.search,
     hash: window.location.hash,
   }));
+  const [maintenanceSettings, setMaintenanceSettings] = useState(() => ({
+    ...readCachedMaintenanceSettings(),
+  }));
+  const [maintenanceBannerHost, setMaintenanceBannerHost] = useState(null);
   const path = locationState.path;
   const route = useMemo(() => ROUTES[path] || ROUTES["/"], [path]);
   const Page = route.Page;
+  const showMaintenanceBanner = shouldShowMaintenanceBanner(maintenanceSettings, path);
 
   useEffect(() => {
     const cleanPath = normalizePath(window.location.pathname);
@@ -143,5 +244,63 @@ export default function App() {
     return () => document.removeEventListener("click", onClick);
   }, []);
 
-  return <Page key={`${locationState.path}${locationState.search}${locationState.hash}`} />;
+  useEffect(() => {
+    let active = true;
+    let rafId = 0;
+
+    const updateBannerHost = () => {
+      rafId = window.requestAnimationFrame(() => {
+        if (active) setMaintenanceBannerHost(ensureMaintenanceBannerHost());
+      });
+    };
+
+    updateBannerHost();
+    document.addEventListener("walletlens:template-ready", updateBannerHost);
+
+    return () => {
+      active = false;
+      if (rafId) window.cancelAnimationFrame(rafId);
+      document.removeEventListener("walletlens:template-ready", updateBannerHost);
+    };
+  }, [path]);
+
+  useEffect(() => {
+    let active = true;
+    const applyPublicSettings = (data) => {
+      if (!active) return;
+      const settings = toMaintenanceSettings(data);
+      cacheMaintenanceSettings(settings);
+      setMaintenanceSettings(settings);
+    };
+
+    api.appSettings.getPublic().then(applyPublicSettings).catch(() => {});
+
+    const onMaintenanceUpdated = (event) => {
+      const settings = toMaintenanceSettings({
+        maintenanceModeEnabled: event?.detail?.enabled,
+        maintenanceModeBannerText: event?.detail?.text,
+        maintenanceModePageIds: event?.detail?.pageIds,
+      });
+      cacheMaintenanceSettings(settings);
+      if (active) setMaintenanceSettings(settings);
+    };
+    window.addEventListener("maintenanceSettings:updated", onMaintenanceUpdated);
+
+    return () => {
+      active = false;
+      window.removeEventListener("maintenanceSettings:updated", onMaintenanceUpdated);
+    };
+  }, []);
+
+  return (
+    <>
+      <Page key={`${locationState.path}${locationState.search}${locationState.hash}`} />
+      {showMaintenanceBanner && maintenanceBannerHost ? createPortal(
+        <div id="maintenanceBanner" className="maintenance-banner">
+          {maintenanceSettings.text}
+        </div>,
+        maintenanceBannerHost
+      ) : null}
+    </>
+  );
 }
