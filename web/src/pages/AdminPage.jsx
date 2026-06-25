@@ -896,7 +896,7 @@ export default function AdminPage() {
         </div>
 
         <div id="maintenanceMessageModal" className="modal hidden" role="dialog" aria-modal="true" aria-labelledby="maintenanceMessageModalTitle">
-          <div className="modal-content admin-modal">
+          <div className="modal-content admin-modal admin-maintenance-modal">
             <div className="modal-header">
               <h3 id="maintenanceMessageModalTitle">Maintenance Message</h3>
               <button className="modal-close" type="button" data-close-modal>&times;</button>
