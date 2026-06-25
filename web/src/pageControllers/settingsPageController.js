@@ -42,7 +42,12 @@ export function initSettingsPage() {
     sessionsList: $("#sessionsList"),
     signOutAllBtn: $("#signOutAllBtn"),
     signOutAllModal: $("#signOutAllModal"),
+    signOutAllPrompt: $("#signOutAllPrompt"),
+    signOutAllCredentialLabelText: $("#signOutAllCredentialLabelText"),
     signOutAllPassword: $("#signOutAllPassword"),
+    signOutAllCredentialActions: $("#signOutAllCredentialActions"),
+    signOutAllUsePasswordBtn: $("#signOutAllUsePasswordBtn"),
+    signOutAllRequestCodeBtn: $("#signOutAllRequestCodeBtn"),
     signOutAllConfirmBtn: $("#confirmSignOutAllBtn"),
     signOutAllCancelBtn: $("#cancelSignOutAllBtn"),
     signOutAllStatus: $("#signOutAllStatus"),
@@ -56,7 +61,12 @@ export function initSettingsPage() {
     confirmEnableTwoFaBtn: $("#confirmEnableTwoFaBtn"),
     cancelEnableTwoFaBtn: $("#cancelEnableTwoFaBtn"),
     enableTwoFaStatus: $("#enableTwoFaStatus"),
+    disableTwoFaPrompt: $("#disableTwoFaPrompt"),
+    twoFaDisableCredentialLabelText: $("#twoFaDisableCredentialLabelText"),
     twoFaDisablePassword: $("#twoFaDisablePassword"),
+    disableTwoFaCredentialActions: $("#disableTwoFaCredentialActions"),
+    disableTwoFaUsePasswordBtn: $("#disableTwoFaUsePasswordBtn"),
+    disableTwoFaRequestCodeBtn: $("#disableTwoFaRequestCodeBtn"),
     confirmDisableTwoFaBtn: $("#confirmDisableTwoFaBtn"),
     cancelDisableTwoFaBtn: $("#cancelDisableTwoFaBtn"),
     disableTwoFaStatus: $("#disableTwoFaStatus"),
@@ -69,7 +79,11 @@ export function initSettingsPage() {
     passwordModalSubtitle: $("#passwordModalSubtitle"),
     passwordStatus: $("#passwordStatus"),
     currentPasswordRow: $("#currentPasswordRow"),
+    currentPasswordLabelText: $("#currentPasswordLabelText"),
     currentPassword: $("#currentPassword"),
+    passwordCredentialActions: $("#passwordCredentialActions"),
+    passwordUsePasswordBtn: $("#passwordUsePasswordBtn"),
+    passwordRequestCodeBtn: $("#passwordRequestCodeBtn"),
     newPassword: $("#newPassword"),
     confirmPassword: $("#confirmPassword"),
     passwordTwoFaRow: $("#passwordTwoFaRow"),
@@ -85,6 +99,11 @@ export function initSettingsPage() {
   const state = {
     twoFaEnabled: false,
     googleEnabled: false,
+    userHasPassword: true,
+    userHasGoogle: false,
+    disableTwoFaMethod: "password",
+    signOutAllMethod: "password",
+    passwordCredentialMethod: "password",
     passwordResetMode: false,
   };
 
@@ -108,6 +127,41 @@ export function initSettingsPage() {
       el.classList.add("is-hidden");
       el.classList.remove("is-ok", "is-error");
     }, ms);
+  };
+
+  const canUseEmailSecurityCode = () => state.userHasGoogle;
+  const hasPasswordOption = () => state.userHasPassword;
+
+  const configureCredentialInput = ({ input, label, method, passwordLabel = "Password", codeLabel = "Email Code" }) => {
+    if (label) label.textContent = method === "email_code" ? codeLabel : passwordLabel;
+    if (!input) return;
+    input.value = "";
+    input.type = method === "email_code" ? "text" : "password";
+    input.inputMode = method === "email_code" ? "numeric" : "";
+    input.autocomplete = method === "email_code" ? "one-time-code" : "current-password";
+    input.placeholder = method === "email_code" ? "6-digit code" : "Password";
+  };
+
+  const updateCredentialActions = ({ actions, usePasswordBtn, requestCodeBtn, method }) => {
+    const showActions = canUseEmailSecurityCode() && hasPasswordOption();
+    actions?.classList.toggle("is-hidden", !showActions);
+    if (usePasswordBtn) usePasswordBtn.disabled = method === "password";
+    if (requestCodeBtn) requestCodeBtn.disabled = method === "email_code";
+  };
+
+  const requestEmailSecurityCode = async ({ action, statusEl, successMessage }) => {
+    try {
+      const result = await api.auth.requestSecurityCode(action);
+      if (result?.method === "password") {
+        showStatus(statusEl, result?.message || "Enter your current password to continue.");
+        return false;
+      }
+      showStatus(statusEl, successMessage || result?.message || "A verification code was sent to your email.");
+      return true;
+    } catch (err) {
+      showStatus(statusEl, err?.message || "Unable to send verification code.", "error");
+      return false;
+    }
   };
 
   const formatDateTime = (value) => {
@@ -479,6 +533,8 @@ export function initSettingsPage() {
       const { user } = await api.auth.me();
       const enabled = !!user?.two_fa_enabled || !!user?.twoFaEnabled;
       state.twoFaEnabled = enabled;
+      state.userHasPassword = !!(user?.has_password || user?.hasPassword);
+      state.userHasGoogle = !!(user?.google_id || user?.googleId);
       renderAccountAccess(user);
       els.twoFaStatus.textContent = enabled ? "Enabled" : "Disabled";
       els.enableTwoFaBtn?.classList.toggle("is-hidden", enabled);
@@ -486,6 +542,8 @@ export function initSettingsPage() {
       return user || null;
     } catch {
       state.twoFaEnabled = false;
+      state.userHasPassword = true;
+      state.userHasGoogle = false;
       renderAccountAccess(null);
       els.twoFaStatus.textContent = "Unavailable";
       els.enableTwoFaBtn?.classList.add("is-hidden");
@@ -590,14 +648,38 @@ export function initSettingsPage() {
 
   const openDisableTwoFaModal = () => {
     if (!els.disableTwoFaModal) return;
+    state.disableTwoFaMethod = canUseEmailSecurityCode() && !hasPasswordOption() ? "email_code" : "password";
     if (els.disableTwoFaStatus) {
       els.disableTwoFaStatus.classList.add("is-hidden");
       els.disableTwoFaStatus.textContent = "";
       els.disableTwoFaStatus.classList.remove("is-ok", "is-error");
     }
-    if (els.twoFaDisablePassword) els.twoFaDisablePassword.value = "";
+    configureCredentialInput({
+      input: els.twoFaDisablePassword,
+      label: els.twoFaDisableCredentialLabelText,
+      method: state.disableTwoFaMethod,
+    });
+    updateCredentialActions({
+      actions: els.disableTwoFaCredentialActions,
+      usePasswordBtn: els.disableTwoFaUsePasswordBtn,
+      requestCodeBtn: els.disableTwoFaRequestCodeBtn,
+      method: state.disableTwoFaMethod,
+    });
+    if (els.disableTwoFaPrompt) {
+      els.disableTwoFaPrompt.textContent =
+        state.disableTwoFaMethod === "email_code"
+          ? "Enter the email verification code to disable 2FA."
+          : "Enter your password to disable 2FA.";
+    }
     showModal(els.disableTwoFaModal);
     els.twoFaDisablePassword?.focus?.();
+    if (state.disableTwoFaMethod === "email_code") {
+      requestEmailSecurityCode({
+        action: "disable_two_fa",
+        statusEl: els.disableTwoFaStatus,
+        successMessage: "A 2FA disable code was sent to your email.",
+      });
+    }
   };
 
   const closeDisableTwoFaModal = () => hideModal(els.disableTwoFaModal);
@@ -647,9 +729,13 @@ export function initSettingsPage() {
   };
 
   const confirmDisableTwoFa = async () => {
-    const password = (els.twoFaDisablePassword?.value || "").trim();
-    if (!password) {
-      showStatus(els.disableTwoFaStatus, "Enter your password.", "error");
+    const credential = (els.twoFaDisablePassword?.value || "").trim();
+    if (!credential) {
+      showStatus(
+        els.disableTwoFaStatus,
+        state.disableTwoFaMethod === "email_code" ? "Enter the email verification code." : "Enter your password.",
+        "error"
+      );
       return;
     }
 
@@ -659,7 +745,7 @@ export function initSettingsPage() {
     }
 
     try {
-      await api.auth.disableTwoFa(password);
+      await api.auth.disableTwoFa(credential, state.disableTwoFaMethod);
       showStatus(els.disableTwoFaStatus, "Two-factor authentication disabled.", "ok");
       await updateTwoFaUI();
       window.setTimeout(() => closeDisableTwoFaModal(), 800);
@@ -733,7 +819,24 @@ export function initSettingsPage() {
   // ===============================
   const openSignOutAllModal = () => {
     if (!els.signOutAllModal) return;
-    if (els.signOutAllPassword) els.signOutAllPassword.value = "";
+    state.signOutAllMethod = canUseEmailSecurityCode() && !hasPasswordOption() ? "email_code" : "password";
+    configureCredentialInput({
+      input: els.signOutAllPassword,
+      label: els.signOutAllCredentialLabelText,
+      method: state.signOutAllMethod,
+    });
+    updateCredentialActions({
+      actions: els.signOutAllCredentialActions,
+      usePasswordBtn: els.signOutAllUsePasswordBtn,
+      requestCodeBtn: els.signOutAllRequestCodeBtn,
+      method: state.signOutAllMethod,
+    });
+    if (els.signOutAllPrompt) {
+      els.signOutAllPrompt.textContent =
+        state.signOutAllMethod === "email_code"
+          ? "Enter the email verification code to sign out of all devices."
+          : "Please re-enter your password to sign out of all devices.";
+    }
     if (els.signOutAllStatus) {
       els.signOutAllStatus.style.display = "none";
       els.signOutAllStatus.textContent = "";
@@ -741,14 +844,25 @@ export function initSettingsPage() {
     }
     showModal(els.signOutAllModal);
     els.signOutAllPassword?.focus?.();
+    if (state.signOutAllMethod === "email_code") {
+      requestEmailSecurityCode({
+        action: "logout_all",
+        statusEl: els.signOutAllStatus,
+        successMessage: "A sign out code was sent to your email.",
+      });
+    }
   };
 
   const closeSignOutAllModal = () => hideModal(els.signOutAllModal);
 
   const performSignOutAll = async () => {
-    const password = (els.signOutAllPassword?.value || "").trim();
-    if (!password) {
-      showStatus(els.signOutAllStatus, "Please enter your password.", "error");
+    const credential = (els.signOutAllPassword?.value || "").trim();
+    if (!credential) {
+      showStatus(
+        els.signOutAllStatus,
+        state.signOutAllMethod === "email_code" ? "Please enter the email verification code." : "Please enter your password.",
+        "error"
+      );
       clearStatusSoon(els.signOutAllStatus, 3000);
       return;
     }
@@ -761,7 +875,7 @@ export function initSettingsPage() {
     showStatus(els.signOutAllStatus, "Signing out all sessions…");
 
     try {
-      await api.auth.signOutAll(password);
+      await api.auth.signOutAll(credential, state.signOutAllMethod);
 
       showStatus(els.signOutAllStatus, "All sessions signed out. Redirecting…", "ok");
 
@@ -794,12 +908,24 @@ export function initSettingsPage() {
   // ===============================
   const openPasswordModal = async () => {
     if (!els.passwordModal) return;
+    state.passwordCredentialMethod = canUseEmailSecurityCode() && !hasPasswordOption() ? "email_code" : "password";
     if (els.passwordStatus) {
       els.passwordStatus.style.display = "none";
       els.passwordStatus.textContent = "";
       els.passwordStatus.classList.remove("is-ok", "is-error");
     }
-    if (els.currentPassword) els.currentPassword.value = "";
+    configureCredentialInput({
+      input: els.currentPassword,
+      label: els.currentPasswordLabelText,
+      method: state.passwordCredentialMethod,
+      passwordLabel: "Current Password",
+    });
+    updateCredentialActions({
+      actions: els.passwordCredentialActions,
+      usePasswordBtn: els.passwordUsePasswordBtn,
+      requestCodeBtn: els.passwordRequestCodeBtn,
+      method: state.passwordCredentialMethod,
+    });
     if (els.newPassword) els.newPassword.value = "";
     if (els.confirmPassword) els.confirmPassword.value = "";
     if (els.passwordTwoFaCode) els.passwordTwoFaCode.value = "";
@@ -813,6 +939,8 @@ export function initSettingsPage() {
     if (els.passwordModalSubtitle) {
       els.passwordModalSubtitle.textContent = state.passwordResetMode
         ? "You signed in with a verification code. Set a new password to finish recovering your account."
+        : state.passwordCredentialMethod === "email_code"
+          ? "Enter the email verification code and choose a new password."
         : "Use a strong unique password for better security.";
     }
     if (els.submitPasswordBtn) {
@@ -824,11 +952,17 @@ export function initSettingsPage() {
     if (els.passwordTwoFaRow) {
       els.passwordTwoFaRow.classList.toggle(
         "is-hidden",
-        !state.twoFaEnabled || state.passwordResetMode
+        !state.twoFaEnabled || state.passwordResetMode || state.passwordCredentialMethod === "email_code"
       );
     }
 
-    if (state.twoFaEnabled && !state.passwordResetMode) {
+    if (state.passwordCredentialMethod === "email_code" && !state.passwordResetMode) {
+      await requestEmailSecurityCode({
+        action: "password_set",
+        statusEl: els.passwordStatus,
+        successMessage: "A password setup code was sent to your email.",
+      });
+    } else if (state.twoFaEnabled && !state.passwordResetMode) {
       try {
         await api.auth.requestTwoFaPasswordChange();
         showStatus(els.passwordStatus, "2FA code sent to your email.");
@@ -868,7 +1002,7 @@ export function initSettingsPage() {
       return;
     }
 
-    if (state.twoFaEnabled && !state.passwordResetMode && !twoFaCode) {
+    if (state.twoFaEnabled && !state.passwordResetMode && state.passwordCredentialMethod !== "email_code" && !twoFaCode) {
       showStatus(els.passwordStatus, "Enter the 2FA code from your email.", "error");
       return;
     }
@@ -879,10 +1013,11 @@ export function initSettingsPage() {
 
     try {
       await api.auth.changePassword(
-        currentPassword,
+        state.passwordCredentialMethod === "email_code" ? "" : currentPassword,
         newPassword,
-        twoFaCode,
-        state.passwordResetMode ? passwordResetToken : ""
+        state.passwordCredentialMethod === "email_code" ? currentPassword : twoFaCode,
+        state.passwordResetMode ? passwordResetToken : "",
+        state.passwordCredentialMethod
       );
       if (state.passwordResetMode) {
         sessionStorage.removeItem("passwordResetToken");
@@ -902,6 +1037,97 @@ export function initSettingsPage() {
         "error"
       );
     }
+  };
+
+  const switchDisableTwoFaCredential = async (method) => {
+    state.disableTwoFaMethod = method;
+    configureCredentialInput({
+      input: els.twoFaDisablePassword,
+      label: els.twoFaDisableCredentialLabelText,
+      method,
+    });
+    updateCredentialActions({
+      actions: els.disableTwoFaCredentialActions,
+      usePasswordBtn: els.disableTwoFaUsePasswordBtn,
+      requestCodeBtn: els.disableTwoFaRequestCodeBtn,
+      method,
+    });
+    if (els.disableTwoFaPrompt) {
+      els.disableTwoFaPrompt.textContent =
+        method === "email_code"
+          ? "Enter the email verification code to disable 2FA."
+          : "Enter your password to disable 2FA.";
+    }
+    if (method === "email_code") {
+      await requestEmailSecurityCode({
+        action: "disable_two_fa",
+        statusEl: els.disableTwoFaStatus,
+        successMessage: "A 2FA disable code was sent to your email.",
+      });
+    }
+    els.twoFaDisablePassword?.focus?.();
+  };
+
+  const switchSignOutAllCredential = async (method) => {
+    state.signOutAllMethod = method;
+    configureCredentialInput({
+      input: els.signOutAllPassword,
+      label: els.signOutAllCredentialLabelText,
+      method,
+    });
+    updateCredentialActions({
+      actions: els.signOutAllCredentialActions,
+      usePasswordBtn: els.signOutAllUsePasswordBtn,
+      requestCodeBtn: els.signOutAllRequestCodeBtn,
+      method,
+    });
+    if (els.signOutAllPrompt) {
+      els.signOutAllPrompt.textContent =
+        method === "email_code"
+          ? "Enter the email verification code to sign out of all devices."
+          : "Please re-enter your password to sign out of all devices.";
+    }
+    if (method === "email_code") {
+      await requestEmailSecurityCode({
+        action: "logout_all",
+        statusEl: els.signOutAllStatus,
+        successMessage: "A sign out code was sent to your email.",
+      });
+    }
+    els.signOutAllPassword?.focus?.();
+  };
+
+  const switchPasswordCredential = async (method) => {
+    state.passwordCredentialMethod = method;
+    configureCredentialInput({
+      input: els.currentPassword,
+      label: els.currentPasswordLabelText,
+      method,
+      passwordLabel: "Current Password",
+    });
+    updateCredentialActions({
+      actions: els.passwordCredentialActions,
+      usePasswordBtn: els.passwordUsePasswordBtn,
+      requestCodeBtn: els.passwordRequestCodeBtn,
+      method,
+    });
+    if (els.passwordModalSubtitle) {
+      els.passwordModalSubtitle.textContent =
+        method === "email_code"
+          ? "Enter the email verification code and choose a new password."
+          : "Use a strong unique password for better security.";
+    }
+    if (els.passwordTwoFaRow) {
+      els.passwordTwoFaRow.classList.toggle("is-hidden", !state.twoFaEnabled || method === "email_code");
+    }
+    if (method === "email_code") {
+      await requestEmailSecurityCode({
+        action: "password_set",
+        statusEl: els.passwordStatus,
+        successMessage: "A password setup code was sent to your email.",
+      });
+    }
+    els.currentPassword?.focus?.();
   };
 
   // ===============================
@@ -935,6 +1161,8 @@ export function initSettingsPage() {
     els.signOutAllBtn?.addEventListener("click", openSignOutAllModal);
     els.signOutAllCancelBtn?.addEventListener("click", closeSignOutAllModal);
     els.signOutAllConfirmBtn?.addEventListener("click", performSignOutAll);
+    els.signOutAllUsePasswordBtn?.addEventListener("click", () => switchSignOutAllCredential("password"));
+    els.signOutAllRequestCodeBtn?.addEventListener("click", () => switchSignOutAllCredential("email_code"));
 
     els.signOutAllModal?.addEventListener("click", (e) => {
       if (e.target.classList.contains("modal")) closeSignOutAllModal();
@@ -953,6 +1181,8 @@ export function initSettingsPage() {
     els.confirmEnableTwoFaBtn?.addEventListener("click", confirmEnableTwoFa);
     els.cancelDisableTwoFaBtn?.addEventListener("click", closeDisableTwoFaModal);
     els.confirmDisableTwoFaBtn?.addEventListener("click", confirmDisableTwoFa);
+    els.disableTwoFaUsePasswordBtn?.addEventListener("click", () => switchDisableTwoFaCredential("password"));
+    els.disableTwoFaRequestCodeBtn?.addEventListener("click", () => switchDisableTwoFaCredential("email_code"));
 
     els.enableTwoFaModal?.addEventListener("click", (e) => {
       if (e.target.classList.contains("modal")) closeEnableTwoFaModal();
@@ -966,6 +1196,8 @@ export function initSettingsPage() {
     els.changePasswordBtn?.addEventListener("click", openPasswordModal);
     els.closePasswordModal?.addEventListener("click", closePasswordModal);
     els.passwordForm?.addEventListener("submit", submitPasswordChange);
+    els.passwordUsePasswordBtn?.addEventListener("click", () => switchPasswordCredential("password"));
+    els.passwordRequestCodeBtn?.addEventListener("click", () => switchPasswordCredential("email_code"));
 
     // Connect Google account
     els.connectGoogleBtn?.addEventListener("click", connectGoogleAccount);

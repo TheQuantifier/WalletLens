@@ -43,7 +43,24 @@ let inactivityTimedOut = false;
 const MAINTENANCE_MODE_ENABLED_KEY = "maintenanceModeEnabled";
 const MAINTENANCE_MODE_BANNER_TEXT_KEY = "maintenanceModeBannerText";
 const MAINTENANCE_MODE_PAGE_IDS_KEY = "maintenanceModePageIds";
+const MAINTENANCE_MODE_BACKGROUND_COLOR_KEY = "maintenanceModeBackgroundColor";
+const MAINTENANCE_MODE_TEXT_COLOR_KEY = "maintenanceModeTextColor";
 const DEFAULT_EXPORT_FORMAT_KEY = "defaultDataExportFormat";
+const AUTH_TOKEN_KEY = "auth_token";
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+const PROTECTED_ROUTE_PATHS = new Set([
+  "/home",
+  "/upload",
+  "/records",
+  "/recurring",
+  "/rules",
+  "/budgeting",
+  "/reports",
+  "/profile",
+  "/settings",
+  "/admin",
+  "/team",
+]);
 
 /**
  * Pages that do NOT require authentication
@@ -200,6 +217,7 @@ function loadHeaderAndFooter() {
       footerEl.innerHTML = cachedFooter;
     }
     setActiveFooterLink();
+    setProtectedNavigationVisibility(hasClientAuthHint());
   }
 
   // --- Load Header ---
@@ -239,6 +257,7 @@ function loadHeaderAndFooter() {
       }
       sessionStorage.setItem("cachedFooterHtml", html);
       setActiveFooterLink();
+      setProtectedNavigationVisibility(hasClientAuthHint());
     })
     .catch((err) => console.error("Footer load failed:", err));
 }
@@ -262,6 +281,50 @@ function isPublicPage() {
   const rawPage = (window.location.pathname.split("/").pop() || "").toLowerCase();
   const currentPage = rawPage === "" ? "index.html" : rawPage;
   return PUBLIC_PAGES.includes(currentPage);
+}
+
+function normalizeRoutePathFromHref(href) {
+  try {
+    const url = new URL(href, window.location.href);
+    if (url.origin !== window.location.origin) return "";
+    let path = url.pathname || "/";
+    if (path.length > 1) path = path.replace(/\/$/, "");
+    if (path.endsWith(".html")) {
+      const base = path.slice(0, -5);
+      path = base === "/index" ? "/" : base;
+    }
+    return path || "/";
+  } catch {
+    return "";
+  }
+}
+
+function isProtectedHref(href) {
+  return PROTECTED_ROUTE_PATHS.has(normalizeRoutePathFromHref(href));
+}
+
+function hasClientAuthHint() {
+  if (sessionStorage.getItem(AUTH_TOKEN_KEY)) return true;
+  const cachedUserRaw = sessionStorage.getItem("cachedUser");
+  if (!cachedUserRaw) return false;
+  try {
+    return Boolean(JSON.parse(cachedUserRaw));
+  } catch {
+    sessionStorage.removeItem("cachedUser");
+    return false;
+  }
+}
+
+function setProtectedNavigationVisibility(isAuthenticated) {
+  document.querySelectorAll("a[href], button[data-href]").forEach((item) => {
+    const href = item.getAttribute("href") || item.getAttribute("data-href") || "";
+    if (!isProtectedHref(href)) return;
+    if (normalizeRoutePathFromHref(href) === "/team" || item.closest(".org-admin-only")) return;
+    const target = item.closest("li") || item;
+    target.classList.toggle("is-hidden", !isAuthenticated);
+    item.setAttribute("aria-hidden", isAuthenticated ? "false" : "true");
+    if ("disabled" in item) item.disabled = !isAuthenticated;
+  });
 }
 
 function getSessionTimeoutMinutes() {
@@ -737,6 +800,14 @@ function initMobileNavMenu() {
     menu.classList.remove("show");
     toggle.classList.remove("is-open");
     toggle.setAttribute("aria-expanded", "false");
+    if (typeof window.__walletlensNavigate === "function") {
+      window.__walletlensNavigate(href);
+      return;
+    }
+    if (isProtectedHref(href) && !hasClientAuthHint()) {
+      window.location.assign("/");
+      return;
+    }
     if (LIVE_NAV_ENABLED) {
       const url = new URL(href, window.location.href).href;
       navigateLive(url, { pushState: true });
@@ -883,6 +954,7 @@ async function updateHeaderAuthState() {
     document.body.classList.remove("business-account-context", "personal-account-context");
     setAdminVisibility("user");
     setLogoLinkDestination("/");
+    setProtectedNavigationVisibility(false);
   };
 
   try {
@@ -905,8 +977,10 @@ async function updateHeaderAuthState() {
           cachedUser.fullName || cachedUser.full_name || cachedUser.username || ""
         );
         applyAccountContext(cachedUser);
-        setAdminVisibility(cachedUser?.platform_role && cachedUser.platform_role !== "user" ? cachedUser.platform_role : cachedUser?.role);
-        setLogoLinkDestination("/about");
+        setAdminVisibility(cachedUser?.platform_role && cachedUser.platform_role !== "user" ? cachedUser.platform_role : cachedUser?.role, cachedUser);
+        updateOrganizationSwitcher(cachedUser);
+        setLogoLinkDestination("/home");
+        setProtectedNavigationVisibility(true);
       } catch {
         sessionStorage.removeItem("cachedUser");
       }
@@ -937,9 +1011,10 @@ async function updateHeaderAuthState() {
     applyAccountAvatar(avatarUrl, user.fullName || user.full_name || user.username || "");
     sessionStorage.setItem("cachedUser", JSON.stringify(user));
     applyAccountContext(user);
-    setAdminVisibility(user?.platform_role && user.platform_role !== "user" ? user.platform_role : user?.role);
-    await updateOrganizationSwitcher();
-    setLogoLinkDestination("/about");
+    setAdminVisibility(user?.platform_role && user.platform_role !== "user" ? user.platform_role : user?.role, user);
+    await updateOrganizationSwitcher(user);
+    setLogoLinkDestination("/home");
+    setProtectedNavigationVisibility(true);
 
   } catch {
     // Not authenticated
@@ -947,21 +1022,41 @@ async function updateHeaderAuthState() {
   }
 }
 
-function setAdminVisibility(role) {
+function hasOrganizationContext(user = {}) {
+  return Boolean(
+    user?.active_organization_id ||
+    user?.activeOrganizationId
+  );
+}
+
+function setAdminVisibility(role, user = {}) {
   const normalizedRole = String(role || "").trim().toLowerCase();
   const isAdminType = ["admin", "support_admin", "analyst"].includes(normalizedRole);
   document.querySelectorAll(".admin-only").forEach((el) => {
     el.classList.toggle("is-hidden", !isAdminType);
   });
+  // Team & Organization is resolved from /auth/organizations, same as Switch account.
+  setOrganizationAdminVisibility(false);
+}
+
+function setOrganizationAdminVisibility(canManageOrganization) {
   document.querySelectorAll(".org-admin-only").forEach((el) => {
-    el.classList.toggle("is-hidden", normalizedRole !== "org_admin");
+    el.classList.toggle("is-hidden", !canManageOrganization);
+  });
+  document.querySelectorAll("a[href], button[data-href]").forEach((item) => {
+    const href = item.getAttribute("href") || item.getAttribute("data-href") || "";
+    if (normalizeRoutePathFromHref(href) !== "/team") return;
+    const target = item.closest(".org-admin-only") || item.closest("li") || item;
+    target.classList.toggle("is-hidden", !canManageOrganization);
+    item.setAttribute("aria-hidden", canManageOrganization ? "false" : "true");
+    if ("disabled" in item) item.disabled = !canManageOrganization;
   });
 }
 
 function applyAccountContext(user) {
   const role = String(user?.role || "").trim().toLowerCase();
   const organizationId = user?.active_organization_id || user?.activeOrganizationId || null;
-  const isBusiness = Boolean(organizationId || role === "org_user" || role === "org_admin");
+  const isBusiness = hasOrganizationContext(user);
   document.body.classList.toggle("business-account-context", isBusiness);
   document.body.classList.toggle("personal-account-context", !isBusiness);
   document.body.dataset.accountContext = isBusiness ? "business" : "personal";
@@ -972,20 +1067,28 @@ function applyAccountContext(user) {
   window.dispatchEvent(new CustomEvent("walletlens:account-context", { detail: window.__walletlensAccountContext }));
 }
 
-async function updateOrganizationSwitcher() {
+async function updateOrganizationSwitcher(user = null) {
   const button = document.getElementById("switchAccountBtn");
   const switchItem = button?.closest(".account-switch-menu-item");
   const addButton = document.getElementById("addAccountBtn");
   if (addButton) addButton.onclick = openAddAccountModal;
-  if (!button) return;
+  if (!button && !user) return;
   try {
     const { organizations = [], activeOrganizationId } = await api.auth.listOrganizations();
     const hasBusinessAccounts = organizations.length > 0;
     switchItem?.classList.toggle("is-hidden", !hasBusinessAccounts);
+    if (user) {
+      const role = user?.platform_role && user.platform_role !== "user" ? user.platform_role : user?.role;
+      const canManageOrganization = String(role || "").trim().toLowerCase() === "org_admin" && hasBusinessAccounts;
+      setOrganizationAdminVisibility(canManageOrganization);
+    }
+    if (!button) return;
     button.disabled = !hasBusinessAccounts;
     button.onclick = () => openAccountSwitcher(organizations, activeOrganizationId || null);
   } catch {
     switchItem?.classList.add("is-hidden");
+    if (user) setOrganizationAdminVisibility(false);
+    if (!button) return;
     button.disabled = true;
   }
 }
@@ -1143,6 +1246,8 @@ async function updateAppName() {
     const maintenanceModePageIds = Array.isArray(data?.maintenanceModePageIds)
       ? normalizeMaintenancePageIds(data.maintenanceModePageIds)
       : null;
+    const maintenanceModeBackgroundColor = normalizeMaintenanceColor(data?.maintenanceModeBackgroundColor, "#ff8a00");
+    const maintenanceModeTextColor = normalizeMaintenanceColor(data?.maintenanceModeTextColor, "#ffffff");
     const defaultDataExportFormat = String(data?.defaultDataExportFormat || "csv").toLowerCase() === "json"
       ? "json"
       : "csv";
@@ -1152,6 +1257,8 @@ async function updateAppName() {
     sessionStorage.setItem(MAINTENANCE_MODE_ENABLED_KEY, String(maintenanceModeEnabled));
     sessionStorage.setItem(MAINTENANCE_MODE_BANNER_TEXT_KEY, maintenanceModeBannerText);
     sessionStorage.setItem(MAINTENANCE_MODE_PAGE_IDS_KEY, JSON.stringify(maintenanceModePageIds));
+    sessionStorage.setItem(MAINTENANCE_MODE_BACKGROUND_COLOR_KEY, maintenanceModeBackgroundColor);
+    sessionStorage.setItem(MAINTENANCE_MODE_TEXT_COLOR_KEY, maintenanceModeTextColor);
     localStorage.setItem(DEFAULT_EXPORT_FORMAT_KEY, defaultDataExportFormat);
     if (Number.isFinite(timeoutMinutes) && timeoutMinutes >= 1) {
       localStorage.setItem(
@@ -1170,6 +1277,11 @@ function normalizeMaintenancePageIds(value) {
   return Array.from(
     new Set(value.map((pageId) => String(pageId || "").trim().toLowerCase()).filter(Boolean))
   );
+}
+
+function normalizeMaintenanceColor(value, fallback) {
+  const color = String(value || "").trim();
+  return HEX_COLOR_RE.test(color) ? color.toLowerCase() : fallback;
 }
 
 function applyCachedAppName() {
@@ -1249,9 +1361,13 @@ window.addEventListener("maintenanceSettings:updated", (event) => {
   const enabled = Boolean(event?.detail?.enabled);
   const text = String(event?.detail?.text || "");
   const pageIds = normalizeMaintenancePageIds(event?.detail?.pageIds);
+  const backgroundColor = normalizeMaintenanceColor(event?.detail?.backgroundColor, "#ff8a00");
+  const textColor = normalizeMaintenanceColor(event?.detail?.textColor, "#ffffff");
   sessionStorage.setItem(MAINTENANCE_MODE_ENABLED_KEY, String(enabled));
   sessionStorage.setItem(MAINTENANCE_MODE_BANNER_TEXT_KEY, text);
   sessionStorage.setItem(MAINTENANCE_MODE_PAGE_IDS_KEY, JSON.stringify(pageIds));
+  sessionStorage.setItem(MAINTENANCE_MODE_BACKGROUND_COLOR_KEY, backgroundColor);
+  sessionStorage.setItem(MAINTENANCE_MODE_TEXT_COLOR_KEY, textColor);
 });
 
 window.addEventListener("avatar:updated", (event) => {
@@ -1446,6 +1562,16 @@ function handleLiveNavPrefetch(event) {
 }
 
 async function navigateLive(targetUrl, { pushState }) {
+  if (isProtectedHref(targetUrl) && !hasClientAuthHint()) {
+    if (pushState) {
+      window.history.pushState({}, "", "/");
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    } else if (window.location.pathname !== "/") {
+      window.location.assign("/");
+    }
+    return;
+  }
+
   if (liveNavInFlight) liveNavInFlight.abort();
   const controller = new AbortController();
   liveNavInFlight = controller;

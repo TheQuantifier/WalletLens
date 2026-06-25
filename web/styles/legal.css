@@ -11,6 +11,28 @@ body.legal-page .main.main--legal {
   margin: 0 auto;
 }
 
+body.embedded-page {
+  padding-top: 0;
+}
+
+body.embedded-page .main {
+  margin: 0 auto;
+  padding: 1rem;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+body.embedded-page .main--legal {
+  gap: 1rem;
+}
+
+body.embedded-page .legal-hero,
+body.embedded-page .about-hero {
+  margin-bottom: 0.75rem;
+}
+
 .legal-hero {
   display: grid;
   gap: var(--space-2);

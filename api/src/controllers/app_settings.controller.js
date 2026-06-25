@@ -45,6 +45,12 @@ const MAINTENANCE_PAGE_IDS = Object.freeze([
   "expired",
 ]);
 const MAINTENANCE_PAGE_ID_SET = new Set(MAINTENANCE_PAGE_IDS);
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+
+function normalizeMaintenanceColor(value, fallback) {
+  const color = String(value || "").trim();
+  return HEX_COLOR_RE.test(color) ? color.toLowerCase() : fallback;
+}
 
 function normalizeMaintenancePageIds(value) {
   if (!Array.isArray(value)) return [...MAINTENANCE_PAGE_IDS];
@@ -68,6 +74,8 @@ function sanitizeMaintenanceMessages(value) {
         id,
         title: String(source.title || "Maintenance message").trim().slice(0, 80) || "Maintenance message",
         text: text.slice(0, 500),
+        backgroundColor: normalizeMaintenanceColor(source.backgroundColor, "#ff8a00"),
+        textColor: normalizeMaintenanceColor(source.textColor, "#ffffff"),
         pageIds: normalizeMaintenancePageIds(source.pageIds),
       };
     })
@@ -87,6 +95,8 @@ function getSelectedMaintenanceMessage(settings) {
     id: "legacy",
     title: "Maintenance message",
     text: legacyText.slice(0, 500),
+    backgroundColor: "#ff8a00",
+    textColor: "#ffffff",
     pageIds: [...MAINTENANCE_PAGE_IDS],
   };
 }
@@ -98,6 +108,8 @@ export const getPublic = asyncHandler(async (_req, res) => {
   const selectedMaintenanceMessage = getSelectedMaintenanceMessage(settings);
   const maintenanceModeBannerText = String(selectedMaintenanceMessage?.text || "").trim();
   const maintenanceModePageIds = normalizeMaintenancePageIds(selectedMaintenanceMessage?.pageIds);
+  const maintenanceModeBackgroundColor = normalizeMaintenanceColor(selectedMaintenanceMessage?.backgroundColor, "#ff8a00");
+  const maintenanceModeTextColor = normalizeMaintenanceColor(selectedMaintenanceMessage?.textColor, "#ffffff");
   const defaultDataExportFormat = String(settings?.default_data_export_format || "csv").toLowerCase() === "json"
     ? "json"
     : "csv";
@@ -107,6 +119,8 @@ export const getPublic = asyncHandler(async (_req, res) => {
     maintenanceModeEnabled,
     maintenanceModeBannerText,
     maintenanceModePageIds,
+    maintenanceModeBackgroundColor,
+    maintenanceModeTextColor,
     defaultDataExportFormat,
     supportEmail: process.env.SUPPORT_EMAIL || "support.wisewallet@manuswebworks.org",
   });

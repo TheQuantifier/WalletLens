@@ -104,6 +104,71 @@ async function issueLoginCode({ userId, email, purpose, subject, text }) {
   });
 }
 
+const SECURITY_CODE_ACTIONS = {
+  disable_two_fa: {
+    purpose: "security_disable_two_fa",
+    subject: "Your <AppName> 2FA disable code",
+    label: "2FA disable",
+  },
+  logout_all: {
+    purpose: "security_logout_all",
+    subject: "Your <AppName> sign out code",
+    label: "sign out all devices",
+  },
+  password_set: {
+    purpose: "security_password_set",
+    subject: "Your <AppName> password setup code",
+    label: "password setup",
+  },
+};
+
+function getSecurityCodeAction(action) {
+  return SECURITY_CODE_ACTIONS[String(action || "").trim()] || null;
+}
+
+async function verifySecurityActionCode({ userId, action, code }) {
+  const config = getSecurityCodeAction(action);
+  if (!config || !code) return false;
+  const match = await findValidTwoFaCode({
+    userId,
+    purpose: config.purpose,
+    codeHash: hashCode(code),
+  });
+  if (!match) return false;
+  await deleteTwoFaCodeById(match.id);
+  return true;
+}
+
+async function verifyPasswordOrSecurityCode({ user, userId, action, password, code, passwordRequiredMessage = "Password is required" }) {
+  const canUseEmailCode = Boolean(user?.google_id);
+  if (code && canUseEmailCode) {
+    const verified = await verifySecurityActionCode({ userId, action, code });
+    if (!verified) {
+      return { ok: false, status: 401, message: "Invalid or expired verification code" };
+    }
+    return { ok: true, method: "email_code" };
+  }
+
+  if (!user?.password_hash) {
+    return {
+      ok: false,
+      status: 400,
+      message: canUseEmailCode ? "Request an email verification code to continue" : "Password is not set for this account",
+    };
+  }
+
+  if (!password) {
+    return { ok: false, status: 400, message: passwordRequiredMessage };
+  }
+
+  const ok = await bcrypt.compare(String(password), user.password_hash);
+  if (!ok) {
+    return { ok: false, status: 401, message: "Password is incorrect" };
+  }
+
+  return { ok: true, method: "password" };
+}
+
 function isAdminRoleType(role) {
   const normalized = String(role || "").trim().toLowerCase();
   return (
@@ -1013,7 +1078,7 @@ export const acceptExistingOrganizationInvitation = asyncHandler(async (req, res
 
 export const listMyOrganizations = asyncHandler(async (req, res) => {
   const organizations = await listUserOrganizations(req.user.id);
-  res.json({ organizations, activeOrganizationId: req.user.active_organization_id || req.user.organization_id || null });
+  res.json({ organizations, activeOrganizationId: req.user.active_organization_id || null });
 });
 
 export const switchActiveOrganization = asyncHandler(async (req, res) => {
@@ -1264,11 +1329,6 @@ export const changePassword = asyncHandler(async (req, res) => {
 
   const user = await findUserAuthById(userId);
   if (!user) return res.status(404).json({ message: "User not found" });
-  if (!user.password_hash) {
-    return res.status(400).json({
-      message: "No password is set for this account. Connect password login first.",
-    });
-  }
 
   let usingPasswordResetToken = false;
   if (passwordResetToken) {
@@ -1285,11 +1345,22 @@ export const changePassword = asyncHandler(async (req, res) => {
     usingPasswordResetToken = true;
   }
 
-  if (!usingPasswordResetToken && !currentPassword) {
+  if (!usingPasswordResetToken && user.password_hash && !currentPassword) {
     return res.status(400).json({ message: "Current password is required" });
   }
 
-  if (user.two_fa_enabled && !usingPasswordResetToken) {
+  if (!usingPasswordResetToken && (!user.password_hash || req.body?.securityMethod === "email_code")) {
+    const verified = await verifySecurityActionCode({
+      userId,
+      action: "password_set",
+      code: twoFaCode,
+    });
+    if (!verified) {
+      return res.status(401).json({ message: "Invalid or expired verification code" });
+    }
+  }
+
+  if (user.two_fa_enabled && !usingPasswordResetToken && user.password_hash && req.body?.securityMethod !== "email_code") {
     if (!twoFaCode) {
       return res.status(400).json({ message: "Two-factor code is required" });
     }
@@ -1308,7 +1379,7 @@ export const changePassword = asyncHandler(async (req, res) => {
     await deleteTwoFaCodeById(match.id);
   }
 
-  if (!usingPasswordResetToken) {
+  if (!usingPasswordResetToken && user.password_hash && req.body?.securityMethod !== "email_code") {
     const isMatch = await bcrypt.compare(String(currentPassword), user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ message: "Current password is incorrect" });
@@ -1370,6 +1441,40 @@ export const requestTwoFaPasswordChange = asyncHandler(async (req, res) => {
 });
 
 /* =====================================================
+   SECURITY CODE: REQUEST FOR NO-PASSWORD ACCOUNTS
+===================================================== */
+export const requestSecurityCode = asyncHandler(async (req, res) => {
+  const config = getSecurityCodeAction(req.body?.action);
+  if (!config) {
+    return res.status(400).json({ message: "Unknown security action" });
+  }
+
+  const user = await findUserAuthById(req.user.id);
+  if (!user) return res.status(404).json({ message: "User not found" });
+
+  if (user.password_hash && !user.google_id) {
+    return res.json({
+      method: "password",
+      message: "Enter your current password to continue.",
+    });
+  }
+
+  await issueLoginCode({
+    userId: user.id,
+    email: user.email,
+    purpose: config.purpose,
+    subject: config.subject,
+    text: (code) =>
+      `Your ${config.label} code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+  });
+
+  res.json({
+    method: "email_code",
+    message: "A verification code was sent to your email.",
+  });
+});
+
+/* =====================================================
    2FA: REQUEST ENABLE (email code)
 ===================================================== */
 export const requestTwoFaEnable = asyncHandler(async (req, res) => {
@@ -1425,17 +1530,22 @@ export const confirmTwoFaEnable = asyncHandler(async (req, res) => {
    2FA: DISABLE (password required)
 ===================================================== */
 export const disableTwoFa = asyncHandler(async (req, res) => {
-  const { password } = req.body;
-  if (!password) return res.status(400).json({ message: "Password is required" });
+  const { password, code } = req.body;
 
   const user = await findUserAuthById(req.user.id);
   if (!user) return res.status(404).json({ message: "User not found" });
-  if (!user.password_hash) {
-    return res.status(400).json({ message: "Password is not set for this account" });
-  }
 
-  const ok = await bcrypt.compare(String(password), user.password_hash);
-  if (!ok) return res.status(401).json({ message: "Password is incorrect" });
+  const verification = await verifyPasswordOrSecurityCode({
+    user,
+    userId: req.user.id,
+    action: "disable_two_fa",
+    password,
+    code,
+    passwordRequiredMessage: "Password is required",
+  });
+  if (!verification.ok) {
+    return res.status(verification.status).json({ message: verification.message });
+  }
 
   await clearTrustedDevices(req.user.id);
   const updated = await setTwoFaEnabled(req.user.id, false);
@@ -1528,21 +1638,21 @@ export const listSessions = asyncHandler(async (req, res) => {
 ===================================================== */
 export const logoutAll = asyncHandler(async (req, res) => {
   const userId = req.user.id;
-  const { password } = req.body;
-
-  if (!password) {
-    return res.status(400).json({ message: "Password is required" });
-  }
+  const { password, code } = req.body;
 
   const user = await findUserAuthById(userId);
   if (!user) return res.status(404).json({ message: "User not found" });
-  if (!user.password_hash) {
-    return res.status(400).json({ message: "Password is not set for this account" });
-  }
 
-  const ok = await bcrypt.compare(String(password), user.password_hash);
-  if (!ok) {
-    return res.status(401).json({ message: "Password is incorrect" });
+  const verification = await verifyPasswordOrSecurityCode({
+    user,
+    userId,
+    action: "logout_all",
+    password,
+    code,
+    passwordRequiredMessage: "Password is required",
+  });
+  if (!verification.ok) {
+    return res.status(verification.status).json({ message: verification.message });
   }
 
   await revokeAllSessionsForUser(userId);

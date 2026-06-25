@@ -1,8 +1,16 @@
+import { useEffect } from "react";
+
 export default function AboutPage() {
+  const embedded = new URLSearchParams(window.location.search).get("embedded") === "1";
+  useEffect(() => {
+    if (!embedded) return undefined;
+    document.body.classList.add("embedded-page");
+    return () => document.body.classList.remove("embedded-page");
+  }, [embedded]);
   return (
     <>
       {/* Header injected by default.js */}
-        <div id="header"></div>
+        {!embedded && <div id="header"></div>}
       
       
         {/* ==================== MAIN ==================== */}
@@ -85,7 +93,7 @@ export default function AboutPage() {
         </main>
       
         {/* Footer injected by default.js */}
-        <div id="footer"></div>
+        {!embedded && <div id="footer"></div>}
         
       
       

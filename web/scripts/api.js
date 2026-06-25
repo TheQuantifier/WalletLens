@@ -211,10 +211,10 @@ export const auth = {
     return request("/auth/sessions");
   },
 
-  async signOutAll(password) {
+  async signOutAll(credential, method = "password") {
     const data = await request("/auth/sessions/logout-all", {
       method: "POST",
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(method === "email_code" ? { code: credential } : { password: credential }),
     });
     clearAuthToken();
     return data;
@@ -228,6 +228,13 @@ export const auth = {
     return request("/auth/2fa/request-password-change", { method: "POST" });
   },
 
+  requestSecurityCode(action) {
+    return request("/auth/security-code/request", {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    });
+  },
+
   confirmTwoFaEnable(code) {
     return request("/auth/2fa/confirm-enable", {
       method: "POST",
@@ -235,10 +242,10 @@ export const auth = {
     });
   },
 
-  disableTwoFa(password) {
+  disableTwoFa(credential, method = "password") {
     return request("/auth/2fa/disable", {
       method: "POST",
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(method === "email_code" ? { code: credential } : { password: credential }),
     });
   },
 
@@ -249,10 +256,10 @@ export const auth = {
     });
   },
 
-  async changePassword(currentPassword, newPassword, twoFaCode, passwordResetToken) {
+  async changePassword(currentPassword, newPassword, twoFaCode, passwordResetToken, securityMethod = "password") {
     const data = await request("/auth/change-password", {
       method: "POST",
-      body: JSON.stringify({ currentPassword, newPassword, twoFaCode, passwordResetToken }),
+      body: JSON.stringify({ currentPassword, newPassword, twoFaCode, passwordResetToken, securityMethod }),
     });
     if (data?.token) setAuthToken(data.token);
     return data;
@@ -893,10 +900,17 @@ export const admin = {
     });
   },
 
-  forceLogoutAllSessions(password) {
+  requestAdminSecurityCode(action) {
+    return request("/admin/security-code/request", {
+      method: "POST",
+      body: JSON.stringify({ action }),
+    });
+  },
+
+  forceLogoutAllSessions(credential, method = "password") {
     return request("/admin/sessions/force-logout-all", {
       method: "POST",
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(method === "email_code" ? { code: credential } : { password: credential }),
     });
   },
 
@@ -956,17 +970,17 @@ export const admin = {
     });
   },
 
-  deactivateSystemHealthService(serviceId, password) {
+  deactivateSystemHealthService(serviceId, credential, method = "password") {
     return request(`/admin/system-health/${serviceId}/deactivate`, {
       method: "POST",
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(method === "email_code" ? { code: credential } : { password: credential }),
     });
   },
 
-  activateSystemHealthService(serviceId, password) {
+  activateSystemHealthService(serviceId, credential, method = "password") {
     return request(`/admin/system-health/${serviceId}/activate`, {
       method: "POST",
-      body: JSON.stringify({ password }),
+      body: JSON.stringify(method === "email_code" ? { code: credential } : { password: credential }),
     });
   },
 

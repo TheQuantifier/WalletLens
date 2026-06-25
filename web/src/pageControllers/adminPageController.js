@@ -110,6 +110,8 @@ const els = {
   maintenanceMessageEditBtn: document.getElementById("maintenanceMessageEditBtn"),
   maintenanceMessageTitleInput: document.getElementById("maintenanceMessageTitleInput"),
   maintenanceModeBannerTextInput: document.getElementById("maintenanceModeBannerTextInput"),
+  maintenanceMessageBackgroundColorInput: document.getElementById("maintenanceMessageBackgroundColorInput"),
+  maintenanceMessageTextColorInput: document.getElementById("maintenanceMessageTextColorInput"),
   maintenanceMessageNewBtn: document.getElementById("maintenanceMessageNewBtn"),
   maintenanceMessageSaveBtn: document.getElementById("maintenanceMessageSaveBtn"),
   maintenanceMessageDefaultBtn: document.getElementById("maintenanceMessageDefaultBtn"),
@@ -182,6 +184,8 @@ const els = {
 const state = {
   currentUser: null,
   currentRole: "user",
+  currentUserHasPassword: true,
+  currentUserHasGoogle: false,
   permissions: new Set(),
   selectedUserId: "",
   selectedUser: null,
@@ -208,6 +212,7 @@ const state = {
   savingPermissions: false,
   testingHealthServiceIds: new Set(),
   healthPassByService: {},
+  healthCredentialMethod: "password",
   healthConfirmAction: "",
   healthDisconnectServiceId: "",
   editingNotificationId: "",
@@ -244,6 +249,7 @@ const MAINTENANCE_PAGE_IDS = [
   "expired",
 ];
 const MAINTENANCE_PAGE_ID_SET = new Set(MAINTENANCE_PAGE_IDS);
+const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 const MAINTENANCE_PAGE_LABELS = {
   index: "Landing",
   login: "Login",
@@ -391,6 +397,21 @@ function openModal(modal) {
 function closeModal(modal) {
   if (!modal) return;
   modal.classList.add("hidden");
+}
+
+async function requestAdminEmailCode(action, statusEl, message) {
+  try {
+    const result = await api.admin.requestAdminSecurityCode(action);
+    if (result?.method === "password") {
+      setStatus(statusEl, result?.message || "Enter your current password to continue.");
+      return false;
+    }
+    setStatus(statusEl, message || result?.message || "A verification code was sent to your email.");
+    return true;
+  } catch (err) {
+    setStatus(statusEl, err?.message || "Unable to send verification code.", "error");
+    return false;
+  }
 }
 
 function openPermissionModal(requiredRole = "admin") {
@@ -619,6 +640,8 @@ async function ensureAdmin() {
       return false;
     }
     state.currentUser = user || null;
+    state.currentUserHasPassword = !!(user?.has_password || user?.hasPassword);
+    state.currentUserHasGoogle = !!(user?.google_id || user?.googleId);
     state.currentRole = String(user?.role || "user").trim();
     state.permissions = ROLE_PERMISSIONS[state.currentRole] || new Set();
     try {
@@ -1732,15 +1755,23 @@ function openHealthServiceActionModal(serviceId, action) {
   const service = services.find((item) => String(item.id) === String(serviceId || ""));
   if (!service) return;
   const mode = String(action || "").trim() === "activate" ? "activate" : "deactivate";
+  const usesEmergencyCode = mode === "activate" && String(service.id) === "database_connection";
+  state.healthCredentialMethod =
+    !usesEmergencyCode && state.currentUserHasGoogle && !state.currentUserHasPassword
+      ? "email_code"
+      : "password";
   state.healthConfirmAction = mode;
   state.healthDisconnectServiceId = String(service.id || "");
   if (els.healthDisconnectTitle) {
     els.healthDisconnectTitle.textContent = mode === "activate" ? "Activate Service" : "Deactivate Service";
   }
   if (els.healthDisconnectMessage) {
-    if (mode === "activate" && String(service.id) === "database_connection") {
+    if (usesEmergencyCode) {
       els.healthDisconnectMessage.textContent =
         `Are you sure you want to activate ${service.label}? Enter the emergency activation code and press Activate.`;
+    } else if (state.healthCredentialMethod === "email_code") {
+      els.healthDisconnectMessage.textContent =
+        `Are you sure you want to ${mode} ${service.label}? Enter the email verification code and press ${mode === "activate" ? "Activate" : "Deactivate"}.`;
     } else {
       els.healthDisconnectMessage.textContent =
         `Are you sure you want to ${mode} ${service.label}? Enter your password and press ${mode === "activate" ? "Activate" : "Deactivate"}.`;
@@ -1748,8 +1779,10 @@ function openHealthServiceActionModal(serviceId, action) {
   }
   if (els.healthDisconnectCredentialLabel) {
     els.healthDisconnectCredentialLabel.textContent =
-      mode === "activate" && String(service.id) === "database_connection"
+      usesEmergencyCode
         ? "Emergency Code"
+        : state.healthCredentialMethod === "email_code"
+          ? "Email Code"
         : "Password";
   }
   if (els.healthDisconnectBtn) {
@@ -1757,9 +1790,34 @@ function openHealthServiceActionModal(serviceId, action) {
   }
   if (els.healthDisconnectPassword) {
     els.healthDisconnectPassword.value = "";
+    els.healthDisconnectPassword.type = state.healthCredentialMethod === "email_code" || usesEmergencyCode ? "text" : "password";
+    els.healthDisconnectPassword.placeholder = state.healthCredentialMethod === "email_code" ? "6-digit code" : "";
+    els.healthDisconnectPassword.autocomplete = state.healthCredentialMethod === "email_code" ? "one-time-code" : "current-password";
   }
   setStatus(els.healthDisconnectStatus, "");
   openModal(els.healthDisconnectModal);
+  if (!usesEmergencyCode && state.currentUserHasGoogle && state.currentUserHasPassword) {
+    if (window.confirm("Use an email verification code instead of your password?")) {
+      state.healthCredentialMethod = "email_code";
+      if (els.healthDisconnectCredentialLabel) els.healthDisconnectCredentialLabel.textContent = "Email Code";
+      if (els.healthDisconnectPassword) {
+        els.healthDisconnectPassword.type = "text";
+        els.healthDisconnectPassword.placeholder = "6-digit code";
+        els.healthDisconnectPassword.autocomplete = "one-time-code";
+      }
+      if (els.healthDisconnectMessage) {
+        els.healthDisconnectMessage.textContent =
+          `Are you sure you want to ${mode} ${service.label}? Enter the email verification code and press ${mode === "activate" ? "Activate" : "Deactivate"}.`;
+      }
+    }
+  }
+  if (!usesEmergencyCode && state.healthCredentialMethod === "email_code") {
+    requestAdminEmailCode(
+      mode === "activate" ? "system_health_activate" : "system_health_deactivate",
+      els.healthDisconnectStatus,
+      `A system health ${mode === "activate" ? "activation" : "deactivation"} code was sent to your email.`
+    );
+  }
 }
 
 async function submitHealthDisconnect(event) {
@@ -1773,7 +1831,9 @@ async function submitHealthDisconnect(event) {
       els.healthDisconnectStatus,
       action === "activate" && serviceId === "database_connection"
         ? "Enter your emergency activation code."
-        : "Enter your password.",
+        : state.healthCredentialMethod === "email_code"
+          ? "Enter the email verification code."
+          : "Enter your password.",
       "error"
     );
     return;
@@ -1791,10 +1851,10 @@ async function submitHealthDisconnect(event) {
       if (serviceId === "database_connection") {
         result = await api.admin.emergencyActivateDatabaseConnection(credential);
       } else {
-        result = await api.admin.activateSystemHealthService(serviceId, credential);
+        result = await api.admin.activateSystemHealthService(serviceId, credential, state.healthCredentialMethod);
       }
     } else {
-      result = await api.admin.deactivateSystemHealthService(serviceId, credential);
+      result = await api.admin.deactivateSystemHealthService(serviceId, credential, state.healthCredentialMethod);
     }
     state.healthPassByService = {};
     setStatus(
@@ -2298,6 +2358,11 @@ function normalizeMaintenancePageIds(value) {
   return Array.from(new Set(cleaned));
 }
 
+function normalizeMaintenanceColor(value, fallback) {
+  const color = String(value || "").trim();
+  return HEX_COLOR_RE.test(color) ? color.toLowerCase() : fallback;
+}
+
 function normalizeMaintenanceMessages(value) {
   if (!Array.isArray(value)) return [];
   const seen = new Set();
@@ -2312,6 +2377,8 @@ function normalizeMaintenanceMessages(value) {
         id,
         title: String(source.title || "Maintenance message").trim().slice(0, 80) || "Maintenance message",
         text: text.slice(0, 500),
+        backgroundColor: normalizeMaintenanceColor(source.backgroundColor, "#ff8a00"),
+        textColor: normalizeMaintenanceColor(source.textColor, "#ffffff"),
         pageIds: normalizeMaintenancePageIds(source.pageIds),
       };
     })
@@ -2410,6 +2477,12 @@ function syncMaintenanceEditorFromSelected() {
   if (els.maintenanceModeBannerTextInput) {
     els.maintenanceModeBannerTextInput.value = message?.text || "";
   }
+  if (els.maintenanceMessageBackgroundColorInput) {
+    els.maintenanceMessageBackgroundColorInput.value = normalizeMaintenanceColor(message?.backgroundColor, "#ff8a00");
+  }
+  if (els.maintenanceMessageTextColorInput) {
+    els.maintenanceMessageTextColorInput.value = normalizeMaintenanceColor(message?.textColor, "#ffffff");
+  }
   setMaintenancePageCheckboxes(message?.pageIds || MAINTENANCE_PAGE_IDS);
   updateMaintenanceSelectedSummary();
   if (els.maintenanceMessageEditBtn) {
@@ -2431,6 +2504,8 @@ function loadMaintenanceMessagesFromSettings(settings) {
       id: "legacy-maintenance-message",
       title: "Maintenance message",
       text: legacyText.slice(0, 500),
+      backgroundColor: "#ff8a00",
+      textColor: "#ffffff",
       pageIds: [...MAINTENANCE_PAGE_IDS],
     }];
   }
@@ -2464,6 +2539,8 @@ function upsertCurrentMaintenanceMessage({ requireText = false, closeAfterSave =
     id: selectedId,
     title: title.slice(0, 80),
     text,
+    backgroundColor: normalizeMaintenanceColor(els.maintenanceMessageBackgroundColorInput?.value, "#ff8a00"),
+    textColor: normalizeMaintenanceColor(els.maintenanceMessageTextColorInput?.value, "#ffffff"),
     pageIds: getSelectedMaintenancePageIds(),
   };
   const index = state.maintenanceMessages.findIndex((message) => message.id === selectedId);
@@ -2491,6 +2568,8 @@ function openMaintenanceMessageModal({ mode = "edit" } = {}) {
   if (isNew) {
     if (els.maintenanceMessageTitleInput) els.maintenanceMessageTitleInput.value = "";
     if (els.maintenanceModeBannerTextInput) els.maintenanceModeBannerTextInput.value = "";
+    if (els.maintenanceMessageBackgroundColorInput) els.maintenanceMessageBackgroundColorInput.value = "#ff8a00";
+    if (els.maintenanceMessageTextColorInput) els.maintenanceMessageTextColorInput.value = "#ffffff";
     setMaintenancePageCheckboxes(MAINTENANCE_PAGE_IDS);
   } else {
     state.selectedMaintenanceMessageId =
@@ -2712,6 +2791,8 @@ async function saveSettings(event) {
         enabled: Boolean(els.maintenanceModeEnabledInput?.checked),
         text: defaultMaintenanceMessage?.text || maintenanceModeBannerText,
         pageIds: defaultMaintenanceMessage?.pageIds || MAINTENANCE_PAGE_IDS,
+        backgroundColor: normalizeMaintenanceColor(defaultMaintenanceMessage?.backgroundColor, "#ff8a00"),
+        textColor: normalizeMaintenanceColor(defaultMaintenanceMessage?.textColor, "#ffffff"),
       },
     }));
     setStatus(els.maintenanceMessageStatus, "Maintenance messages saved.", "ok");
@@ -2728,8 +2809,22 @@ async function forceLogoutAllUsers() {
     openPermissionModal("admin");
     return;
   }
-  const password = window.prompt("Enter your password to force logout all users:");
-  if (!password) return;
+  let method = "password";
+  if (state.currentUserHasGoogle && (!state.currentUserHasPassword || window.confirm("Use an email verification code instead of your password?"))) {
+    method = "email_code";
+    const sent = await requestAdminEmailCode(
+      "force_logout_all",
+      els.settingsStatus,
+      "A force logout code was sent to your email."
+    );
+    if (!sent) return;
+  }
+  const credential = window.prompt(
+    method === "email_code"
+      ? "Enter the email verification code to force logout all users:"
+      : "Enter your password to force logout all users:"
+  );
+  if (!credential) return;
   const confirmed = window.confirm(
     "This will revoke every active session for all users immediately. Continue?"
   );
@@ -2737,7 +2832,7 @@ async function forceLogoutAllUsers() {
 
   setStatus(els.settingsStatus, "Revoking all active sessions...");
   try {
-    const result = await api.admin.forceLogoutAllSessions(password);
+    const result = await api.admin.forceLogoutAllSessions(credential, method);
     setStatus(
       els.settingsStatus,
       result?.message || "All active sessions were revoked.",

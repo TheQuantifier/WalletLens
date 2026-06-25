@@ -21,6 +21,7 @@ import {
   updateOrganizationAdmin,
   removeOrganizationMemberAdmin,
   forceLogoutAllUsersAdmin,
+  requestAdminSecurityCode,
   getAdminStatsController,
   getAdminPermissionsController,
   listRecordsAdminController,
@@ -34,6 +35,9 @@ import {
   updateSupportTicketAdmin,
   getSystemHealthAdmin,
   testSystemHealthServiceAdmin,
+  deactivateSystemHealthServiceAdmin,
+  activateSystemHealthServiceAdmin,
+  emergencyActivateDatabaseConnectionAdmin,
 } from "../controllers/admin.controller.js";
 import {
   getAdmin as getAppSettingsAdmin,
@@ -47,6 +51,8 @@ import {
 } from "../controllers/notifications.controller.js";
 
 const router = express.Router();
+
+router.post("/system-health/database_connection/emergency-activate", emergencyActivateDatabaseConnectionAdmin);
 
 router.use(auth, requireAdmin);
 
@@ -72,6 +78,10 @@ router.post(
   "/sessions/force-logout-all",
   requireAdminPermission("settings.write"),
   forceLogoutAllUsersAdmin
+);
+router.post(
+  "/security-code/request",
+  requestAdminSecurityCode
 );
 
 // Stats
@@ -109,5 +119,7 @@ router.put("/support-tickets/:id", requireAdminPermission("support.write"), upda
 // System health
 router.get("/system-health", requireAdminPermission("health.read"), getSystemHealthAdmin);
 router.post("/system-health/:serviceId/test", requireAdminPermission("health.read"), testSystemHealthServiceAdmin);
+router.post("/system-health/:serviceId/deactivate", requireAdminPermission("health.write"), deactivateSystemHealthServiceAdmin);
+router.post("/system-health/:serviceId/activate", requireAdminPermission("health.write"), activateSystemHealthServiceAdmin);
 
 export default router;

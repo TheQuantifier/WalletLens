@@ -79,12 +79,82 @@ function isOrganizationScopedRole(role) {
   return normalized === ORG_USER_ROLE || normalized === ORG_ADMIN_ROLE;
 }
 
+const ADMIN_SECURITY_CODE_ACTIONS = {
+  force_logout_all: {
+    purpose: "admin_force_logout_all",
+    subject: "Your <AppName> admin sign out code",
+    label: "force logout all users",
+  },
+  system_health_activate: {
+    purpose: "admin_system_health_activate",
+    subject: "Your <AppName> system health activation code",
+    label: "system health activation",
+  },
+  system_health_deactivate: {
+    purpose: "admin_system_health_deactivate",
+    subject: "Your <AppName> system health deactivation code",
+    label: "system health deactivation",
+  },
+};
+
+function getAdminSecurityCodeAction(action) {
+  return ADMIN_SECURITY_CODE_ACTIONS[String(action || "").trim()] || null;
+}
+
+async function issueAdminSecurityCode({ userId, email, action }) {
+  const config = getAdminSecurityCodeAction(action);
+  if (!config) return false;
+  const code = String(crypto.randomInt(100000, 1000000));
+  await clearTwoFaCodes(userId, config.purpose);
+  await createTwoFaCode({
+    userId,
+    purpose: config.purpose,
+    codeHash: crypto.createHmac("sha256", env.jwtSecret).update(code).digest("hex"),
+    expiresAt: new Date(Date.now() + env.twoFaCodeMinutes * 60 * 1000),
+  });
+  await sendEmail({
+    to: email,
+    subject: config.subject,
+    text: `Your ${config.label} code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
+  });
+  return true;
+}
+
+async function verifyAdminSensitiveCredential({ userId, action, password, code }) {
+  const actor = await findUserAuthById(userId);
+  if (!actor) return { ok: false, status: 403, message: "Current administrator could not be verified." };
+  if (code && actor.google_id) {
+    const config = getAdminSecurityCodeAction(action);
+    const match = config
+      ? await findValidTwoFaCode({
+          userId,
+          purpose: config.purpose,
+          codeHash: crypto.createHmac("sha256", env.jwtSecret).update(code).digest("hex"),
+        })
+      : null;
+    if (!match) return { ok: false, status: 401, message: "Invalid or expired verification code." };
+    await deleteTwoFaCodeById(match.id);
+    return { ok: true, method: "email_code", actor };
+  }
+  if (!actor.password_hash) {
+    return {
+      ok: false,
+      status: 400,
+      message: actor.google_id ? "Request an email verification code to continue." : "This account does not have a password set.",
+    };
+  }
+  if (!password) return { ok: false, status: 400, message: "Password is required." };
+  const ok = await bcrypt.compare(String(password), actor.password_hash);
+  if (!ok) return { ok: false, status: 401, message: "Password is incorrect." };
+  return { ok: true, method: "password", actor };
+}
+
 function isFullAdminRole(role) {
   return String(role || "").trim().toLowerCase() === "admin";
 }
 
 function getActorOrganizationId(req) {
-  return String(req.user?.organization_id || req.user?.organizationId || "").trim();
+  return String(req.user?.active_organization_id || req.user?.activeOrganizationId || "").trim();
 }
 
 function getActorAdminRole(req) {
@@ -776,14 +846,19 @@ export const transferOrganizationAdmin = asyncHandler(async (req, res) => {
   const actorAuth = await findUserAuthById(req.user.id);
   const credential = String(req.body?.credential || "").trim();
   if (!actorAuth) return res.status(403).json({ message: "Current administrator could not be verified." });
-  if (actorAuth.two_fa_enabled) {
+  if (actorAuth.two_fa_enabled || actorAuth.google_id) {
     const match = credential ? await findValidTwoFaCode({
       userId: req.user.id,
       purpose: "organization_admin_transfer",
       codeHash: crypto.createHmac("sha256", env.jwtSecret).update(credential).digest("hex"),
     }) : null;
-    if (!match) return res.status(400).json({ message: "Enter the valid administrator transfer code." });
-    await deleteTwoFaCodeById(match.id);
+    if (match) {
+      await deleteTwoFaCodeById(match.id);
+    } else if (actorAuth.two_fa_enabled || !actorAuth.password_hash) {
+      return res.status(400).json({ message: "Enter the valid administrator transfer code." });
+    } else if (!credential || !(await bcrypt.compare(credential, actorAuth.password_hash))) {
+      return res.status(400).json({ message: "Enter your current password or a valid administrator transfer code." });
+    }
   } else if (actorAuth.password_hash) {
     if (!credential || !(await bcrypt.compare(credential, actorAuth.password_hash))) {
       return res.status(400).json({ message: "Enter your current password to reassign the administrator." });
@@ -847,10 +922,7 @@ export const requestOrganizationAdminTransferVerification = asyncHandler(async (
   if (!organizationId) return;
   const actor = await findUserAuthById(req.user.id);
   if (!actor) return res.status(403).json({ message: "Current administrator could not be verified." });
-  if (!actor.two_fa_enabled) {
-    if (!actor.password_hash) {
-      return res.status(400).json({ message: "Enable two-factor authentication before reassigning the administrator." });
-    }
+  if (!actor.two_fa_enabled && !actor.google_id) {
     return res.json({ method: "password", message: "Enter your current password to continue." });
   }
   const code = String(crypto.randomInt(100000, 1000000));
@@ -867,7 +939,12 @@ export const requestOrganizationAdminTransferVerification = asyncHandler(async (
     subject: "Verify administrator reassignment",
     text: `Your administrator reassignment code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
   });
-  res.json({ method: "two_factor", message: "A verification code was sent to your email." });
+  res.json({
+    method: actor.password_hash ? "password_or_email" : "two_factor",
+    message: actor.password_hash
+      ? "Enter your current password or use the verification code sent to your email."
+      : "A verification code was sent to your email.",
+  });
 });
 
 export const requestOrganizationDeletionVerification = asyncHandler(async (req, res) => {
@@ -875,10 +952,7 @@ export const requestOrganizationDeletionVerification = asyncHandler(async (req, 
   if (!organizationId) return;
   const actor = await findUserAuthById(req.user.id);
   if (!actor) return res.status(403).json({ message: "Current administrator could not be verified." });
-  if (!actor.two_fa_enabled) {
-    if (!actor.password_hash) {
-      return res.status(400).json({ message: "Enable two-factor authentication before deleting the organization." });
-    }
+  if (!actor.two_fa_enabled && !actor.google_id) {
     return res.json({ method: "password", message: "Enter your current password to continue." });
   }
   const code = String(crypto.randomInt(100000, 1000000));
@@ -895,7 +969,12 @@ export const requestOrganizationDeletionVerification = asyncHandler(async (req, 
     subject: "Verify organization deletion",
     text: `Your organization deletion code is ${code}. It expires in ${env.twoFaCodeMinutes} minutes.`,
   });
-  res.json({ method: "two_factor", message: "A verification code was sent to your email." });
+  res.json({
+    method: actor.password_hash ? "password_or_email" : "two_factor",
+    message: actor.password_hash
+      ? "Enter your current password or use the verification code sent to your email."
+      : "A verification code was sent to your email.",
+  });
 });
 
 export const deleteOrganizationAdmin = asyncHandler(async (req, res) => {
@@ -909,14 +988,19 @@ export const deleteOrganizationAdmin = asyncHandler(async (req, res) => {
   if (confirmationName !== organization.name) {
     return res.status(400).json({ message: "Enter the organization name exactly as shown." });
   }
-  if (actor.two_fa_enabled) {
+  if (actor.two_fa_enabled || actor.google_id) {
     const match = credential ? await findValidTwoFaCode({
       userId: req.user.id,
       purpose: "organization_delete",
       codeHash: crypto.createHmac("sha256", env.jwtSecret).update(credential).digest("hex"),
     }) : null;
-    if (!match) return res.status(400).json({ message: "Enter the valid organization deletion code." });
-    await deleteTwoFaCodeById(match.id);
+    if (match) {
+      await deleteTwoFaCodeById(match.id);
+    } else if (actor.two_fa_enabled || !actor.password_hash) {
+      return res.status(400).json({ message: "Enter the valid organization deletion code." });
+    } else if (!credential || !(await bcrypt.compare(credential, actor.password_hash))) {
+      return res.status(400).json({ message: "Enter your current password or a valid organization deletion code." });
+    }
   } else if (actor.password_hash) {
     if (!credential || !(await bcrypt.compare(credential, actor.password_hash))) {
       return res.status(400).json({ message: "Enter your current password to delete the organization." });
@@ -1151,17 +1235,14 @@ export const updateUserAdmin = asyncHandler(async (req, res) => {
 });
 
 export const forceLogoutAllUsersAdmin = asyncHandler(async (req, res) => {
-  const password = String(req.body?.password || "");
-  if (!password) {
-    return res.status(400).json({ message: "Password is required." });
-  }
-  const actor = await findUserAuthById(req.user.id);
-  if (!actor?.password_hash) {
-    return res.status(400).json({ message: "This account does not have a password set." });
-  }
-  const ok = await bcrypt.compare(password, actor.password_hash);
-  if (!ok) {
-    return res.status(401).json({ message: "Password is incorrect." });
+  const verification = await verifyAdminSensitiveCredential({
+    userId: req.user.id,
+    action: "force_logout_all",
+    password: String(req.body?.password || ""),
+    code: String(req.body?.code || ""),
+  });
+  if (!verification.ok) {
+    return res.status(verification.status).json({ message: verification.message });
   }
 
   const revokedSessions = await revokeAllActiveSessions();
@@ -1179,6 +1260,21 @@ export const forceLogoutAllUsersAdmin = asyncHandler(async (req, res) => {
     revokedSessions,
     message: `Revoked ${revokedSessions} active session(s).`,
   });
+});
+
+export const requestAdminSecurityCode = asyncHandler(async (req, res) => {
+  const action = String(req.body?.action || "").trim();
+  const config = getAdminSecurityCodeAction(action);
+  if (!config) return res.status(400).json({ message: "Unknown security action." });
+
+  const actor = await findUserAuthById(req.user.id);
+  if (!actor) return res.status(403).json({ message: "Current administrator could not be verified." });
+  if (!actor.google_id) {
+    return res.json({ method: "password", message: "Enter your current password to continue." });
+  }
+
+  await issueAdminSecurityCode({ userId: req.user.id, email: actor.email, action });
+  res.json({ method: "email_code", message: "A verification code was sent to your email." });
 });
 
 // ==========================================================
@@ -1582,17 +1678,14 @@ export const deactivateSystemHealthServiceAdmin = asyncHandler(async (req, res) 
     return res.status(400).json({ message: "This service cannot be deactivated." });
   }
 
-  const password = String(req.body?.password || "");
-  if (!password) {
-    return res.status(400).json({ message: "Password is required." });
-  }
-  const actor = await findUserAuthById(req.user.id);
-  if (!actor?.password_hash) {
-    return res.status(400).json({ message: "This account does not have a password set." });
-  }
-  const ok = await bcrypt.compare(password, actor.password_hash);
-  if (!ok) {
-    return res.status(401).json({ message: "Password is incorrect." });
+  const verification = await verifyAdminSensitiveCredential({
+    userId: req.user.id,
+    action: "system_health_deactivate",
+    password: String(req.body?.password || ""),
+    code: String(req.body?.code || ""),
+  });
+  if (!verification.ok) {
+    return res.status(verification.status).json({ message: verification.message });
   }
 
   if (serviceId === "database_connection") {
@@ -1661,17 +1754,14 @@ export const activateSystemHealthServiceAdmin = asyncHandler(async (req, res) =>
     return res.status(400).json({ message: "This service cannot be activated." });
   }
 
-  const password = String(req.body?.password || "");
-  if (!password) {
-    return res.status(400).json({ message: "Password is required." });
-  }
-  const actor = await findUserAuthById(req.user.id);
-  if (!actor?.password_hash) {
-    return res.status(400).json({ message: "This account does not have a password set." });
-  }
-  const ok = await bcrypt.compare(password, actor.password_hash);
-  if (!ok) {
-    return res.status(401).json({ message: "Password is incorrect." });
+  const verification = await verifyAdminSensitiveCredential({
+    userId: req.user.id,
+    action: "system_health_activate",
+    password: String(req.body?.password || ""),
+    code: String(req.body?.code || ""),
+  });
+  if (!verification.ok) {
+    return res.status(verification.status).json({ message: verification.message });
   }
 
   if (serviceId === "database_connection") {

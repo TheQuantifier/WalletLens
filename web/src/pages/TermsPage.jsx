@@ -12,8 +12,12 @@ export default function TermsPage() {
 
   useEffect(() => {
     document.body.classList.add("legal-page");
-    return () => document.body.classList.remove("legal-page");
-  }, []);
+    if (embedded) document.body.classList.add("embedded-page");
+    return () => {
+      document.body.classList.remove("legal-page");
+      document.body.classList.remove("embedded-page");
+    };
+  }, [embedded]);
 
   return (
     <>

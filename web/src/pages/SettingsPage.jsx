@@ -250,12 +250,17 @@ export default function SettingsPage() {
         <div className="modal hidden" id="signOutAllModal" aria-hidden="true">
           <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="signOutAllTitle">
             <h2 id="signOutAllTitle">Sign Out All Devices</h2>
-            <p className="subtle">Please re-enter your password to sign out of all devices.</p>
+            <p className="subtle" id="signOutAllPrompt">Please re-enter your password to sign out of all devices.</p>
       
-            <label>
-              <span className="label">Password</span>
+            <label id="signOutAllCredentialLabel">
+              <span className="label" id="signOutAllCredentialLabelText">Password</span>
               <input id="signOutAllPassword" type="password" autoComplete="current-password" placeholder="Password" />
             </label>
+
+            <div className="modal-actions is-hidden" id="signOutAllCredentialActions">
+              <button className="btn" id="signOutAllUsePasswordBtn" type="button">Use Password</button>
+              <button className="btn" id="signOutAllRequestCodeBtn" type="button">Send Email Code</button>
+            </div>
       
             <div className="modal-actions">
               <button className="btn btn--danger" id="confirmSignOutAllBtn" type="button">Sign Out All</button>
@@ -274,9 +279,14 @@ export default function SettingsPage() {
       
             <form id="passwordForm" className="form-grid">
               <label className="span-2" id="currentPasswordRow">
-                <span className="label">Current Password</span>
+                <span className="label" id="currentPasswordLabelText">Current Password</span>
                 <input id="currentPassword" type="password" autoComplete="current-password" required />
               </label>
+
+              <div className="modal-actions span-2 is-hidden" id="passwordCredentialActions">
+                <button className="btn" id="passwordUsePasswordBtn" type="button">Use Password</button>
+                <button className="btn" id="passwordRequestCodeBtn" type="button">Send Email Code</button>
+              </div>
       
               <label className="span-2">
                 <span className="label">New Password</span>
@@ -333,12 +343,17 @@ export default function SettingsPage() {
         <div className="modal hidden" id="disableTwoFaModal" aria-hidden="true">
           <div className="modal-content" role="dialog" aria-modal="true" aria-labelledby="disableTwoFaTitle">
             <h2 id="disableTwoFaTitle">Disable Two-Factor Authentication</h2>
-            <p className="subtle">Enter your password to disable 2FA.</p>
+            <p className="subtle" id="disableTwoFaPrompt">Enter your password to disable 2FA.</p>
       
-            <label>
-              <span className="label">Password</span>
+            <label id="twoFaDisableCredentialLabel">
+              <span className="label" id="twoFaDisableCredentialLabelText">Password</span>
               <input id="twoFaDisablePassword" type="password" autoComplete="current-password" placeholder="Password" />
             </label>
+
+            <div className="modal-actions is-hidden" id="disableTwoFaCredentialActions">
+              <button className="btn" id="disableTwoFaUsePasswordBtn" type="button">Use Password</button>
+              <button className="btn" id="disableTwoFaRequestCodeBtn" type="button">Send Email Code</button>
+            </div>
       
             <div className="modal-actions">
               <button className="btn btn--danger" id="confirmDisableTwoFaBtn" type="button">Disable 2FA</button>

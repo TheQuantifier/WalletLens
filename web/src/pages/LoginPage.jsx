@@ -39,63 +39,6 @@ function PasswordEyeIcon() {
   );
 }
 
-function ContactModal({ open, onClose }) {
-  const [form, setForm] = useState({ subject: "", email: "", message: "" });
-  const [status, setStatus] = useState("");
-  const [sending, setSending] = useState(false);
-
-  if (!open) return null;
-
-  const submit = async (event) => {
-    event.preventDefault();
-    if (!form.subject.trim() || !form.email.trim() || !form.message.trim()) {
-      setStatus("Please add subject, email, and message.");
-      return;
-    }
-    setSending(true);
-    setStatus("Sending your message...");
-    try {
-      await api.support.contactPublic({ ...form, name: "Guest User" });
-      setStatus("Thanks. Your message has been sent to support.");
-      setForm({ subject: "", email: "", message: "" });
-    } catch (err) {
-      setStatus(err?.message || "Unable to send message right now.");
-    } finally {
-      setSending(false);
-    }
-  };
-
-  return (
-    <div id="contactModal" className="nf-modal" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
-      <div className="nf-modal-backdrop" onClick={onClose}></div>
-      <div className="nf-modal-content nf-contact-modal-content" role="document">
-        <div className="nf-modal-header">
-          <h2 id="contactModalTitle">Contact Support</h2>
-          <button type="button" className="nf-modal-close" onClick={onClose}>Close</button>
-        </div>
-        <div className="nf-modal-body">
-          <form id="authContactForm" className="nf-contact-form" onSubmit={submit}>
-            <label htmlFor="contactSubject">
-              <span className="label">Subject</span>
-              <input id="contactSubject" name="subject" value={form.subject} onChange={(event) => setForm({ ...form, subject: event.target.value })} autoComplete="off" placeholder="What can we help with?" required />
-            </label>
-            <label htmlFor="contactEmail">
-              <span className="label">Email</span>
-              <input id="contactEmail" name="email" type="email" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} autoComplete="email" placeholder="you@example.com" required />
-            </label>
-            <label htmlFor="contactMessage">
-              <span className="label">Message</span>
-              <textarea id="contactMessage" name="message" value={form.message} onChange={(event) => setForm({ ...form, message: event.target.value })} rows="5" placeholder="Tell us what happened." required />
-            </label>
-            {status ? <p id="contactStatus" className="subtle" aria-live="polite">{status}</p> : null}
-            <button type="submit" id="contactSubmitBtn" className="nf-btn" disabled={sending}>{sending ? "Sending..." : "Send Message"}</button>
-          </form>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function LoginPage() {
   const [appName, setAppName] = useState(sessionStorage.getItem("appName") || "WalletLens");
   const [identifier, setIdentifier] = useState("");
@@ -105,7 +48,6 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [googleEnabled, setGoogleEnabled] = useState(false);
   const [verification, setVerification] = useState({ mode: "login", token: "", code: "" });
-  const [contactOpen, setContactOpen] = useState(false);
 
   useEffect(() => {
     sessionStorage.removeItem("authRedirectMessage");
@@ -276,14 +218,12 @@ export default function LoginPage() {
         <div className="nf-footer-inner">
           <p>&copy; {new Date().getFullYear()} {appName}. All rights reserved.</p>
           <nav className="nf-legal" aria-label="Footer">
-            <a href="/privacy" className="nf-legal-link">Privacy</a><span className="sep">&bull;</span>
-            <a href="/terms" className="nf-legal-link">Terms</a><span className="sep">&bull;</span>
-            <button type="button" className="nf-legal-link" onClick={() => setContactOpen(true)}>Contact</button>
+            <a href="/about" className="nf-legal-link" data-public-modal="about">About</a><span className="sep">&bull;</span>
+            <a href="/privacy" className="nf-legal-link" data-public-modal="privacy">Privacy</a><span className="sep">&bull;</span>
+            <button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button>
           </nav>
         </div>
       </footer>
-
-      <ContactModal open={contactOpen} onClose={() => setContactOpen(false)} />
     </>
   );
 }

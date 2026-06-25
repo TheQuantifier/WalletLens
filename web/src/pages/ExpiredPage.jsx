@@ -44,6 +44,16 @@ export default function ExpiredPage() {
           </div>
         </section>
       </main>
+      <footer className="nf-footer" role="contentinfo">
+        <div className="nf-footer-inner">
+          <p>© {new Date().getFullYear()} &lt;AppName&gt;. All rights reserved.</p>
+          <nav className="nf-legal" aria-label="Footer">
+            <a href="/about" data-public-modal="about">About</a><span className="sep">•</span>
+            <a href="/privacy" data-public-modal="privacy">Privacy</a><span className="sep">•</span>
+            <button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button>
+          </nav>
+        </div>
+      </footer>
     </>
   );
 }

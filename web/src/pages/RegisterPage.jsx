@@ -556,9 +556,9 @@ export default function RegisterPage() {
           <div className="nf-footer-inner">
             <p>&copy; <span id="year"></span> &lt;AppName&gt;. All rights reserved.</p>
             <nav className="nf-legal" aria-label="Footer">
-              <a href="/privacy" className="nf-legal-link">Privacy</a><span className="sep">&bull;</span>
-              <a href="/terms" className="nf-legal-link">Terms</a><span className="sep">&bull;</span>
-              <button type="button" className="nf-legal-link" data-contact-open="true">Contact</button>
+              <a href="/about" className="nf-legal-link" data-public-modal="about">About</a><span className="sep">&bull;</span>
+              <a href="/privacy" className="nf-legal-link" data-public-modal="privacy">Privacy</a><span className="sep">&bull;</span>
+              <button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button>
             </nav>
           </div>
         </footer>

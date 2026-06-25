@@ -910,6 +910,16 @@ export default function AdminPage() {
                 <span>Banner Text</span>
                 <input id="maintenanceModeBannerTextInput" type="text" maxLength="500" placeholder="Please be aware: Maintenance is underway." />
               </label>
+              <div className="admin-settings-inline-grid">
+                <label className="settings-item">
+                  <span>Background Color</span>
+                  <input id="maintenanceMessageBackgroundColorInput" type="color" defaultValue="#ff8a00" />
+                </label>
+                <label className="settings-item">
+                  <span>Text Color</span>
+                  <input id="maintenanceMessageTextColorInput" type="color" defaultValue="#ffffff" />
+                </label>
+              </div>
               <div className="settings-item-head">
                 <span>Pages</span>
                 <p className="subtle">Select where this message should appear.</p>
