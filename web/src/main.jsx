@@ -9,6 +9,7 @@ import "../styles/careers.css";
 import "../styles/home.css";
 import "../styles/index.css";
 import "../styles/legal.css";
+import "../styles/planning.css";
 import "../styles/profile.css";
 import "../styles/records.css";
 import "../styles/recurring.css";

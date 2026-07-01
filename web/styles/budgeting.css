@@ -60,6 +60,13 @@
   margin-bottom: 1.5rem;
 }
 
+.budget-income-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
 .summary-card {
   --summary-text: #0f172a;
   --summary-subtle: rgba(15, 23, 42, 0.72);
@@ -287,6 +294,10 @@
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   text-align: right;
+}
+
+.budget-percent-input {
+  width: 92px;
 }
 
 /* Remove number input spinners */

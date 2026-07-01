@@ -1,3 +1,16 @@
+import { useEffect } from "react";
+import { api } from "../../scripts/api.js";
+
+function postAuthDestination(user) {
+  const accountStatus = String(user?.account_status || user?.accountStatus || "active").trim().toLowerCase();
+  return accountStatus === "expired" ? "/expired" : "/home";
+}
+
+function navigateTo(path) {
+  if (window.__walletlensNavigate) window.__walletlensNavigate(path);
+  else window.location.href = path;
+}
+
 function AccountChoice({ href, title, description, children }) {
   return (
     <a href={href} className="account-choice-card">
@@ -12,6 +25,12 @@ function AccountChoice({ href, title, description, children }) {
 }
 
 export default function RegisterWhoPage() {
+  useEffect(() => {
+    api.auth.me()
+      .then(({ user }) => navigateTo(postAuthDestination(user)))
+      .catch(() => {});
+  }, []);
+
   return (
     <>
       <header className="nf-header" role="banner">
@@ -37,7 +56,7 @@ export default function RegisterWhoPage() {
           </div>
         </section>
       </main>
-      <footer className="nf-footer" role="contentinfo"><div className="nf-footer-inner"><p>© {new Date().getFullYear()} &lt;AppName&gt;. All rights reserved.</p><nav className="nf-legal"><a href="/about" data-public-modal="about">About</a><span className="sep">•</span><a href="/privacy" data-public-modal="privacy">Privacy</a><span className="sep">•</span><button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button></nav></div></footer>
+      <footer className="nf-footer" role="contentinfo"><div className="nf-footer-inner"><p>© {new Date().getFullYear()} &lt;AppName&gt;. All rights reserved.</p><nav className="nf-legal"><a href="/about" data-public-modal="about">About</a><span className="sep">•</span><a href="/privacy" data-public-modal="privacy">Privacy</a><span className="sep">•</span><a href="/help" className="nf-legal-link" data-public-modal="contact">Contact</a></nav></div></footer>
     </>
   );
 }

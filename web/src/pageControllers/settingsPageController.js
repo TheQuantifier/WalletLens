@@ -503,12 +503,7 @@ export function initSettingsPage() {
 
       showStatus(els.deleteStatus, "Account deleted. Redirecting…", "ok");
 
-      // Clear any legacy client-side auth artifacts (new system uses cookies)
-      localStorage.removeItem("token");
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("jwt");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      api.auth.clearLocalSession();
 
       window.setTimeout(() => {
       window.location.href = "/login";
@@ -879,11 +874,7 @@ export function initSettingsPage() {
 
       showStatus(els.signOutAllStatus, "All sessions signed out. Redirecting…", "ok");
 
-      localStorage.removeItem("token");
-      localStorage.removeItem("auth_token");
-      localStorage.removeItem("jwt");
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("refresh_token");
+      api.auth.clearLocalSession();
 
       window.setTimeout(() => {
       window.location.href = "/login";

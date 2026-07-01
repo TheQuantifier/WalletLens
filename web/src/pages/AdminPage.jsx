@@ -14,6 +14,7 @@ const MAINTENANCE_PAGE_OPTIONS = [
   ["records", "Records"],
   ["recurring", "Recurring"],
   ["rules", "Rules"],
+  ["planning", "Planning"],
   ["budgeting", "Budgeting"],
   ["reports", "Reports"],
   ["profile", "Profile"],
@@ -407,6 +408,16 @@ export default function AdminPage() {
                       <span><span className="subtle">Use JSON export by default (unchecked = CSV).</span></span>
                     </div>
                   </label>
+
+                  <h3 className="admin-settings-subtitle">Data</h3>
+                  <div className="admin-tax-sync-panel">
+                    <div>
+                      <strong>Tax Rate Data</strong>
+                      <p className="subtle">Ask Gemini for current federal, FICA, and state tax quantities, then store them for Planning calculations.</p>
+                      <p className="subtle" id="taxDataLastSynced">No tax data sync has been recorded.</p>
+                    </div>
+                    <button className="btn" id="taxDataSyncBtn" type="button">Pull Tax Data Now</button>
+                  </div>
       
                   <h3 className="admin-settings-subtitle">System Operations</h3>
                   <div className="admin-maintenance-panel">

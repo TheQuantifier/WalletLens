@@ -47,6 +47,9 @@ const MAINTENANCE_MODE_BACKGROUND_COLOR_KEY = "maintenanceModeBackgroundColor";
 const MAINTENANCE_MODE_TEXT_COLOR_KEY = "maintenanceModeTextColor";
 const DEFAULT_EXPORT_FORMAT_KEY = "defaultDataExportFormat";
 const AUTH_TOKEN_KEY = "auth_token";
+const TEMPLATE_CACHE_VERSION = "2026-06-25-planning-after-budgeting";
+const HEADER_CACHE_KEY = `cachedHeaderHtml:${TEMPLATE_CACHE_VERSION}`;
+const FOOTER_CACHE_KEY = `cachedFooterHtml:${TEMPLATE_CACHE_VERSION}`;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
 const PROTECTED_ROUTE_PATHS = new Set([
   "/home",
@@ -54,6 +57,7 @@ const PROTECTED_ROUTE_PATHS = new Set([
   "/records",
   "/recurring",
   "/rules",
+  "/planning",
   "/budgeting",
   "/reports",
   "/profile",
@@ -195,8 +199,10 @@ document.addEventListener("walletlens:template-ready", () => {
 function loadHeaderAndFooter() {
   const headerEl = document.getElementById("header");
   const footerEl = document.getElementById("footer");
-  const cachedHeader = sessionStorage.getItem("cachedHeaderHtml");
-  const cachedFooter = sessionStorage.getItem("cachedFooterHtml");
+  sessionStorage.removeItem("cachedHeaderHtml");
+  sessionStorage.removeItem("cachedFooterHtml");
+  const cachedHeader = sessionStorage.getItem(HEADER_CACHE_KEY);
+  const cachedFooter = sessionStorage.getItem(FOOTER_CACHE_KEY);
 
   if (headerEl && cachedHeader) {
     if (headerEl.innerHTML !== cachedHeader) {
@@ -221,7 +227,7 @@ function loadHeaderAndFooter() {
   }
 
   // --- Load Header ---
-  fetch("components/header.html")
+  fetch("components/header.html", { cache: "no-store" })
     .then((res) => {
       if (!res.ok) throw new Error("Header not found");
       return res.text();
@@ -230,7 +236,7 @@ function loadHeaderAndFooter() {
       if (headerEl && headerEl.innerHTML !== html) {
       headerEl.innerHTML = html;
     }
-    sessionStorage.setItem("cachedHeaderHtml", html);
+    sessionStorage.setItem(HEADER_CACHE_KEY, html);
     setLogoLinkDestination("/");
 
     setActiveNavLink();
@@ -245,7 +251,7 @@ function loadHeaderAndFooter() {
     .catch((err) => console.error("Header load failed:", err));
 
   // --- Load Footer ---
-  fetch("components/footer.html")
+  fetch("components/footer.html", { cache: "no-store" })
     .then((res) => {
       if (!res.ok) throw new Error("Footer not found");
       return res.text();
@@ -255,7 +261,7 @@ function loadHeaderAndFooter() {
       if (footerEl.innerHTML !== html) {
         footerEl.innerHTML = html;
       }
-      sessionStorage.setItem("cachedFooterHtml", html);
+      sessionStorage.setItem(FOOTER_CACHE_KEY, html);
       setActiveFooterLink();
       setProtectedNavigationVisibility(hasClientAuthHint());
     })
@@ -304,15 +310,7 @@ function isProtectedHref(href) {
 }
 
 function hasClientAuthHint() {
-  if (sessionStorage.getItem(AUTH_TOKEN_KEY)) return true;
-  const cachedUserRaw = sessionStorage.getItem("cachedUser");
-  if (!cachedUserRaw) return false;
-  try {
-    return Boolean(JSON.parse(cachedUserRaw));
-  } catch {
-    sessionStorage.removeItem("cachedUser");
-    return false;
-  }
+  return Boolean(sessionStorage.getItem(AUTH_TOKEN_KEY));
 }
 
 function setProtectedNavigationVisibility(isAuthenticated) {
@@ -958,7 +956,7 @@ async function updateHeaderAuthState() {
   };
 
   try {
-    const cachedUserRaw = sessionStorage.getItem("cachedUser");
+    const cachedUserRaw = hasClientAuthHint() ? sessionStorage.getItem("cachedUser") : "";
     let hasCachedUser = false;
     if (cachedUserRaw) {
       try {
@@ -1140,6 +1138,7 @@ function openAddAccountModal() {
       await api.auth.createBusinessAccount(Object.fromEntries(new FormData(form).entries()));
       sessionStorage.removeItem("cachedUser");
       sessionStorage.removeItem("cachedHeaderHtml");
+      sessionStorage.removeItem(HEADER_CACHE_KEY);
       window.location.href = "/home";
     } catch (error) {
       status.textContent = error?.message || "Unable to create the business account.";
@@ -1412,10 +1411,13 @@ function wireLogoutButton() {
 
     try {
       await api.auth.logout();
-      window.location.href = "/login";
     } catch (err) {
-      console.error("Logout failed:", err);
-      alert("Could not log out.");
+      console.warn("Logout request failed; clearing local session anyway.", err);
+    } finally {
+      api.auth.clearLocalSession();
+      sessionStorage.removeItem(HEADER_CACHE_KEY);
+      sessionStorage.removeItem(FOOTER_CACHE_KEY);
+      window.location.href = "/login";
     }
   });
 

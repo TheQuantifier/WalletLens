@@ -18,6 +18,41 @@ export function initBudgetingPage() {
     { id: "yearly", label: "Yearly", months: 12 },
   ];
   const CADENCE_LOOKUP = new Map(CADENCE_OPTIONS.map((c) => [c.id, c]));
+  const CADENCE_ANNUAL_FACTOR = {
+    weekly: 52,
+    biweekly: 26,
+    monthly: 12,
+    quarterly: 4,
+    "semi-annually": 2,
+    yearly: 1,
+  };
+  const PLANNING_FREQUENCY_FACTOR = {
+    weekly: 52,
+    biweekly: 26,
+    monthly: 12,
+    quarterly: 4,
+    "semi-annually": 2,
+    yearly: 1,
+    "one-time": 1,
+  };
+  const DEFAULT_TAX_DATA = {
+    federalIncomeTax: {
+      standardDeduction: 15750,
+      brackets: [
+        { over: 0, upTo: 11925, rate: 0.10 },
+        { over: 11925, upTo: 48475, rate: 0.12 },
+        { over: 48475, upTo: 103350, rate: 0.22 },
+        { over: 103350, upTo: 197300, rate: 0.24 },
+        { over: 197300, upTo: 250525, rate: 0.32 },
+        { over: 250525, upTo: 626350, rate: 0.35 },
+        { over: 626350, upTo: null, rate: 0.37 },
+      ],
+    },
+    fica: {
+      socialSecurity: { rate: 0.062, wageBase: 176100 },
+      medicare: { rate: 0.0145, wageBase: null },
+    },
+  };
 
   const BASE_CATEGORIES = [
     { name: "Housing", budget: null },
@@ -106,6 +141,140 @@ export function initBudgetingPage() {
         seen.add(key);
         return true;
       });
+  };
+
+  const planningAnnualize = (row, frequency) => {
+    const amount = Number(row?.amount);
+    if (!Number.isFinite(amount)) return 0;
+    return amount * (PLANNING_FREQUENCY_FACTOR[frequency || row?.frequency] || 12);
+  };
+
+  const planningAnnualizeAmount = (amount, frequency) => {
+    const value = Number(amount);
+    if (!Number.isFinite(value)) return 0;
+    return value * (PLANNING_FREQUENCY_FACTOR[frequency] || 12);
+  };
+
+  const normalizeTaxData = (value) => {
+    const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+    return {
+      ...DEFAULT_TAX_DATA,
+      ...source,
+      federalIncomeTax: {
+        ...DEFAULT_TAX_DATA.federalIncomeTax,
+        ...(source.federalIncomeTax || {}),
+        brackets: Array.isArray(source.federalIncomeTax?.brackets) && source.federalIncomeTax.brackets.length
+          ? source.federalIncomeTax.brackets
+          : DEFAULT_TAX_DATA.federalIncomeTax.brackets,
+      },
+      fica: {
+        socialSecurity: {
+          ...DEFAULT_TAX_DATA.fica.socialSecurity,
+          ...(source.fica?.socialSecurity || {}),
+        },
+        medicare: {
+          ...DEFAULT_TAX_DATA.fica.medicare,
+          ...(source.fica?.medicare || {}),
+        },
+      },
+    };
+  };
+
+  const getPlanningTaxKind = (row) => {
+    const explicit = String(row?.taxKind || "").trim();
+    if (explicit) return explicit;
+    const text = `${row?.label || ""} ${row?.category || ""}`.toLowerCase();
+    if (text.includes("federal")) return "federal";
+    if (text.includes("social security") || text.includes("fica")) return "social_security";
+    if (text.includes("medicare")) return "medicare";
+    if (text.includes("state")) return "state";
+    if (text.includes("local")) return "local";
+    return row?.type === "tax" ? "manual" : "";
+  };
+
+  const calculateFederalPlanningTax = (grossAnnual, taxData) => {
+    const federal = normalizeTaxData(taxData).federalIncomeTax;
+    const taxableIncome = Math.max(0, grossAnnual - Math.max(0, Number(federal.standardDeduction) || 0));
+    return (federal.brackets || []).reduce((sum, bracket) => {
+      const over = Math.max(0, Number(bracket?.over) || 0);
+      const upTo = bracket?.upTo === null || bracket?.upTo === undefined || bracket?.upTo === ""
+        ? Infinity
+        : Math.max(over, Number(bracket?.upTo) || 0);
+      const rate = Math.max(0, Math.min(1, Number(bracket?.rate) || 0));
+      if (taxableIncome <= over || rate <= 0) return sum;
+      return sum + Math.max(0, Math.min(taxableIncome, upTo) - over) * rate;
+    }, 0);
+  };
+
+  const calculatePlanningTax = (row, grossAnnual, taxData) => {
+    const overrideMode = String(row?.taxOverrideMode || "").trim();
+    const overridePercent = Number(row?.taxOverridePercent);
+    const overrideAmount = Number(row?.taxOverrideAmount);
+    if (overrideMode === "percent" && Number.isFinite(overridePercent) && overridePercent > 0) {
+      return grossAnnual * Math.max(0, Math.min(1, overridePercent / 100));
+    }
+    if (overrideMode === "amount" && Number.isFinite(overrideAmount) && overrideAmount > 0) {
+      return planningAnnualizeAmount(overrideAmount, row?.frequency);
+    }
+    const data = normalizeTaxData(taxData);
+    const kind = getPlanningTaxKind(row);
+    if (kind === "federal") return calculateFederalPlanningTax(grossAnnual, data);
+    if (kind === "social_security") {
+      const rate = Math.max(0, Math.min(1, Number(data.fica.socialSecurity.rate) || 0));
+      const wageBase = data.fica.socialSecurity.wageBase === null ? grossAnnual : Math.max(0, Number(data.fica.socialSecurity.wageBase) || 0);
+      return Math.min(grossAnnual, wageBase) * rate;
+    }
+    if (kind === "medicare") {
+      return grossAnnual * Math.max(0, Math.min(1, Number(data.fica.medicare.rate) || 0));
+    }
+    if (kind === "state" || kind === "local") {
+      const configuredRate = Math.max(0, Math.min(1, (Number(row?.percent) || 0) / 100));
+      if (configuredRate > 0) return grossAnnual * configuredRate;
+      return planningAnnualize(row);
+    }
+    const manualRate = Math.max(0, Math.min(1, (Number(row?.percent) || 0) / 100));
+    return manualRate > 0 ? grossAnnual * manualRate : planningAnnualize(row);
+  };
+
+  const planningTemporaryTotal = (row, frequency) => {
+    if (!row?.startDate || !row?.endDate) return planningAnnualize(row, frequency);
+    const start = new Date(`${row.startDate}T00:00:00`);
+    const end = new Date(`${row.endDate}T00:00:00`);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || end < start) {
+      return planningAnnualize(row, frequency);
+    }
+    const days = Math.max(1, (end - start) / 86400000 + 1);
+    return planningAnnualize(row, frequency) * Math.min(days / 365, 1);
+  };
+
+  const computePlanningSalaryAfterExpensesAnnual = (data, taxData) => {
+    const tables = data?.tables || {};
+    const takeHomeRows = Array.isArray(tables.takeHomePay?.rows) ? tables.takeHomePay.rows : [];
+    const incomeAnnual = takeHomeRows
+      .filter((row) => row?.type === "income")
+      .reduce((sum, row) => sum + planningAnnualize(row), 0);
+    const taxAnnual = takeHomeRows
+      .filter((row) => row?.type === "tax")
+      .reduce((sum, row) => sum + calculatePlanningTax(row, incomeAnnual, taxData), 0);
+    const expenseAnnual = (Array.isArray(tables.expenseItems?.rows) ? tables.expenseItems.rows : [])
+      .reduce((sum, row) => sum + planningAnnualize(row), 0);
+    const temporaryTotal = (Array.isArray(tables.temporaryExpenses?.rows) ? tables.temporaryExpenses.rows : [])
+      .reduce((sum, row) => sum + planningTemporaryTotal(row), 0);
+    return incomeAnnual - taxAnnual - expenseAnnual - temporaryTotal;
+  };
+
+  const amountForCadence = (annual, cadenceId) => {
+    const factor = CADENCE_ANNUAL_FACTOR[cadenceId] || 12;
+    return annual / factor;
+  };
+
+  const renderPlanningSalaryCards = (annual) => {
+    const yearly = $("#planningSalaryYearly");
+    const monthly = $("#planningSalaryMonthly");
+    const weekly = $("#planningSalaryWeekly");
+    if (yearly) yearly.textContent = fmtMoney(annual, CURRENCY_FALLBACK);
+    if (monthly) monthly.textContent = fmtMoney(amountForCadence(annual, "monthly"), CURRENCY_FALLBACK);
+    if (weekly) weekly.textContent = fmtMoney(amountForCadence(annual, "weekly"), CURRENCY_FALLBACK);
   };
 
   const formatDateKey = (date) => {
@@ -515,7 +684,12 @@ export function initBudgetingPage() {
       computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
     );
     renderReallocateOptions(state.categories);
-    renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+    renderTable(
+      state.categories,
+      state.spentMap,
+      CURRENCY_FALLBACK,
+      amountForCadence(state.planningSalaryAnnual || 0, state.cadence || "monthly")
+    );
   };
 
   const showStatus = (msg, tone = "") => {
@@ -630,7 +804,7 @@ export function initBudgetingPage() {
     });
   }
 
-  function renderTable(categories, spentMap, currency) {
+  function renderTable(categories, spentMap, currency, budgetBase = 0) {
     const tbody = $("#budgetTbody");
     if (!tbody) return;
     tbody.innerHTML = "";
@@ -664,6 +838,18 @@ export function initBudgetingPage() {
 
       const tdBudget = document.createElement("td");
       tdBudget.className = "num";
+      const tdPercent = document.createElement("td");
+      tdPercent.className = "num";
+      const percentInput = document.createElement("input");
+      percentInput.type = "number";
+      percentInput.min = "0";
+      percentInput.step = "0.1";
+      percentInput.value = budgetBase > 0 && budget > 0 ? ((budget / budgetBase) * 100).toFixed(1) : "";
+      percentInput.className = "budget-input budget-percent-input";
+      percentInput.dataset.index = String(idx);
+      percentInput.dataset.field = "percent";
+      tdPercent.appendChild(percentInput);
+
       const input = document.createElement("input");
       input.type = "number";
       input.min = "0";
@@ -671,6 +857,7 @@ export function initBudgetingPage() {
       input.value = c.budget ?? "";
       input.className = "budget-input";
       input.dataset.index = String(idx);
+      input.dataset.field = "amount";
       tdBudget.appendChild(input);
 
       const tdSpent = document.createElement("td");
@@ -699,6 +886,7 @@ export function initBudgetingPage() {
       tdProgress.appendChild(bar);
 
       tr.appendChild(tdName);
+      tr.appendChild(tdPercent);
       tr.appendChild(tdBudget);
       tr.appendChild(tdSpent);
       tr.appendChild(tdRemaining);
@@ -823,9 +1011,28 @@ export function initBudgetingPage() {
       categories: [],
       spentMap: new Map(),
       records,
+      planningSalaryAnnual: 0,
       sheetId: null,
       isDirty: false,
     };
+
+    const getBudgetBase = () => amountForCadence(state.planningSalaryAnnual || 0, state.cadence);
+
+    const loadPlanningSalary = async () => {
+      try {
+        const [payload, publicSettings] = await Promise.all([
+          api.planningSheets.get(),
+          api.appSettings.getPublic().catch(() => null),
+        ]);
+        state.planningSalaryAnnual = computePlanningSalaryAfterExpensesAnnual(payload?.planningSheet?.data, publicSettings?.taxData);
+      } catch {
+        state.planningSalaryAnnual = 0;
+      }
+      renderPlanningSalaryCards(state.planningSalaryAnnual);
+    };
+
+    await loadPlanningSalary();
+    window.addEventListener("planning:updated", loadPlanningSalary);
 
     const getPeriodRecords = () =>
       records.filter((r) => {
@@ -878,7 +1085,7 @@ export function initBudgetingPage() {
         computeIncomeTotal(periodRecords)
       );
       renderReallocateOptions(state.categories);
-      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK, getBudgetBase());
     };
 
     const saveBudgetSheet = async ({ silent = false } = {}) => {
@@ -937,7 +1144,8 @@ export function initBudgetingPage() {
         state.isDirty = false;
         const saveBtn = $("#btnSaveBudget");
         if (saveBtn) saveBtn.disabled = true;
-        refreshView();
+        const usedServer = await loadSpentMapFromServer();
+        refreshView({ forceLocal: !usedServer });
       } catch (err) {
         if (err?.message?.includes("not found")) {
           state.sheetId = null;
@@ -966,9 +1174,15 @@ export function initBudgetingPage() {
       state.isDirty = false;
       const saveBtn = $("#btnSaveBudget");
       if (saveBtn) saveBtn.disabled = true;
-      const usedServer = await loadSpentMapFromServer();
-      refreshView({ forceLocal: !usedServer });
-      await loadBudgetSheet();
+      const hasSavedBudget = budgetEntries.some(
+        (entry) => entry.cadence === state.cadence && entry.periodKey === state.periodKey
+      );
+      if (hasSavedBudget) {
+        await loadBudgetSheet();
+      } else {
+        state.sheetId = null;
+        refreshView({ forceLocal: true });
+      }
       syncBudgetSelector(state.cadence, state.periodKey);
     };
 
@@ -1000,11 +1214,25 @@ export function initBudgetingPage() {
       if (!target.dataset.index) return;
 
       const idx = Number(target.dataset.index);
-      if (target.value === "") {
-        state.categories[idx].budget = null;
+      const field = target.dataset.field || "amount";
+      const budgetBase = getBudgetBase();
+      if (field === "percent") {
+        if (target.value === "" || budgetBase <= 0) {
+          state.categories[idx].budget = null;
+        } else {
+          const percent = Number(target.value || 0);
+          state.categories[idx].budget = Math.max(
+            0,
+            Number.isFinite(percent) ? (budgetBase * percent) / 100 : 0
+          );
+        }
       } else {
-        const next = Number(target.value || 0);
-        state.categories[idx].budget = Math.max(0, Number.isFinite(next) ? next : 0);
+        if (target.value === "") {
+          state.categories[idx].budget = null;
+        } else {
+          const next = Number(target.value || 0);
+          state.categories[idx].budget = Math.max(0, Number.isFinite(next) ? next : 0);
+        }
       }
       state.isDirty = true;
       const saveBtn = $("#btnSaveBudget");
@@ -1024,6 +1252,15 @@ export function initBudgetingPage() {
         const remaining = budget - spent;
         const progress = budget > 0 ? Math.min(spent / budget, 1) : 0;
         const isSavings = normalizeName(category.name) === "savings";
+
+        const amountInput = row.querySelector('input[data-field="amount"]');
+        const percentInput = row.querySelector('input[data-field="percent"]');
+        if (amountInput && amountInput !== target) {
+          amountInput.value = category.budget ?? "";
+        }
+        if (percentInput && percentInput !== target) {
+          percentInput.value = budgetBase > 0 && budget > 0 ? ((budget / budgetBase) * 100).toFixed(1) : "";
+        }
 
         const remainingCell = row.querySelector("td.remaining");
         if (remainingCell) {
@@ -1077,7 +1314,7 @@ export function initBudgetingPage() {
         computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
       );
       renderReallocateOptions(state.categories);
-      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK, getBudgetBase());
       showStatus("Budgets reset to defaults.");
     });
 
@@ -1114,7 +1351,7 @@ export function initBudgetingPage() {
         computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
       );
       renderReallocateOptions(state.categories);
-      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK, getBudgetBase());
       showStatus(`Moved ${fmtMoney(moved, CURRENCY_FALLBACK)} to Savings.`);
     });
 
@@ -1154,7 +1391,7 @@ export function initBudgetingPage() {
         computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
       );
       renderReallocateOptions(state.categories);
-      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK, getBudgetBase());
       showStatus(`Moved ${fmtMoney(moved, CURRENCY_FALLBACK)} to ${target}.`);
     });
 
@@ -1176,6 +1413,10 @@ export function initBudgetingPage() {
             name: "Budget",
             rows: state.categories.map((c) => ({
               Category: c.name,
+              Percent:
+                getBudgetBase() > 0 && Number.isFinite(c.budget)
+                  ? Number(((c.budget / getBudgetBase()) * 100).toFixed(2))
+                  : "",
               Budget: Number.isFinite(c.budget) ? c.budget : "",
               Spent: Number.isFinite(c.spent) ? c.spent : 0,
               Remaining:
@@ -1407,7 +1648,7 @@ export function initBudgetingPage() {
         computeIncomeTotal(state.records, state.periodStart, state.periodEnd)
       );
       renderReallocateOptions(state.categories);
-      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK);
+      renderTable(state.categories, state.spentMap, CURRENCY_FALLBACK, getBudgetBase());
       closeCustomModal();
     });
   }

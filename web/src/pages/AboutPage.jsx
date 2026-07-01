@@ -2,20 +2,35 @@ import { useEffect } from "react";
 
 export default function AboutPage() {
   const embedded = new URLSearchParams(window.location.search).get("embedded") === "1";
+  const isAuthenticated = Boolean(sessionStorage.getItem("auth_token"));
+  const backOnly = !embedded && !isAuthenticated;
+  const goBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.location.assign("/");
+  };
+
   useEffect(() => {
-    if (!embedded) return undefined;
-    document.body.classList.add("embedded-page");
-    return () => document.body.classList.remove("embedded-page");
-  }, [embedded]);
+    if (embedded) document.body.classList.add("embedded-page");
+    if (backOnly) document.body.classList.add("legal-page");
+    return () => {
+      document.body.classList.remove("embedded-page");
+      document.body.classList.remove("legal-page");
+    };
+  }, [embedded, backOnly]);
+
   return (
     <>
       {/* Header injected by default.js */}
-        {!embedded && <div id="header"></div>}
+        {!embedded && !backOnly && <div id="header"></div>}
       
       
         {/* ==================== MAIN ==================== */}
         <main className="main main--about">
           <section className="about-hero">
+            {backOnly && <button type="button" className="legal-back-btn" onClick={goBack}>Go Back</button>}
             <h1>About &lt;AppName&gt;</h1>
             <p className="lead">
               &lt;AppName&gt; transforms everyday receipts and transactions into structured, actionable financial intelligence.
@@ -93,7 +108,7 @@ export default function AboutPage() {
         </main>
       
         {/* Footer injected by default.js */}
-        {!embedded && <div id="footer"></div>}
+        {!embedded && !backOnly && <div id="footer"></div>}
         
       
       

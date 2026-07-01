@@ -105,6 +105,8 @@ const els = {
   ocrTimeoutSecondsInput: document.getElementById("ocrTimeoutSecondsInput"),
   ocrRetryLimitInput: document.getElementById("ocrRetryLimitInput"),
   defaultDataExportFormatInput: document.getElementById("defaultDataExportFormatInput"),
+  taxDataSyncBtn: document.getElementById("taxDataSyncBtn"),
+  taxDataLastSynced: document.getElementById("taxDataLastSynced"),
   maintenanceModeEnabledInput: document.getElementById("maintenanceModeEnabledInput"),
   maintenanceMessageSelect: document.getElementById("maintenanceMessageSelect"),
   maintenanceMessageEditBtn: document.getElementById("maintenanceMessageEditBtn"),
@@ -234,6 +236,7 @@ const MAINTENANCE_PAGE_IDS = [
   "records",
   "recurring",
   "rules",
+  "planning",
   "budgeting",
   "reports",
   "profile",
@@ -262,6 +265,7 @@ const MAINTENANCE_PAGE_LABELS = {
   records: "Records",
   recurring: "Recurring",
   rules: "Rules",
+  planning: "Planning",
   budgeting: "Budgeting",
   reports: "Reports",
   profile: "Profile",
@@ -674,6 +678,24 @@ function formatDateTime(value) {
   const dt = new Date(value);
   if (Number.isNaN(dt.getTime())) return "—";
   return dt.toLocaleString();
+}
+
+function renderTaxDataStatus(settings = {}) {
+  if (!els.taxDataLastSynced) return;
+  const taxData = settings?.tax_data || {};
+  const fetchedAt = taxData.fetchedAt || taxData.fetched_at || "";
+  const year = Number(taxData.year);
+  const provider = String(taxData.provider || "gemini").trim();
+  if (!fetchedAt) {
+    els.taxDataLastSynced.textContent = "No tax data sync has been recorded.";
+    return;
+  }
+  const pieces = [
+    `Last synced ${formatDateTime(fetchedAt)}`,
+    Number.isInteger(year) ? `Tax year ${year}` : "",
+    provider ? `Provider: ${provider}` : "",
+  ].filter(Boolean);
+  els.taxDataLastSynced.textContent = pieces.join(" | ");
 }
 
 function getSupportedIanaTimezones() {
@@ -2669,6 +2691,7 @@ async function loadSettings() {
       const format = String(settings?.default_data_export_format || "csv").toLowerCase();
       els.defaultDataExportFormatInput.checked = format === "json";
     }
+    renderTaxDataStatus(settings);
     if (els.maintenanceModeEnabledInput) {
       els.maintenanceModeEnabledInput.checked = Boolean(settings?.maintenance_mode_enabled);
     }
@@ -2801,6 +2824,26 @@ async function saveSettings(event) {
     console.error(err);
     if (handlePermissionError(err, "admin")) return;
     setStatus(els.settingsStatus, err.message || "Failed to update settings.", "error");
+  }
+}
+
+async function syncTaxDataFromProvider() {
+  if (!hasPermission("settings.write")) {
+    openPermissionModal("admin");
+    return;
+  }
+  setStatus(els.settingsStatus, "Pulling tax data from Gemini...");
+  if (els.taxDataSyncBtn) els.taxDataSyncBtn.disabled = true;
+  try {
+    const { settings } = await api.admin.syncTaxData();
+    renderTaxDataStatus(settings);
+    setStatus(els.settingsStatus, "Tax data synced.", "ok");
+  } catch (err) {
+    console.error(err);
+    if (handlePermissionError(err, "admin")) return;
+    setStatus(els.settingsStatus, err.message || "Failed to sync tax data.", "error");
+  } finally {
+    if (els.taxDataSyncBtn) els.taxDataSyncBtn.disabled = false;
   }
 }
 
@@ -2941,6 +2984,7 @@ function bindEvents() {
   if (els.settingsForm) {
     els.settingsForm.addEventListener("submit", saveSettings);
   }
+  els.taxDataSyncBtn?.addEventListener("click", syncTaxDataFromProvider);
   if (els.maintenanceMessageSelect) {
     els.maintenanceMessageSelect.addEventListener("change", () => {
       state.selectedMaintenanceMessageId = els.maintenanceMessageSelect.value;

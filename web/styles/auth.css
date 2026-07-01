@@ -889,13 +889,13 @@ body.landing-light::before {
   pointer-events: none;
   border-style: solid;
   border-width: 292.6667px 400px;
-  border-image-source: url("../images/background.png?v=20260202");
+  border-image-source: url("/images/background.png?v=20260202");
   border-image-slice: 292.6667 400 292.6667 400 fill;
   border-image-repeat: stretch;
 }
 
 :root[data-theme="dark"] body.landing-light::before {
-  border-image-source: url("../images/background.png?v=20260202");
+  border-image-source: url("/images/background.png?v=20260202");
 }
 
 /* Account type and business registration */

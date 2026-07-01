@@ -328,6 +328,26 @@
   padding-top: 0;
 }
 
+.admin-tax-sync-panel {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.admin-tax-sync-panel p {
+  margin: 0.25rem 0 0;
+}
+
+.admin-tax-sync-panel .btn {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .admin-maintenance-panel {
   display: grid;
   gap: var(--space-3);
@@ -460,6 +480,11 @@
 @media (max-width: 900px) {
   .admin-settings-inline-grid {
     grid-template-columns: 1fr;
+  }
+
+  .admin-tax-sync-panel {
+    align-items: stretch;
+    flex-direction: column;
   }
 
   .admin-checklist-grid {

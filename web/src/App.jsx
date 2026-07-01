@@ -12,6 +12,7 @@ import HomePage from "./pages/HomePage.jsx";
 import IndexPage from "./pages/IndexPage.jsx";
 import LoginPage from "./pages/LoginPage.jsx";
 import PrivacyPage from "./pages/PrivacyPage.jsx";
+import PlanningPage from "./pages/PlanningPage.jsx";
 import ProfilePage from "./pages/ProfilePage.jsx";
 import RecordsPage from "./pages/RecordsPage.jsx";
 import RecurringPage from "./pages/RecurringPage.jsx";
@@ -39,6 +40,7 @@ const ROUTES = {
   "/records": { title: "WalletLens - Records", Page: RecordsPage },
   "/recurring": { title: "WalletLens - Recurring", Page: RecurringPage },
   "/rules": { title: "WalletLens - Rules", Page: RulesPage },
+  "/planning": { title: "WalletLens - Planning", Page: PlanningPage },
   "/budgeting": { title: "WalletLens - Budgeting", Page: BudgetingPage },
   "/reports": { title: "WalletLens - Reports", Page: ReportsPage },
   "/profile": { title: "WalletLens - Profile", Page: ProfilePage },
@@ -101,15 +103,7 @@ function isProtectedRoute(path) {
 }
 
 function hasClientAuthHint() {
-  if (sessionStorage.getItem(AUTH_TOKEN_KEY)) return true;
-  const cachedUserRaw = sessionStorage.getItem("cachedUser");
-  if (!cachedUserRaw) return false;
-  try {
-    return Boolean(JSON.parse(cachedUserRaw));
-  } catch {
-    sessionStorage.removeItem("cachedUser");
-    return false;
-  }
+  return Boolean(sessionStorage.getItem(AUTH_TOKEN_KEY));
 }
 
 function normalizeMaintenanceColor(value, fallback) {
@@ -292,6 +286,9 @@ export default function App() {
     search: window.location.search,
     hash: window.location.hash,
   }));
+  const [authGateChecking, setAuthGateChecking] = useState(() =>
+    isProtectedRoute(window.location.pathname) && !hasClientAuthHint()
+  );
   const [maintenanceSettings, setMaintenanceSettings] = useState(() => ({
     ...readCachedMaintenanceSettings(),
   }));
@@ -308,35 +305,51 @@ export default function App() {
       window.history.replaceState({}, "", `${cleanPath}${window.location.search}${window.location.hash}`);
     }
 
-    const routeTo = (href, { replace = false } = {}) => {
+    const verifyAuthForProtectedRoute = async () => {
+      if (hasClientAuthHint()) return true;
+      try {
+        const { user } = await api.auth.me();
+        if (user) sessionStorage.setItem("cachedUser", JSON.stringify(user));
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    const routeTo = async (href, { replace = false } = {}) => {
       let url = new URL(href, window.location.href);
       const nextPath = normalizePath(url.pathname);
       if (!ROUTES[nextPath]) {
         window.location.href = href;
         return;
       }
-      if (isProtectedRoute(nextPath) && !hasClientAuthHint()) {
+      if (isProtectedRoute(nextPath) && !(await verifyAuthForProtectedRoute())) {
         url = new URL("/", window.location.href);
       }
       const safePath = normalizePath(url.pathname);
       if (replace) window.history.replaceState({}, "", cleanHref(url));
       else window.history.pushState({}, "", cleanHref(url));
       setLocationState({ path: safePath, search: url.search, hash: url.hash });
+      setAuthGateChecking(false);
       window.scrollTo({ top: 0, left: 0 });
     };
 
     window.__walletlensNavigate = (href) => routeTo(href);
 
     if (isProtectedRoute(cleanPath) && !hasClientAuthHint()) {
-      routeTo("/", { replace: true });
+      setAuthGateChecking(true);
+      routeTo(`${cleanPath}${window.location.search}${window.location.hash}`, { replace: true });
+    } else {
+      setAuthGateChecking(false);
     }
 
-    const onPopState = () => {
+    const onPopState = async () => {
       const nextPath = normalizePath(window.location.pathname);
-      if (isProtectedRoute(nextPath) && !hasClientAuthHint()) {
+      if (isProtectedRoute(nextPath) && !(await verifyAuthForProtectedRoute())) {
         routeTo("/", { replace: true });
         return;
       }
+      setAuthGateChecking(false);
       setLocationState({
         path: nextPath,
         search: window.location.search,
@@ -362,13 +375,15 @@ export default function App() {
   useEffect(() => {
     const onClick = (event) => {
       if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-      const target = event.target.closest?.("a[href], [data-href]");
+      const target = event.target.closest?.("a[href], [data-href], [data-public-modal]");
       if (!target) return;
       const publicModalKind = target.getAttribute("data-public-modal");
       if (publicModalKind && ["about", "privacy", "contact"].includes(publicModalKind)) {
-        event.preventDefault();
-        setPublicModal(publicModalKind);
-        return;
+        if (!hasClientAuthHint()) {
+          event.preventDefault();
+          setPublicModal(publicModalKind);
+          return;
+        }
       }
       const rawHref = target.getAttribute("href") || target.getAttribute("data-href") || "";
       if (!rawHref || rawHref.startsWith("#") || rawHref.startsWith("mailto:") || rawHref.startsWith("tel:")) return;
@@ -437,7 +452,7 @@ export default function App() {
 
   return (
     <>
-      <Page key={`${locationState.path}${locationState.search}${locationState.hash}`} />
+      {authGateChecking ? null : <Page key={`${locationState.path}${locationState.search}${locationState.hash}`} />}
       {showMaintenanceBanner && maintenanceBannerHost ? createPortal(
         <div
           id="maintenanceBanner"

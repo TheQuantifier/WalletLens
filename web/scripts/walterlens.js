@@ -1883,7 +1883,7 @@ export function initWalterLens() {
 
   const WRITE_PAGE_MAP = {
     record: new Set(["records", "reports"]),
-    budget: new Set(["budgeting", "reports"]),
+    budget: new Set(["planning", "budgeting", "reports"]),
     recurring: new Set(["recurring", "reports"]),
     rules: new Set(["rules", "reports"]),
   };
@@ -1891,7 +1891,7 @@ export function initWalterLens() {
   const refreshIfOnPage = (resource) => {
     const pageMap = {
       record: new Set(["records"]),
-      budget: new Set(["budgeting"]),
+      budget: new Set(["planning", "budgeting"]),
       recurring: new Set(["recurring"]),
       rules: new Set(["rules"]),
       receipts: new Set(["upload", "records"]),
@@ -1980,7 +1980,7 @@ export function initWalterLens() {
     if (!canWriteResource(normalizedAction.resource)) {
       addMessage(
         "assistant",
-        "I can only make changes on the Records, Budgeting, Recurring, Rules, or Reports pages."
+        "I can only make changes on the Records, Planning, Budgeting, Recurring, Rules, or Reports pages."
       );
       return;
     }
@@ -2005,7 +2005,7 @@ export function initWalterLens() {
       if (!canWriteResource(resource)) {
         addMessage(
           "assistant",
-          "I can only make changes on the Records, Budgeting, Recurring, Rules, or Reports pages."
+          "I can only make changes on the Records, Planning, Budgeting, Recurring, Rules, or Reports pages."
         );
         return;
       }

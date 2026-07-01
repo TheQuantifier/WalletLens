@@ -12,6 +12,11 @@ function navigateTo(path) {
   else window.location.href = path;
 }
 
+function postAuthDestination(user) {
+  const accountStatus = String(user?.account_status || user?.accountStatus || "active").trim().toLowerCase();
+  return accountStatus === "expired" ? "/expired" : "/home";
+}
+
 export default function RegisterBusinessPage() {
   const [form, setForm] = useState(initialForm);
   const [message, setMessage] = useState("");
@@ -24,6 +29,12 @@ export default function RegisterBusinessPage() {
     document.body.style.overflow = legalStep ? "hidden" : "";
     return () => { document.body.style.overflow = ""; };
   }, [legalStep]);
+
+  useEffect(() => {
+    api.auth.me()
+      .then(({ user }) => navigateTo(postAuthDestination(user)))
+      .catch(() => {});
+  }, []);
 
   const update = (event) => {
     const { name, value, type, checked } = event.target;
@@ -139,7 +150,7 @@ export default function RegisterBusinessPage() {
           </div>
         </div>
       )}
-      <footer className="nf-footer"><div className="nf-footer-inner"><p>© {new Date().getFullYear()} &lt;AppName&gt;. All rights reserved.</p><nav className="nf-legal"><a href="/about" data-public-modal="about">About</a><span className="sep">•</span><a href="/privacy" data-public-modal="privacy">Privacy</a><span className="sep">•</span><button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button></nav></div></footer>
+      <footer className="nf-footer"><div className="nf-footer-inner"><p>© {new Date().getFullYear()} &lt;AppName&gt;. All rights reserved.</p><nav className="nf-legal"><a href="/about" data-public-modal="about">About</a><span className="sep">•</span><a href="/privacy" data-public-modal="privacy">Privacy</a><span className="sep">•</span><a href="/help" className="nf-legal-link" data-public-modal="contact">Contact</a></nav></div></footer>
     </>
   );
 }

@@ -24,6 +24,7 @@ export async function getAppSettings() {
       maintenance_mode_banner_text,
       maintenance_mode_messages,
       maintenance_mode_default_message_id,
+      tax_data,
       admin_role_permissions,
       system_health_controls,
       updated_by,
@@ -58,6 +59,7 @@ export async function updateAppSettings({
   maintenanceModeDefaultMessageId,
   adminRolePermissions,
   systemHealthControls,
+  taxData,
   updatedBy,
 }) {
   const { rows } = await query(
@@ -81,9 +83,10 @@ export async function updateAppSettings({
         maintenance_mode_banner_text = COALESCE($16, maintenance_mode_banner_text),
         maintenance_mode_messages = COALESCE($17::jsonb, maintenance_mode_messages),
         maintenance_mode_default_message_id = COALESCE($18, maintenance_mode_default_message_id),
-        admin_role_permissions = COALESCE($19, admin_role_permissions),
-        system_health_controls = COALESCE($20, system_health_controls),
-        updated_by = $21,
+        tax_data = COALESCE($19::jsonb, tax_data),
+        admin_role_permissions = COALESCE($20, admin_role_permissions),
+        system_health_controls = COALESCE($21, system_health_controls),
+        updated_by = $22,
         updated_at = now()
     WHERE id = (
       SELECT id FROM app_settings ORDER BY created_at ASC LIMIT 1
@@ -108,6 +111,7 @@ export async function updateAppSettings({
       maintenance_mode_banner_text,
       maintenance_mode_messages,
       maintenance_mode_default_message_id,
+      tax_data,
       admin_role_permissions,
       system_health_controls,
       updated_by,
@@ -133,6 +137,7 @@ export async function updateAppSettings({
       maintenanceModeBannerText ?? null,
       maintenanceModeMessages !== undefined ? JSON.stringify(maintenanceModeMessages) : null,
       maintenanceModeDefaultMessageId ?? null,
+      taxData !== undefined ? JSON.stringify(taxData) : null,
       adminRolePermissions ?? null,
       systemHealthControls ?? null,
       updatedBy || null,

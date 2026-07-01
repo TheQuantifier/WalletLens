@@ -17,6 +17,7 @@ import {
 import { sanitizeSystemHealthControls } from "../services/system_health_controls.service.js";
 import { clearRuntimeAppSettingsCache } from "../services/app_settings_runtime.service.js";
 import { clearAdminPermissionsCache } from "../middleware/require_admin_permission.js";
+import { getCachedTaxRates } from "../services/tax_data_provider.service.js";
 
 const MAINTENANCE_PAGE_IDS = Object.freeze([
   "index",
@@ -30,6 +31,7 @@ const MAINTENANCE_PAGE_IDS = Object.freeze([
   "records",
   "recurring",
   "rules",
+  "planning",
   "budgeting",
   "reports",
   "profile",
@@ -46,6 +48,87 @@ const MAINTENANCE_PAGE_IDS = Object.freeze([
 ]);
 const MAINTENANCE_PAGE_ID_SET = new Set(MAINTENANCE_PAGE_IDS);
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
+const DEFAULT_TAX_DATA = Object.freeze({
+  version: 1,
+  year: 2025,
+  filingStatus: "single",
+  federalIncomeTax: {
+    standardDeduction: 15750,
+    brackets: [
+      { over: 0, upTo: 11925, rate: 0.10 },
+      { over: 11925, upTo: 48475, rate: 0.12 },
+      { over: 48475, upTo: 103350, rate: 0.22 },
+      { over: 103350, upTo: 197300, rate: 0.24 },
+      { over: 197300, upTo: 250525, rate: 0.32 },
+      { over: 250525, upTo: 626350, rate: 0.35 },
+      { over: 626350, upTo: null, rate: 0.37 },
+    ],
+  },
+  fica: {
+    socialSecurity: { rate: 0.062, wageBase: 176100 },
+    medicare: { rate: 0.0145, wageBase: null },
+  },
+});
+
+function sanitizeNumber(value, fallback = 0) {
+  const next = Number(value);
+  return Number.isFinite(next) ? next : fallback;
+}
+
+function sanitizeTaxData(value) {
+  const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
+  const federal = source.federalIncomeTax && typeof source.federalIncomeTax === "object"
+    ? source.federalIncomeTax
+    : {};
+  const brackets = Array.isArray(federal.brackets) && federal.brackets.length
+    ? federal.brackets
+    : DEFAULT_TAX_DATA.federalIncomeTax.brackets;
+  const fica = source.fica && typeof source.fica === "object" ? source.fica : {};
+  const socialSecurity = fica.socialSecurity && typeof fica.socialSecurity === "object" ? fica.socialSecurity : {};
+  const medicare = fica.medicare && typeof fica.medicare === "object" ? fica.medicare : {};
+  const stateIncomeTax =
+    source.stateIncomeTax && typeof source.stateIncomeTax === "object" && !Array.isArray(source.stateIncomeTax)
+      ? source.stateIncomeTax
+      : {};
+  return {
+    version: 1,
+    provider: String(source.provider || "").trim().slice(0, 80) || undefined,
+    source: String(source.source || "").trim().slice(0, 160) || undefined,
+    fetchedAt: String(source.fetchedAt || "").trim().slice(0, 80) || undefined,
+    country: String(source.country || "US").trim().toUpperCase().slice(0, 4) || "US",
+    year: Math.max(2000, Math.min(2100, Math.trunc(sanitizeNumber(source.year, DEFAULT_TAX_DATA.year)))),
+    filingStatus: String(source.filingStatus || DEFAULT_TAX_DATA.filingStatus).trim().slice(0, 80) || DEFAULT_TAX_DATA.filingStatus,
+    federalIncomeTax: {
+      standardDeduction: Math.max(0, sanitizeNumber(federal.standardDeduction, DEFAULT_TAX_DATA.federalIncomeTax.standardDeduction)),
+      brackets: brackets
+        .map((bracket) => ({
+          over: Math.max(0, sanitizeNumber(bracket?.over, 0)),
+          upTo: bracket?.upTo === null || bracket?.upTo === "" || bracket?.upTo === undefined
+            ? null
+            : Math.max(0, sanitizeNumber(bracket?.upTo, 0)),
+          rate: Math.max(0, Math.min(1, sanitizeNumber(bracket?.rate, 0))),
+        }))
+        .filter((bracket) => bracket.rate > 0)
+        .sort((a, b) => a.over - b.over)
+        .slice(0, 20),
+    },
+    fica: {
+      socialSecurity: {
+        rate: Math.max(0, Math.min(1, sanitizeNumber(socialSecurity.rate, DEFAULT_TAX_DATA.fica.socialSecurity.rate))),
+        wageBase: socialSecurity.wageBase === null
+          ? null
+          : Math.max(0, sanitizeNumber(socialSecurity.wageBase, DEFAULT_TAX_DATA.fica.socialSecurity.wageBase)),
+      },
+      medicare: {
+        rate: Math.max(0, Math.min(1, sanitizeNumber(medicare.rate, DEFAULT_TAX_DATA.fica.medicare.rate))),
+        wageBase: medicare.wageBase === null || medicare.wageBase === undefined
+          ? null
+          : Math.max(0, sanitizeNumber(medicare.wageBase, DEFAULT_TAX_DATA.fica.medicare.wageBase || 0)),
+      },
+    },
+    stateIncomeTax,
+  };
+}
 
 function normalizeMaintenanceColor(value, fallback) {
   const color = String(value || "").trim();
@@ -113,6 +196,18 @@ export const getPublic = asyncHandler(async (_req, res) => {
   const defaultDataExportFormat = String(settings?.default_data_export_format || "csv").toLowerCase() === "json"
     ? "json"
     : "csv";
+  let taxData = sanitizeTaxData(settings?.tax_data);
+  try {
+    const cachedTaxRates = await getCachedTaxRates({
+      year: new Date().getFullYear(),
+      filingStatus: taxData.filingStatus || "single",
+      existingTaxData: taxData,
+    });
+    taxData = sanitizeTaxData(cachedTaxRates?.data || taxData);
+  } catch (err) {
+    // Keep public settings resilient if the tax provider is not configured or temporarily unavailable.
+    taxData = sanitizeTaxData(settings?.tax_data);
+  }
   res.json({
     appName: settings?.app_name || "<AppName>",
     sessionTimeoutMinutes: Number.isFinite(timeout) ? timeout : 15,
@@ -122,6 +217,7 @@ export const getPublic = asyncHandler(async (_req, res) => {
     maintenanceModeBackgroundColor,
     maintenanceModeTextColor,
     defaultDataExportFormat,
+    taxData,
     supportEmail: process.env.SUPPORT_EMAIL || "support.wisewallet@manuswebworks.org",
   });
 });
@@ -134,6 +230,17 @@ export const getAdmin = asyncHandler(async (_req, res) => {
     settings.admin_role_permissions = sanitizeRolePermissionOverrides(settings.admin_role_permissions);
     settings.system_health_controls = sanitizeSystemHealthControls(settings.system_health_controls);
     settings.maintenance_mode_messages = sanitizeMaintenanceMessages(settings.maintenance_mode_messages);
+    settings.tax_data = sanitizeTaxData(settings.tax_data);
+    try {
+      const cachedTaxRates = await getCachedTaxRates({
+        year: new Date().getFullYear(),
+        filingStatus: settings.tax_data.filingStatus || "single",
+        existingTaxData: settings.tax_data,
+      });
+      settings.tax_data = sanitizeTaxData(cachedTaxRates?.data || settings.tax_data);
+    } catch {
+      settings.tax_data = sanitizeTaxData(settings.tax_data);
+    }
     const selectedMaintenanceMessage = getSelectedMaintenanceMessage(settings);
     settings.maintenance_mode_default_message_id = selectedMaintenanceMessage?.id || "";
     const effective = buildEffectiveRolePermissionsMap(settings.admin_role_permissions);
@@ -164,6 +271,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     maintenanceModeBannerText,
     maintenanceModeMessages,
     maintenanceModeDefaultMessageId,
+    taxData,
     adminRolePermissions,
     systemHealthControls,
     achievementsCatalog,
@@ -186,6 +294,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
   const hasMaintenanceModeBannerText = maintenanceModeBannerText !== undefined;
   const hasMaintenanceModeMessages = maintenanceModeMessages !== undefined;
   const hasMaintenanceModeDefaultMessageId = maintenanceModeDefaultMessageId !== undefined;
+  const hasTaxData = taxData !== undefined;
   const hasAdminRolePermissions = adminRolePermissions !== undefined;
   const hasSystemHealthControls = systemHealthControls !== undefined;
   const hasAchievementsCatalog = achievementsCatalog !== undefined;
@@ -209,6 +318,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     !hasMaintenanceModeBannerText &&
     !hasMaintenanceModeMessages &&
     !hasMaintenanceModeDefaultMessageId &&
+    !hasTaxData &&
     !hasAdminRolePermissions &&
     !hasSystemHealthControls &&
     !hasAchievementsCatalog
@@ -401,6 +511,14 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     }
   }
 
+  let normalizedTaxData = null;
+  if (hasTaxData) {
+    if (!taxData || typeof taxData !== "object" || Array.isArray(taxData)) {
+      return res.status(400).json({ message: "taxData must be an object" });
+    }
+    normalizedTaxData = sanitizeTaxData(taxData);
+  }
+
   if (hasAchievementsCatalog) {
     await replaceAchievementsCatalog(normalizedCatalog, req.user.id);
   }
@@ -424,6 +542,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     hasMaintenanceModeBannerText ||
     hasMaintenanceModeMessages ||
     hasMaintenanceModeDefaultMessageId ||
+    hasTaxData ||
     hasAdminRolePermissions ||
     hasSystemHealthControls;
   const updated = needsAppSettingsUpdate
@@ -457,6 +576,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
           hasMaintenanceModeMessages || hasMaintenanceModeDefaultMessageId
             ? normalizedMaintenanceDefaultMessageId
             : null,
+        taxData: hasTaxData ? normalizedTaxData : undefined,
         adminRolePermissions: hasAdminRolePermissions ? normalizedAdminRolePermissions : null,
         systemHealthControls: hasSystemHealthControls ? normalizedSystemHealthControls : null,
         updatedBy: req.user.id,
@@ -474,6 +594,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     updated.admin_role_permissions = sanitizeRolePermissionOverrides(updated.admin_role_permissions);
     updated.system_health_controls = sanitizeSystemHealthControls(updated.system_health_controls);
     updated.maintenance_mode_messages = sanitizeMaintenanceMessages(updated.maintenance_mode_messages);
+    updated.tax_data = sanitizeTaxData(updated.tax_data);
     const selectedMaintenanceMessage = getSelectedMaintenanceMessage(updated);
     updated.maintenance_mode_default_message_id = selectedMaintenanceMessage?.id || "";
     const effective = buildEffectiveRolePermissionsMap(updated.admin_role_permissions);
@@ -508,6 +629,7 @@ export const updateAdmin = asyncHandler(async (req, res) => {
       maintenanceModeMessageCount: Array.isArray(updated?.maintenance_mode_messages)
         ? updated.maintenance_mode_messages.length
         : null,
+      taxDataYear: updated?.tax_data?.year,
       adminRolePermissions: updated?.admin_role_permissions,
       systemHealthControls: updated?.system_health_controls,
       achievementsCatalogCount: Array.isArray(achievementsCatalogSanitized)
@@ -518,5 +640,47 @@ export const updateAdmin = asyncHandler(async (req, res) => {
     req,
   });
 
+  res.json({ settings: updated });
+});
+
+export const syncTaxDataAdmin = asyncHandler(async (req, res) => {
+  const currentSettings = await getAppSettings();
+  const currentTaxData = sanitizeTaxData(currentSettings?.tax_data);
+  const year = Number(req.body?.year || new Date().getFullYear());
+  if (!Number.isInteger(year) || year < 2000 || year > 2100) {
+    return res.status(400).json({ message: "year must be an integer between 2000 and 2100" });
+  }
+  const filingStatus = String(req.body?.filingStatus || currentTaxData.filingStatus || "single").trim() || "single";
+  const cachedTaxRates = await getCachedTaxRates({
+    year,
+    filingStatus,
+    existingTaxData: currentTaxData,
+    forceRefresh: true,
+  });
+  const syncedTaxData = cachedTaxRates?.data || currentTaxData;
+  const updated = await updateAppSettings({
+    taxData: sanitizeTaxData(syncedTaxData),
+    updatedBy: req.user.id,
+  });
+  clearRuntimeAppSettingsCache();
+  if (updated) {
+    updated.maintenance_mode_messages = sanitizeMaintenanceMessages(updated.maintenance_mode_messages);
+    updated.tax_data = sanitizeTaxData(updated.tax_data);
+    updated.admin_role_permissions = sanitizeRolePermissionOverrides(updated.admin_role_permissions);
+    updated.system_health_controls = sanitizeSystemHealthControls(updated.system_health_controls);
+  }
+  await logActivity({
+    userId: req.user.id,
+    action: "tax_data_sync",
+    entityType: "app_settings",
+    entityId: updated?.id || null,
+    metadata: {
+      provider: "gemini",
+      year,
+      regions: "all",
+      filingStatus,
+    },
+    req,
+  });
   res.json({ settings: updated });
 });

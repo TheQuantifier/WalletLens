@@ -41,6 +41,7 @@ import {
 } from "../controllers/admin.controller.js";
 import {
   getAdmin as getAppSettingsAdmin,
+  syncTaxDataAdmin,
   updateAdmin as updateAppSettingsAdmin,
 } from "../controllers/app_settings.controller.js";
 import {
@@ -102,6 +103,7 @@ router.get("/budget-sheets", requireAdminPermission("records.read"), listBudgetS
 // App settings
 router.get("/settings", requireAdminPermission("settings.read"), getAppSettingsAdmin);
 router.put("/settings", requireAdminPermission("settings.write"), updateAppSettingsAdmin);
+router.post("/settings/tax-data/sync", requireAdminPermission("settings.write"), syncTaxDataAdmin);
 
 // Notifications
 router.get("/notifications", requireAdminPermission("notifications.read"), listNotificationsAdmin);

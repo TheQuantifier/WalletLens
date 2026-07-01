@@ -11,6 +11,12 @@ function navigateTo(path) {
   else window.location.href = path;
 }
 
+function redirectAuthenticatedUser() {
+  api.auth.me()
+    .then(({ user }) => navigateTo(postAuthDestination(user)))
+    .catch(() => {});
+}
+
 export default function RegisterPage() {
   useEffect(() => {
     const year = document.getElementById("year");
@@ -68,6 +74,8 @@ export default function RegisterPage() {
     };
 
     if (googleRedirect?.error) showMsg(googleRedirect.error, "error");
+
+    redirectAuthenticatedUser();
 
     const setPasswordStyle = (input, isValid) => {
       if (!input) return;
@@ -558,7 +566,7 @@ export default function RegisterPage() {
             <nav className="nf-legal" aria-label="Footer">
               <a href="/about" className="nf-legal-link" data-public-modal="about">About</a><span className="sep">&bull;</span>
               <a href="/privacy" className="nf-legal-link" data-public-modal="privacy">Privacy</a><span className="sep">&bull;</span>
-              <button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button>
+              <a href="/help" className="nf-legal-link" data-public-modal="contact">Contact</a>
             </nav>
           </div>
         </footer>

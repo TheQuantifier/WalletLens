@@ -1,12 +1,31 @@
+import { useEffect } from "react";
+
 export default function CareersPage() {
+  const isAuthenticated = Boolean(sessionStorage.getItem("auth_token"));
+  const backOnly = !isAuthenticated;
+  const goBack = () => {
+    if (window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    window.location.assign("/");
+  };
+
+  useEffect(() => {
+    if (!backOnly) return undefined;
+    document.body.classList.add("legal-page");
+    return () => document.body.classList.remove("legal-page");
+  }, [backOnly]);
+
   return (
     <>
-      <div id="header"></div>
+      {!backOnly && <div id="header"></div>}
       
       
         <main className="main main--careers">
           <section className="careers-hero">
             <div>
+              {backOnly && <button type="button" className="legal-back-btn" onClick={goBack}>Go Back</button>}
               <h1>Careers at &lt;AppName&gt;</h1>
               <p className="lead">
                 We are looking for someone to partner with us as we grow &lt;AppName&gt;.
@@ -104,7 +123,7 @@ export default function CareersPage() {
           </section>
         </main>
       
-        <div id="footer"></div>
+        {!backOnly && <div id="footer"></div>}
     </>
   );
 }

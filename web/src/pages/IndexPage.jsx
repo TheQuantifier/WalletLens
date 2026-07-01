@@ -301,7 +301,7 @@ export default function IndexPage() {
             <nav className="nf-legal" aria-label="Footer">
               <a href="/about" className="nf-legal-link" data-public-modal="about">About</a><span className="sep">&bull;</span>
               <a href="/privacy" className="nf-legal-link" data-public-modal="privacy">Privacy</a><span className="sep">&bull;</span>
-              <button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button>
+              <a href="/help" className="nf-legal-link" data-public-modal="contact">Contact</a>
             </nav>
           </div>
         </footer>

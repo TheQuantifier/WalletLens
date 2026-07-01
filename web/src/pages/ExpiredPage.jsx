@@ -50,7 +50,7 @@ export default function ExpiredPage() {
           <nav className="nf-legal" aria-label="Footer">
             <a href="/about" data-public-modal="about">About</a><span className="sep">•</span>
             <a href="/privacy" data-public-modal="privacy">Privacy</a><span className="sep">•</span>
-            <button type="button" className="nf-legal-link" data-public-modal="contact">Contact</button>
+            <a href="/help" className="nf-legal-link" data-public-modal="contact">Contact</a>
           </nav>
         </div>
       </footer>

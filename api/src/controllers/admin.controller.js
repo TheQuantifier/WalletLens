@@ -787,7 +787,7 @@ export const removeOrganizationMemberAdmin = asyncHandler(async (req, res) => {
       }
       ownerUserId = transferToUserId;
     }
-    const resourceTables = ['records', 'receipts', 'budget_sheets', 'rules', 'recurring_schedules', 'plaid_items', 'plaid_accounts', 'net_worth_items', 'net_worth_snapshots', 'receipt_jobs'];
+    const resourceTables = ['records', 'receipts', 'budget_sheets', 'planning_sheets', 'rules', 'recurring_schedules', 'plaid_items', 'plaid_accounts', 'net_worth_items', 'net_worth_snapshots', 'receipt_jobs'];
     const operationalResources = new Set(['plaid_items', 'plaid_accounts', 'receipt_jobs']);
     for (const table of resourceTables) {
       await executor(
@@ -1050,7 +1050,7 @@ export const deleteOrganizationAdmin = asyncHandler(async (req, res) => {
       [organizationId]
     );
     const resourceTables = [
-      "receipt_jobs", "receipts", "records", "budget_sheets", "rules", "recurring_schedules",
+      "receipt_jobs", "receipts", "records", "budget_sheets", "planning_sheets", "rules", "recurring_schedules",
       "plaid_accounts", "plaid_items", "net_worth_items", "net_worth_snapshots",
     ];
     for (const table of resourceTables) {

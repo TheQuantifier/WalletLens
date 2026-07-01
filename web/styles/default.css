@@ -816,13 +816,25 @@ footer {
 
 }
 
-.footer-column a {
+.footer-column a,
+.footer-link-button {
   color: var(--text);
   text-decoration: none;
   transition: color 0.2s;
 }
 
-.footer-column a:hover {
+.footer-link-button {
+  appearance: none;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  font: inherit;
+  padding: 0;
+  text-align: left;
+}
+
+.footer-column a:hover,
+.footer-link-button:hover {
   color: var(--accent);
 }
 

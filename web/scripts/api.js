@@ -41,6 +41,7 @@ function getAuthToken() {
 
 function setAuthToken(token) {
   if (!token) return;
+  sessionStorage.removeItem("cachedUser");
   sessionStorage.setItem(AUTH_TOKEN_KEY, token);
   sessionStorage.setItem(AUTH_TOKEN_TS_KEY, String(Date.now()));
   localStorage.setItem(INACTIVITY_ACTIVITY_KEY, String(Date.now()));
@@ -49,6 +50,15 @@ function setAuthToken(token) {
 function clearAuthToken() {
   sessionStorage.removeItem(AUTH_TOKEN_KEY);
   sessionStorage.removeItem(AUTH_TOKEN_TS_KEY);
+  sessionStorage.removeItem("cachedUser");
+  sessionStorage.removeItem("passwordResetToken");
+  sessionStorage.removeItem("forcePasswordReset");
+  localStorage.removeItem(INACTIVITY_ACTIVITY_KEY);
+  localStorage.removeItem("token");
+  localStorage.removeItem("auth_token");
+  localStorage.removeItem("jwt");
+  localStorage.removeItem("access_token");
+  localStorage.removeItem("refresh_token");
 }
 
 // --------------------------------------
@@ -107,6 +117,10 @@ async function request(path, options = {}) {
 // AUTH MODULE
 // ======================================================================
 export const auth = {
+  clearLocalSession() {
+    clearAuthToken();
+  },
+
   setToken(token) {
     setAuthToken(token);
   },
@@ -700,6 +714,22 @@ export const budgetSheets = {
 };
 
 // ======================================================================
+// PLANNING SHEETS MODULE
+// ======================================================================
+export const planningSheets = {
+  get() {
+    return request("/planning-sheets");
+  },
+
+  save(data) {
+    return request("/planning-sheets", {
+      method: "PUT",
+      body: JSON.stringify({ data }),
+    });
+  },
+};
+
+// ======================================================================
 // FX RATES MODULE (shared daily cache)
 // ======================================================================
 export const fxRates = {
@@ -900,6 +930,13 @@ export const admin = {
     });
   },
 
+  syncTaxData(payload = {}) {
+    return request("/admin/settings/tax-data/sync", {
+      method: "POST",
+      body: JSON.stringify(payload),
+    });
+  },
+
   requestAdminSecurityCode(action) {
     return request("/admin/security-code/request", {
       method: "POST",
@@ -1072,6 +1109,7 @@ export const api = {
   walterlens,
   netWorth,
   budgetSheets,
+  planningSheets,
   fxRates,
   activity,
   achievements,

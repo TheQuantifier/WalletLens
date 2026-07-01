@@ -28,6 +28,21 @@ export default function BudgetingPage() {
               <button className="btn btn--primary" id="btnAddBudget" type="button">Add budget</button>
             </div>
           </section>
+
+          <section className="budget-income-cards" aria-label="Salary totals after expenses">
+            <article className="summary-card summary-card--total">
+              <h2>Salary After Expenses (Yearly)</h2>
+              <p id="planningSalaryYearly">-</p>
+            </article>
+            <article className="summary-card summary-card--remaining">
+              <h2>Salary After Expenses (Monthly)</h2>
+              <p id="planningSalaryMonthly">-</p>
+            </article>
+            <article className="summary-card summary-card--unused">
+              <h2>Salary After Expenses (Weekly)</h2>
+              <p id="planningSalaryWeekly">-</p>
+            </article>
+          </section>
       
           <section className="budget-summary" aria-label="Budget summary">
             <article className="summary-card summary-card--total">
@@ -78,6 +93,7 @@ export default function BudgetingPage() {
                 <thead>
                   <tr>
                     <th>Category</th>
+                    <th className="num">Percent</th>
                     <th className="num">Budget</th>
                     <th className="num">Spent</th>
                     <th className="num">Remaining</th>
@@ -85,7 +101,7 @@ export default function BudgetingPage() {
                   </tr>
                 </thead>
                 <tbody id="budgetTbody">
-                  <tr><td colSpan="5" className="subtle">Loading budgets…</td></tr>
+                  <tr><td colSpan="6" className="subtle">Loading budgets...</td></tr>
                 </tbody>
               </table>
             </div>

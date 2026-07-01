@@ -68,7 +68,7 @@ const env = {
 
   // AI Parser
   aiProvider: (process.env.AI_PROVIDER || "gemini").toLowerCase(),
-  aiApiKey: required("AI_API_KEY"),
+  aiApiKey: process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "",
   aiModel: process.env.AI_MODEL || "models/gemma-3-4b-it",
   aiChatModel: process.env.AI_CHAT_MODEL || "",
   aiReceiptModel: process.env.AI_RECEIPT_MODEL || "",
