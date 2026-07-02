@@ -1,4 +1,6 @@
 #!/bin/sh
+#to run on macOS, you need to run this script from the terminal.
+#chmod +x runapp
 
 set -e
 cd "$(dirname "$0")"
