@@ -464,7 +464,7 @@ async function testSystemHealthService(serviceId) {
   }
 
   if (id === "ai_provider") {
-    const hasAi = Boolean(env.aiApiKey);
+    const hasAi = Boolean(env.aiChatApiKey || env.aiReceiptApiKey || env.aiTaxApiKey);
     const provider = String(env.aiProvider || "unknown");
     return {
       passed: hasAi,
@@ -473,7 +473,7 @@ async function testSystemHealthService(serviceId) {
   }
 
   if (id === "walterlens_service") {
-    const hasAi = Boolean(env.aiApiKey);
+    const hasAi = Boolean(env.aiChatApiKey);
     const provider = String(env.aiProvider || "unknown");
     return {
       passed: hasAi,

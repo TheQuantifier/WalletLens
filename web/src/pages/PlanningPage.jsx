@@ -110,6 +110,21 @@ function normalizeTaxData(value) {
   };
 }
 
+function getDatabaseTaxSourceLabel(taxData, label = "Tax data") {
+  const data = normalizeTaxData(taxData);
+  const provider = String(data.provider || "").trim();
+  const year = Number(data.year);
+  const parts = ["Source: Pulled from database"];
+  if (label) parts.push(label);
+  if (provider) parts.push(`provider ${provider}`);
+  if (Number.isInteger(year) && year > 0) parts.push(`tax year ${year}`);
+  return parts.join(" | ");
+}
+
+function getManualTaxSourceLabel(label = "Tax data") {
+  return `Source: Manual${label ? ` | ${label}` : ""}`;
+}
+
 function getTaxKind(row) {
   const explicit = String(row.taxKind || "").trim();
   if (explicit) return explicit;
@@ -148,6 +163,7 @@ function calculateFederalTax(grossAnnual, taxData) {
     effectiveRate: grossAnnual > 0 ? tax / grossAnnual : 0,
     displayRate: grossAnnual > 0 ? tax / grossAnnual : 0,
     details: [
+      getDatabaseTaxSourceLabel(taxData, "Federal tax table"),
       `Top bracket reached: ${percent(topRate)}`,
       `Gross income: ${money(grossAnnual)}`,
       `Standard deduction: ${money(standardDeduction)}`,
@@ -173,7 +189,11 @@ function calculateTaxForRow(row, grossAnnual, taxData) {
       effectiveRate: rate,
       displayRate: rate,
       corrected: true,
-      details: [`Corrected to ${percent(rate)} for this planning sheet.`, `Gross income: ${money(grossAnnual)}`],
+      details: [
+        getManualTaxSourceLabel("Planning sheet correction"),
+        `Corrected to ${percent(rate)} for this planning sheet.`,
+        `Gross income: ${money(grossAnnual)}`,
+      ],
     };
   }
   if (overrideMode === "amount" && overrideAmount > 0) {
@@ -183,7 +203,11 @@ function calculateTaxForRow(row, grossAnnual, taxData) {
       effectiveRate: grossAnnual > 0 ? annualAmount / grossAnnual : 0,
       displayRate: grossAnnual > 0 ? annualAmount / grossAnnual : 0,
       corrected: true,
-      details: [`Corrected amount: ${money(overrideAmount)} ${frequencyLabel(row.frequency).toLowerCase()}.`, `Annualized correction: ${money(annualAmount)}`],
+      details: [
+        getManualTaxSourceLabel("Planning sheet correction"),
+        `Corrected amount: ${money(overrideAmount)} ${frequencyLabel(row.frequency).toLowerCase()}.`,
+        `Annualized correction: ${money(annualAmount)}`,
+      ],
     };
   }
   const kind = getTaxKind(row);
@@ -197,7 +221,12 @@ function calculateTaxForRow(row, grossAnnual, taxData) {
       amount: taxable * rate,
       effectiveRate: grossAnnual > 0 ? (taxable * rate) / grossAnnual : 0,
       displayRate: rate,
-      details: [`${percent(rate)} Social Security tax`, `Wage base: ${money(wageBase)}`, `Taxed wages: ${money(taxable)}`],
+      details: [
+        getDatabaseTaxSourceLabel(taxData, "Social Security tax table"),
+        `${percent(rate)} Social Security tax`,
+        `Wage base: ${money(wageBase)}`,
+        `Taxed wages: ${money(taxable)}`,
+      ],
     };
   }
   if (kind === "medicare") {
@@ -207,7 +236,11 @@ function calculateTaxForRow(row, grossAnnual, taxData) {
       amount: taxable * rate,
       effectiveRate: grossAnnual > 0 ? (taxable * rate) / grossAnnual : 0,
       displayRate: rate,
-      details: [`${percent(rate)} Medicare tax`, `Taxed wages: ${money(taxable)}`],
+      details: [
+        getDatabaseTaxSourceLabel(taxData, "Medicare tax table"),
+        `${percent(rate)} Medicare tax`,
+        `Taxed wages: ${money(taxable)}`,
+      ],
     };
   }
   if (kind === "state" || kind === "local") {
@@ -218,7 +251,11 @@ function calculateTaxForRow(row, grossAnnual, taxData) {
         amount: grossAnnual * configuredRate,
         effectiveRate: configuredRate,
         displayRate: configuredRate,
-        details: [`${label} configured at ${percent(configuredRate)} for this row.`, `Gross income: ${money(grossAnnual)}`],
+        details: [
+          getManualTaxSourceLabel(`${label} row setting`),
+          `${label} configured at ${percent(configuredRate)} for this row.`,
+          `Gross income: ${money(grossAnnual)}`,
+        ],
       };
     }
     const configuredAmount = annualize(row);
@@ -227,14 +264,20 @@ function calculateTaxForRow(row, grossAnnual, taxData) {
         amount: configuredAmount,
         effectiveRate: grossAnnual > 0 ? configuredAmount / grossAnnual : 0,
         displayRate: grossAnnual > 0 ? configuredAmount / grossAnnual : 0,
-        details: [`${label} amount entered as ${money(num(row.amount))} ${frequencyLabel(row.frequency).toLowerCase()}.`],
+        details: [
+          getManualTaxSourceLabel(`${label} row setting`),
+          `${label} amount entered as ${money(num(row.amount))} ${frequencyLabel(row.frequency).toLowerCase()}.`,
+        ],
       };
     }
     return {
       amount: 0,
       effectiveRate: 0,
       displayRate: 0,
-      details: [`No default ${kind} tax formula is configured yet. Use Correct to set a user-specific percentage or amount.`],
+      details: [
+        getManualTaxSourceLabel(`${label} row setting`),
+        `No default ${kind} tax formula is configured yet. Use Correct to set a user-specific percentage or amount.`,
+      ],
     };
   }
   const manualRate = Math.max(0, Math.min(1, num(row.percent) / 100));
@@ -243,14 +286,20 @@ function calculateTaxForRow(row, grossAnnual, taxData) {
       amount: grossAnnual * manualRate,
       effectiveRate: manualRate,
       displayRate: manualRate,
-      details: [`Manual ${percent(manualRate)} tax on ${money(grossAnnual)} gross income.`],
+      details: [
+        getManualTaxSourceLabel("Tax row setting"),
+        `Manual ${percent(manualRate)} tax on ${money(grossAnnual)} gross income.`,
+      ],
     };
   }
   return {
     amount: annualize(row),
     effectiveRate: grossAnnual > 0 ? annualize(row) / grossAnnual : 0,
     displayRate: grossAnnual > 0 ? annualize(row) / grossAnnual : 0,
-    details: [`Manual amount entered as ${money(num(row.amount))} ${frequencyLabel(row.frequency).toLowerCase()}.`],
+    details: [
+      getManualTaxSourceLabel("Tax row setting"),
+      `Manual amount entered as ${money(num(row.amount))} ${frequencyLabel(row.frequency).toLowerCase()}.`,
+    ],
   };
 }
 

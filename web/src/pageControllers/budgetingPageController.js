@@ -1147,10 +1147,6 @@ export function initBudgetingPage() {
         const usedServer = await loadSpentMapFromServer();
         refreshView({ forceLocal: !usedServer });
       } catch (err) {
-        if (err?.message?.includes("not found")) {
-          state.sheetId = null;
-          return;
-        }
         console.warn("Failed to load budget sheet:", err);
       }
     };
@@ -1483,7 +1479,6 @@ export function initBudgetingPage() {
           });
           sheetId = sheet?.id || null;
         } catch (err) {
-          if (err?.message?.includes("not found")) return null;
           throw err;
         }
       }
@@ -1655,4 +1650,3 @@ export function initBudgetingPage() {
 
   init();
 }
-

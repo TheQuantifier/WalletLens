@@ -68,10 +68,32 @@ const env = {
 
   // AI Parser
   aiProvider: (process.env.AI_PROVIDER || "gemini").toLowerCase(),
-  aiApiKey: process.env.AI_API_KEY || process.env.GEMINI_API_KEY || "",
+  aiApiKey:
+    process.env.AI_CHAT_API_KEY ||
+    process.env.AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    "",
+  aiChatApiKey:
+    process.env.AI_CHAT_API_KEY ||
+    process.env.AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    "",
+  aiReceiptApiKey:
+    process.env.AI_RECEIPT_API_KEY ||
+    process.env.GEMINI_RECEIPT_API_KEY ||
+    process.env.AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    "",
+  aiTaxApiKey:
+    process.env.AI_TAX_API_KEY ||
+    process.env.GEMINI_TAX_API_KEY ||
+    process.env.AI_API_KEY ||
+    process.env.GEMINI_API_KEY ||
+    "",
   aiModel: process.env.AI_MODEL || "models/gemma-3-4b-it",
   aiChatModel: process.env.AI_CHAT_MODEL || "",
-  aiReceiptModel: process.env.AI_RECEIPT_MODEL || "",
+  aiReceiptModel: process.env.AI_RECEIPT_MODEL || "models/gemini-3.1-flash-lite",
+  aiTaxModel: process.env.AI_TAX_MODEL || process.env.GEMINI_TAX_MODEL || "models/gemini-3.1-flash-lite",
   aiMaxChars: Number(process.env.AI_MAX_CHARS || 5000),
 
   // Object Storage

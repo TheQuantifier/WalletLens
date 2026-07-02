@@ -210,6 +210,7 @@ const state = {
   auditLog: [],
   supportTickets: [],
   systemHealth: null,
+  settings: null,
   adminRolePermissions: {},
   savingPermissions: false,
   testingHealthServiceIds: new Set(),
@@ -374,9 +375,10 @@ function escapeHtml(value) {
 function setStatus(el, message, variant = "info") {
   if (!el) return;
   el.textContent = message;
-  el.classList.remove("is-hidden", "is-error", "is-ok");
+  el.classList.remove("is-hidden", "is-error", "is-ok", "is-warning");
   if (variant === "error") el.classList.add("is-error");
   if (variant === "ok") el.classList.add("is-ok");
+  if (variant === "warning") el.classList.add("is-warning");
   if (!message) el.classList.add("is-hidden");
 }
 
@@ -2622,6 +2624,7 @@ async function loadSettings() {
   setStatus(els.settingsStatus, "");
   try {
     const { settings } = await api.admin.getSettings();
+    state.settings = settings || null;
     if (els.appNameInput) {
       els.appNameInput.value = settings?.app_name || settings?.appName || "<AppName>";
     }
@@ -2833,14 +2836,31 @@ async function syncTaxDataFromProvider() {
     return;
   }
   setStatus(els.settingsStatus, "Pulling tax data from Gemini...");
+  if (els.taxDataLastSynced) {
+    els.taxDataLastSynced.textContent = "Syncing tax data...";
+  }
   if (els.taxDataSyncBtn) els.taxDataSyncBtn.disabled = true;
   try {
-    const { settings } = await api.admin.syncTaxData();
+    const result = await api.admin.syncTaxData();
+    const { settings } = await api.admin.getSettings();
+    state.settings = settings || null;
     renderTaxDataStatus(settings);
-    setStatus(els.settingsStatus, "Tax data synced.", "ok");
+    const syncResult = result?.syncResult || null;
+    if (syncResult?.federalStatus === "synced" && syncResult?.stateReason === "quota_exhausted") {
+      setStatus(els.settingsStatus, "Federal tax data synced. State tax data was skipped because Gemini quota is exhausted.", "warning");
+    } else if (syncResult?.federalStatus === "synced" && syncResult?.stateStatus === "synced") {
+      setStatus(els.settingsStatus, "Federal and state tax data synced.", "ok");
+    } else if (syncResult?.federalStatus === "synced" && syncResult?.stateStatus === "kept_existing") {
+      setStatus(els.settingsStatus, "Federal tax data synced. Existing state tax data was kept because it is already current.", "ok");
+    } else if (syncResult?.federalStatus === "synced") {
+      setStatus(els.settingsStatus, "Federal tax data synced. State tax data was not updated.", "warning");
+    } else {
+      setStatus(els.settingsStatus, "Tax data synced.", "ok");
+    }
   } catch (err) {
     console.error(err);
     if (handlePermissionError(err, "admin")) return;
+    renderTaxDataStatus(state.settings || {});
     setStatus(els.settingsStatus, err.message || "Failed to sync tax data.", "error");
   } finally {
     if (els.taxDataSyncBtn) els.taxDataSyncBtn.disabled = false;
@@ -3373,5 +3393,3 @@ async function init() {
 init();
 
 }
-
-

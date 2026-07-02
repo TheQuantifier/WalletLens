@@ -36,6 +36,7 @@ const ALLOWED_CATEGORIES = new Set([
 ]);
 
 const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+let receiptRuntimeLogged = false;
 
 const PARSE_PROMPT = `
 You are a financial receipt extraction system.
@@ -173,6 +174,13 @@ function sanitizeItems(items) {
     .filter((item) => item.name || item.price > 0);
 }
 
+function maskKeyFingerprint(value) {
+  const raw = String(value || "").trim();
+  if (!raw) return "(missing)";
+  if (raw.length <= 8) return `${raw.slice(0, 2)}...${raw.slice(-2)}`;
+  return `${raw.slice(0, 4)}...${raw.slice(-4)}`;
+}
+
 export function validateReceiptExtraction(parsed = {}) {
   if (!parsed || typeof parsed !== "object") return null;
 
@@ -247,8 +255,17 @@ export async function parseReceiptText(ocrText) {
   if (await isSystemHealthServiceDeactivated("ai_provider")) return null;
 
   try {
-    const ai = new GoogleGenAI({ apiKey: env.aiApiKey });
-    const modelName = env.aiReceiptModel || env.aiModel || "gemini-2.5-flash";
+    if (!env.aiReceiptApiKey) return null;
+    const ai = new GoogleGenAI({ apiKey: env.aiReceiptApiKey });
+    const modelName = env.aiReceiptModel || env.aiModel || "models/gemini-3.1-flash-lite";
+    if (!receiptRuntimeLogged) {
+      receiptRuntimeLogged = true;
+      console.info("Gemini receipt runtime config.", {
+        keyFingerprint: maskKeyFingerprint(env.aiReceiptApiKey),
+        configuredModel: env.aiReceiptModel || "",
+        baseModelFallback: env.aiModel || "",
+      });
+    }
     const windows = splitTextWindows(String(ocrText));
 
     if (windows.length > 1) {
