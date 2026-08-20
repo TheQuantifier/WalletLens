@@ -12,9 +12,35 @@ const FREQUENCIES = [
 ];
 
 const FREQ = new Map(FREQUENCIES.map((item) => [item.id, item]));
-const EXPENSE_TYPES = ["Housing", "Insurance", "Groceries", "Utilities", "Investment", "Transportation", "Health", "Education", "Giving", "Other"];
-const SAVINGS_DEFAULTS = ["Everyday", "Savings", "Emergency"];
-const SOURCE_DEFAULTS = ["Checking", "Savings", "Everyday", "Emergency", "Money Market", "Business Checking"];
+const ALLOCATION_TYPES = [
+  "Everyday cash",
+  "Emergency fund",
+  "Retirement",
+  "Investing",
+  "Debt paydown",
+  "Education",
+  "Giving",
+  "Tax reserve",
+  "Operating reserve",
+  "Payroll reserve",
+  "Growth fund",
+  "Owner pay",
+  "Other",
+];
+const PERSONAL_PURPOSE_DEFAULTS = ["Everyday Cash", "Emergency Fund", "Retirement", "Investing", "Goal Fund"];
+const BUSINESS_PURPOSE_DEFAULTS = ["Operating Reserve", "Tax Reserve", "Payroll Reserve", "Growth Fund", "Owner Pay"];
+const SOURCE_DEFAULTS = [
+  "Take-home pay",
+  "Checking",
+  "Savings",
+  "Everyday Cash",
+  "Emergency Fund",
+  "Money Market",
+  "Investment",
+  "Business Checking",
+  "Operating Reserve",
+  "Tax Reserve",
+];
 const TAX_KIND_OPTIONS = [
   { id: "manual", label: "Manual tax %" },
   { id: "federal", label: "Federal income tax" },
@@ -73,6 +99,12 @@ function annualize(row, frequency = row.frequency) {
 
 function annualizeAmount(amount, frequency) {
   return num(amount) * (FREQ.get(frequency)?.annual || 12);
+}
+
+function plannedAnnual(row, baseAnnual = 0) {
+  const allocationPercent = Math.max(0, Math.min(100, num(row.percent)));
+  if (allocationPercent > 0 && baseAnnual > 0) return baseAnnual * (allocationPercent / 100);
+  return annualize(row);
 }
 
 function convertAnnual(annual, frequency) {
@@ -278,6 +310,7 @@ function emptyRow(overrides = {}) {
 }
 
 function defaultPlanningData(isBusiness = false) {
+  const purposeDefaults = isBusiness ? BUSINESS_PURPOSE_DEFAULTS : PERSONAL_PURPOSE_DEFAULTS;
   return {
     version: 1,
     accountType: isBusiness ? "business" : "personal",
@@ -295,27 +328,33 @@ function defaultPlanningData(isBusiness = false) {
       startingBalance: {
         frequency: "one-time",
         rows: [
-          emptyRow({ label: isBusiness ? "Operating checking" : "Checking", type: "liquid", category: "Liquid", frequency: "one-time", sourceAccount: "Checking" }),
-          emptyRow({ label: "Money market", type: "liquid", category: "Liquid", frequency: "one-time", sourceAccount: "Money Market" }),
-          emptyRow({ label: "Investment portfolio", type: "investment", category: "Investment", frequency: "one-time", sourceAccount: "Investment" }),
+          emptyRow({ label: isBusiness ? "Business checking" : "Checking", type: "liquid", category: "Liquid cash", frequency: "one-time", sourceAccount: isBusiness ? "Business Checking" : "Checking" }),
+          emptyRow({ label: isBusiness ? "Operating reserve" : "High-yield savings", type: "liquid", category: "Reserve cash", frequency: "one-time", sourceAccount: isBusiness ? "Operating Reserve" : "Savings" }),
+          emptyRow({ label: isBusiness ? "Business investments" : "Investment portfolio", type: "investment", category: "Invested assets", frequency: "one-time", sourceAccount: "Investment" }),
         ],
       },
       savingsBreakdown: {
         frequency: "one-time",
-        rows: SAVINGS_DEFAULTS.map((label) => emptyRow({ label, type: "liquid", category: label, frequency: "one-time", sourceAccount: "Savings" })),
+        rows: purposeDefaults.map((label) => emptyRow({ label, type: "purpose", category: label, frequency: "one-time", sourceAccount: label, destinationAccount: label })),
       },
       expenseItems: {
         frequency: "monthly",
-        rows: [
-          emptyRow({ label: isBusiness ? "Rent or lease" : "Housing", type: "Housing", category: "Housing", frequency: "monthly", sourceAccount: "Checking" }),
-          emptyRow({ label: "Insurance", type: "Insurance", category: "Insurance", frequency: "monthly", sourceAccount: "Checking" }),
-          emptyRow({ label: "Groceries", type: "Groceries", category: "Groceries", frequency: "weekly", sourceAccount: "Checking" }),
-        ],
+        rows: isBusiness
+          ? [
+              emptyRow({ label: "Tax reserve", type: "Tax reserve", category: "Tax reserve", frequency: "monthly", percent: "25", sourceAccount: "Take-home pay", destinationAccount: "Tax Reserve" }),
+              emptyRow({ label: "Operating reserve", type: "Operating reserve", category: "Operating reserve", frequency: "monthly", percent: "10", sourceAccount: "Take-home pay", destinationAccount: "Operating Reserve" }),
+              emptyRow({ label: "Owner pay", type: "Owner pay", category: "Owner pay", frequency: "monthly", percent: "40", sourceAccount: "Take-home pay", destinationAccount: "Owner Pay" }),
+            ]
+          : [
+              emptyRow({ label: "Emergency fund", type: "Emergency fund", category: "Emergency fund", frequency: "monthly", percent: "10", sourceAccount: "Take-home pay", destinationAccount: "Emergency Fund" }),
+              emptyRow({ label: "Retirement", type: "Retirement", category: "Retirement", frequency: "monthly", percent: "15", sourceAccount: "Take-home pay", destinationAccount: "Retirement" }),
+              emptyRow({ label: "Investing", type: "Investing", category: "Investing", frequency: "monthly", percent: "10", sourceAccount: "Take-home pay", destinationAccount: "Investing" }),
+            ],
       },
       temporaryExpenses: {
         frequency: "monthly",
         rows: [
-          emptyRow({ label: "Temporary expense", type: "Temporary", category: "Temporary", frequency: "monthly", sourceAccount: "Savings" }),
+          emptyRow({ label: isBusiness ? "Planned equipment purchase" : "Known future commitment", type: "commitment", category: "Scheduled commitment", frequency: "monthly", sourceAccount: isBusiness ? "Operating Reserve" : "Savings" }),
         ],
       },
     },
@@ -358,12 +397,15 @@ function computePlanning(data, taxData = DEFAULT_TAX_DATA) {
   const startingLiquid = startingRows.filter((row) => row.type !== "investment" && row.type !== "roth").reduce((sum, row) => sum + num(row.amount), 0);
   const startingInvestments = startingRows.filter((row) => row.type === "investment").reduce((sum, row) => sum + num(row.amount), 0);
 
-  const recurringExpenseAnnual = (tables.expenseItems?.rows || []).reduce((sum, row) => sum + annualize(row), 0);
+  const plannedFundingAnnual = (tables.expenseItems?.rows || []).reduce((sum, row) => sum + plannedAnnual(row, takeHomeAnnual), 0);
   const temporaryRows = tables.temporaryExpenses?.rows || [];
-  const temporaryFromSavings = temporaryRows
-    .filter((row) => String(row.sourceAccount || "Savings").toLowerCase().includes("saving"))
+  const scheduledFromLiquid = temporaryRows
+    .filter((row) => !String(row.sourceAccount || "").toLowerCase().includes("investment"))
     .reduce((sum, row) => sum + dateOccurrences(row), 0);
-  const temporaryTotal = temporaryRows.reduce((sum, row) => sum + dateOccurrences(row), 0);
+  const scheduledCommitmentTotal = temporaryRows.reduce((sum, row) => sum + dateOccurrences(row), 0);
+  const unassignedTakeHomeAnnual = takeHomeAnnual - plannedFundingAnnual - scheduledCommitmentTotal;
+  const currentLiquidAfterCommitments = startingLiquid - scheduledFromLiquid;
+  const projectedNetPosition = startingLiquid + startingInvestments + takeHomeAnnual - scheduledCommitmentTotal;
 
   return {
     grossAnnual,
@@ -371,12 +413,15 @@ function computePlanning(data, taxData = DEFAULT_TAX_DATA) {
     takeHomeAnnual,
     startingLiquid,
     startingInvestments,
-    recurringExpenseAnnual,
-    temporaryFromSavings,
-    temporaryTotal,
-    liquidAfterExpenses: startingLiquid - temporaryFromSavings,
-    salaryAfterExpensesAnnual: takeHomeAnnual - recurringExpenseAnnual - temporaryTotal,
-    netWorthAfterExpenses: startingLiquid - temporaryFromSavings + startingInvestments + takeHomeAnnual - recurringExpenseAnnual - temporaryTotal,
+    plannedFundingAnnual,
+    scheduledFromLiquid,
+    scheduledCommitmentTotal,
+    unassignedTakeHomeAnnual,
+    currentLiquidAfterCommitments,
+    projectedNetPosition,
+    liquidAfterExpenses: currentLiquidAfterCommitments,
+    salaryAfterExpensesAnnual: unassignedTakeHomeAnnual,
+    netWorthAfterExpenses: projectedNetPosition,
   };
 }
 
@@ -402,18 +447,37 @@ function formatDateRange(row) {
 
 function isDebitPlanningRow(tableKey, row) {
   const type = String(row?.type || "").toLowerCase();
-  if (type === "tax" || type === "expense" || type === "debit") return true;
-  return ["expenseItems", "temporaryExpenses"].includes(tableKey);
+  if (type === "tax" || type === "expense" || type === "debit" || type === "commitment") return true;
+  return tableKey === "temporaryExpenses";
 }
 
-function PlanningTable({ title, description, tableKey, data, setData, columns, taxData, expenseSource = false, majorExpense = false, onMajorExpense }) {
+function PlanningTable({
+  title,
+  description,
+  tableKey,
+  data,
+  setData,
+  columns,
+  taxData,
+  expenseSource = false,
+  sourceColumnLabel = "Paid from",
+  sourceFieldLabel = "Paid from",
+  quickAdd = false,
+  quickAddLabel = "Add entry",
+  onQuickAdd,
+}) {
   const table = data.tables[tableKey];
   const rows = table.rows || [];
   const isTakeHomePay = tableKey === "takeHomePay";
+  const isAllocationPlan = tableKey === "expenseItems";
   const showNotes = !isTakeHomePay;
-  const grossAnnual = isTakeHomePay
-    ? rows.filter((row) => row.type === "income").reduce((sum, row) => sum + annualize(row), 0)
-    : 0;
+  const planningTakeHomeRows = data.tables.takeHomePay?.rows || [];
+  const planningGrossAnnual = planningTakeHomeRows.filter((row) => row.type === "income").reduce((sum, row) => sum + annualize(row), 0);
+  const planningTaxAnnual = planningTakeHomeRows
+    .filter((row) => row.type === "tax")
+    .reduce((sum, row) => sum + calculateTaxForRow(row, planningGrossAnnual, taxData).amount, 0);
+  const planningTakeHomeAnnual = planningGrossAnnual - planningTaxAnnual;
+  const grossAnnual = isTakeHomePay ? planningGrossAnnual : 0;
   const rowTaxCalculations = isTakeHomePay
     ? new Map(rows.map((row) => [row.id, calculateTaxForRow(row, grossAnnual, taxData)]))
     : new Map();
@@ -427,8 +491,10 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
   const sourceAccounts = Array.from(new Set([
     ...SOURCE_DEFAULTS,
     ...(data.tables.savingsBreakdown?.rows || []).map((row) => row.label).filter(Boolean),
+    ...(data.tables.savingsBreakdown?.rows || []).map((row) => row.destinationAccount).filter(Boolean),
     ...(data.tables.startingBalance?.rows || []).map((row) => row.label).filter(Boolean),
     ...rows.map((row) => row.sourceAccount).filter(Boolean),
+    ...rows.map((row) => row.destinationAccount).filter(Boolean),
   ]));
 
   const updateTable = (patch) => {
@@ -447,7 +513,7 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
 
   const addRow = () => {
     setEditingMode("add");
-    setEditingRow(emptyRow({ sourceAccount: expenseSource ? "Savings" : "", frequency: table.frequency }));
+    setEditingRow(emptyRow({ sourceAccount: expenseSource ? "Take-home pay" : "", frequency: table.frequency }));
   };
 
   const editRow = (row) => {
@@ -524,7 +590,7 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
             <span>View</span>
             <FrequencySelect value={table.frequency} includeOneTime onChange={(frequency) => updateTable({ frequency })} />
           </label>
-          {majorExpense ? <button className="btn" type="button" onClick={onMajorExpense}>Add major expense</button> : null}
+          {quickAdd ? <button className="btn" type="button" onClick={onQuickAdd}>{quickAddLabel}</button> : null}
           {!isTakeHomePay ? <button className="btn btn--primary" type="button" onClick={addRow}>Add entry</button> : null}
         </div>
       </div>
@@ -538,9 +604,10 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
               {columns.category ? <th>Category</th> : null}
               <th>Frequency</th>
               {columns.taxPercent ? <th className="num">Tax %</th> : null}
+              {columns.percent ? <th className="num">{columns.percentLabel || "Percent"}</th> : null}
               <th className="num">Amount</th>
               <th className="num">{table.frequency === "one-time" ? "Total" : `As ${FREQ.get(table.frequency)?.label || "Monthly"}`}</th>
-              {expenseSource ? <th>Paid from</th> : null}
+              {expenseSource ? <th>{sourceColumnLabel}</th> : null}
               {columns.destination ? <th>Destination</th> : null}
               {columns.dates ? <th>Dates</th> : null}
               {showNotes ? <th className="planning-notes-col">Notes</th> : null}
@@ -551,8 +618,16 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
             {rows.map((row) => {
               const isDebit = isDebitPlanningRow(tableKey, row);
               const taxCalculation = rowTaxCalculations.get(row.id);
-              const annualAmount = isTakeHomePay && row.type === "tax" ? taxCalculation?.amount || 0 : annualize(row);
-              const rowAmount = isTakeHomePay && row.type === "tax" ? convertAnnual(annualAmount, row.frequency) : num(row.amount);
+              const annualAmount = isTakeHomePay && row.type === "tax"
+                ? taxCalculation?.amount || 0
+                : isAllocationPlan
+                  ? plannedAnnual(row, planningTakeHomeAnnual)
+                  : annualize(row);
+              const rowAmount = isTakeHomePay && row.type === "tax"
+                ? convertAnnual(annualAmount, row.frequency)
+                : isAllocationPlan && num(row.percent) > 0
+                  ? convertAnnual(annualAmount, row.frequency)
+                  : num(row.amount);
               const convertedAmount = table.frequency === "one-time" ? rowAmount : convertAnnual(annualAmount, table.frequency);
               return (
               <tr key={row.id} className={isDebit ? "planning-row--debit" : ""}>
@@ -575,9 +650,10 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
                     ) : "-"}
                   </td>
                 ) : null}
+                {columns.percent ? <td className="num">{num(row.percent) > 0 ? `${num(row.percent).toFixed(1)}%` : "-"}</td> : null}
                 <td className={`num ${isDebit ? "planning-debit" : ""}`}>{signedMoney(rowAmount, isDebit)}</td>
                 <td className={`num planning-computed ${isDebit ? "planning-debit" : ""}`}>{signedMoney(convertedAmount, isDebit)}</td>
-                {expenseSource ? <td>{row.sourceAccount || "Savings"}</td> : null}
+                {expenseSource ? <td>{row.sourceAccount || "Take-home pay"}</td> : null}
                 {columns.destination ? <td>{row.destinationAccount || "-"}</td> : null}
                 {columns.dates ? <td>{formatDateRange(row)}</td> : null}
                 {showNotes ? <td className="planning-notes-cell">{row.notes || "-"}</td> : null}
@@ -603,7 +679,7 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
           {isTakeHomePay ? (
             <tfoot>
               <tr>
-                <td className="planning-title-cell">Take Home Pay</td>
+                <td className="planning-title-cell">Take-Home Pay</td>
                 <td></td>
                 <td></td>
                 <td>{frequencyLabel(table.frequency)}</td>
@@ -679,10 +755,16 @@ function PlanningTable({ title, description, tableKey, data, setData, columns, t
                   <input type="number" min="0" max="100" step="0.01" value={editingRow.percent} onChange={(event) => updateEditingRow({ percent: event.target.value })} />
                 </label>
               ) : null}
+              {columns.percent ? (
+                <label>
+                  <span>{columns.percentLabel || "Percent"}</span>
+                  <input type="number" min="0" max="100" step="0.01" value={editingRow.percent} onChange={(event) => updateEditingRow({ percent: event.target.value })} />
+                </label>
+              ) : null}
               {expenseSource ? (
                 <label>
-                  <span>Paid from</span>
-                  <select value={editingRow.sourceAccount || "Savings"} onChange={(event) => updateEditingRow({ sourceAccount: event.target.value })}>
+                  <span>{sourceFieldLabel}</span>
+                  <select value={editingRow.sourceAccount || "Take-home pay"} onChange={(event) => updateEditingRow({ sourceAccount: event.target.value })}>
                     {sourceAccounts.map((account) => <option key={account} value={account}>{account}</option>)}
                   </select>
                 </label>
@@ -804,8 +886,15 @@ export default function PlanningPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("Loading planning tables...");
-  const [majorExpenseOpen, setMajorExpenseOpen] = useState(false);
-  const [majorExpense, setMajorExpense] = useState({ type: "Housing", frequency: "monthly", amount: "", sourceAccount: "Savings" });
+  const [quickAllocationOpen, setQuickAllocationOpen] = useState(false);
+  const [quickAllocation, setQuickAllocation] = useState({
+    type: "Emergency fund",
+    frequency: "monthly",
+    amount: "",
+    percent: "10",
+    sourceAccount: "Take-home pay",
+    destinationAccount: "Emergency Fund",
+  });
   const [taxData, setTaxData] = useState(DEFAULT_TAX_DATA);
   const totals = useMemo(() => computePlanning(data, taxData), [data, taxData]);
 
@@ -849,7 +938,7 @@ export default function PlanningPage() {
     }
   };
 
-  const addMajorExpense = (event) => {
+  const addQuickAllocation = (event) => {
     event.preventDefault();
     setData((current) => ({
       ...current,
@@ -860,19 +949,28 @@ export default function PlanningPage() {
           rows: [
             ...current.tables.expenseItems.rows,
             emptyRow({
-              label: majorExpense.type,
-              type: majorExpense.type,
-              category: majorExpense.type,
-              frequency: majorExpense.frequency,
-              amount: majorExpense.amount,
-              sourceAccount: majorExpense.sourceAccount || "Savings",
+              label: quickAllocation.type,
+              type: quickAllocation.type,
+              category: quickAllocation.type,
+              frequency: quickAllocation.frequency,
+              amount: quickAllocation.amount,
+              percent: quickAllocation.percent,
+              sourceAccount: quickAllocation.sourceAccount || "Take-home pay",
+              destinationAccount: quickAllocation.destinationAccount || quickAllocation.type,
             }),
           ],
         },
       },
     }));
-    setMajorExpenseOpen(false);
-    setMajorExpense({ type: "Housing", frequency: "monthly", amount: "", sourceAccount: "Savings" });
+    setQuickAllocationOpen(false);
+    setQuickAllocation({
+      type: "Emergency fund",
+      frequency: "monthly",
+      amount: "",
+      percent: "10",
+      sourceAccount: "Take-home pay",
+      destinationAccount: "Emergency Fund",
+    });
   };
 
   return (
@@ -883,7 +981,7 @@ export default function PlanningPage() {
           <div>
             <p className="planning-kicker">{isBusiness ? "Business Planning" : "Personal Planning"}</p>
             <h1>Planning</h1>
-            <p className="subtle">Build structured financial planning tables, then use their totals inside Budgeting.</p>
+            <p className="subtle">Turn income into after-tax take-home pay, then divide it into long-term accounts and purpose-based reserves.</p>
           </div>
           <div className="planning-actions">
             <span className="status-banner subtle" aria-live="polite">{loading ? "Loading..." : status}</span>
@@ -892,14 +990,15 @@ export default function PlanningPage() {
         </section>
 
         <section className="planning-summary-grid" aria-label="Planning totals">
-          <article><span>Liquid Savings After Expenses</span><strong>{money(totals.liquidAfterExpenses)}</strong></article>
-          <article><span>Salary After Expenses</span><strong>{money(convertAnnual(totals.salaryAfterExpensesAnnual, "monthly"))}</strong><small>Monthly</small></article>
-          <article><span>Net Worth After Expenses</span><strong>{money(totals.netWorthAfterExpenses)}</strong></article>
+          <article><span>After-Tax Take-Home</span><strong>{money(convertAnnual(totals.takeHomeAnnual, "monthly"))}</strong><small>Monthly</small></article>
+          <article><span>Planned Account Funding</span><strong>{money(convertAnnual(totals.plannedFundingAnnual, "monthly"))}</strong><small>Monthly</small></article>
+          <article><span>Budgetable After Planning</span><strong>{money(convertAnnual(totals.unassignedTakeHomeAnnual, "monthly"))}</strong><small>Monthly</small></article>
+          <article><span>Projected Net Position</span><strong>{money(totals.projectedNetPosition)}</strong></article>
         </section>
 
         <PlanningTable
-          title={isBusiness ? "Net Business Pay" : "Take Home Pay"}
-          description={isBusiness ? "Track revenue and taxes to estimate usable business earnings." : "Track income and taxes to estimate usable take-home pay."}
+          title={isBusiness ? "Income and Taxes" : "Income and Taxes"}
+          description={isBusiness ? "Estimate net business earnings after federal, state, payroll, and manual tax rows." : "Estimate take-home pay after federal, state, FICA, and manual tax rows."}
           tableKey="takeHomePay"
           data={data}
           setData={setData}
@@ -908,8 +1007,8 @@ export default function PlanningPage() {
         />
 
         <PlanningTable
-          title="Starting Balance"
-          description="Track liquid savings and non-Roth investment balances outside salary."
+          title="Current Balances"
+          description="Track existing cash, reserve, and investment balances before new funding is allocated."
           tableKey="startingBalance"
           data={data}
           setData={setData}
@@ -917,8 +1016,8 @@ export default function PlanningPage() {
         />
 
         <PlanningTable
-          title="Savings Breakdown"
-          description="Break liquid savings into everyday, savings, emergency, or custom buckets."
+          title="Purpose Accounts"
+          description="Name the major accounts or buckets that receive planned funding."
           tableKey="savingsBreakdown"
           data={data}
           setData={setData}
@@ -926,58 +1025,65 @@ export default function PlanningPage() {
         />
 
         <PlanningTable
-          title="Expense Items"
-          description="Track recurring expenses and convert them into the selected view period."
+          title="Allocation Plan"
+          description="Divide after-tax take-home pay into major accounts by percentage or fixed transfer amount."
           tableKey="expenseItems"
           data={data}
           setData={setData}
-          columns={{ type: true, category: true, typeOptions: EXPENSE_TYPES }}
+          columns={{ type: true, category: true, percent: true, percentLabel: "Take-home %", destination: true, typeOptions: ALLOCATION_TYPES }}
           expenseSource
-          majorExpense
-          onMajorExpense={() => setMajorExpenseOpen(true)}
+          sourceColumnLabel="From"
+          sourceFieldLabel="From"
+          quickAdd
+          quickAddLabel="Add allocation"
+          onQuickAdd={() => setQuickAllocationOpen(true)}
         />
 
         <PlanningTable
-          title="Temporary Expenses"
-          description="Track expenses that last for a defined period and choose which account pays them."
+          title="Scheduled Commitments"
+          description="Track known future obligations that should reduce the amount available for short-term budgeting."
           tableKey="temporaryExpenses"
           data={data}
           setData={setData}
           columns={{ category: true, dates: true }}
           expenseSource
+          sourceColumnLabel="From account"
+          sourceFieldLabel="From account"
         />
 
         <section className="planning-bottom-totals">
           <article>
-            <span>Liquid Savings after Expenses</span>
-            <strong>{money(totals.liquidAfterExpenses)}</strong>
+            <span>Current Liquid After Commitments</span>
+            <strong>{money(totals.currentLiquidAfterCommitments)}</strong>
           </article>
           <article>
-            <span>Salary Totals after Expenses</span>
-            <div className="planning-total-row"><b>Yearly</b><strong>{money(totals.salaryAfterExpensesAnnual)}</strong></div>
-            <div className="planning-total-row"><b>Monthly</b><strong>{money(convertAnnual(totals.salaryAfterExpensesAnnual, "monthly"))}</strong></div>
-            <div className="planning-total-row"><b>Weekly</b><strong>{money(convertAnnual(totals.salaryAfterExpensesAnnual, "weekly"))}</strong></div>
+            <span>Budgetable After Planning</span>
+            <div className="planning-total-row"><b>Yearly</b><strong>{money(totals.unassignedTakeHomeAnnual)}</strong></div>
+            <div className="planning-total-row"><b>Monthly</b><strong>{money(convertAnnual(totals.unassignedTakeHomeAnnual, "monthly"))}</strong></div>
+            <div className="planning-total-row"><b>Weekly</b><strong>{money(convertAnnual(totals.unassignedTakeHomeAnnual, "weekly"))}</strong></div>
           </article>
           <article>
-            <span>Net Worth after Expenses</span>
-            <strong>{money(totals.netWorthAfterExpenses)}</strong>
+            <span>Annual Planned Funding</span>
+            <strong>{money(totals.plannedFundingAnnual)}</strong>
           </article>
         </section>
       </main>
       <div id="footer"></div>
 
-      {majorExpenseOpen ? (
-        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="majorExpenseTitle" onClick={(event) => { if (event.target === event.currentTarget) setMajorExpenseOpen(false); }}>
+      {quickAllocationOpen ? (
+        <div className="modal" role="dialog" aria-modal="true" aria-labelledby="quickAllocationTitle" onClick={(event) => { if (event.target === event.currentTarget) setQuickAllocationOpen(false); }}>
           <div className="modal-content card planning-major-modal">
-            <h2 id="majorExpenseTitle">Add Major Expense</h2>
-            <form className="txn-form" onSubmit={addMajorExpense}>
-              <label><span>Expense type</span><select value={majorExpense.type} onChange={(event) => setMajorExpense({ ...majorExpense, type: event.target.value })}>{EXPENSE_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
-              <label><span>Frequency</span><FrequencySelect value={majorExpense.frequency} onChange={(frequency) => setMajorExpense({ ...majorExpense, frequency })} /></label>
-              <label><span>Amount</span><input type="number" min="0" step="0.01" value={majorExpense.amount} onChange={(event) => setMajorExpense({ ...majorExpense, amount: event.target.value })} /></label>
-              <label><span>Paid from</span><select value={majorExpense.sourceAccount} onChange={(event) => setMajorExpense({ ...majorExpense, sourceAccount: event.target.value })}>{SOURCE_DEFAULTS.map((source) => <option key={source} value={source}>{source}</option>)}</select></label>
+            <h2 id="quickAllocationTitle">Add Allocation</h2>
+            <form className="txn-form" onSubmit={addQuickAllocation}>
+              <label><span>Purpose</span><select value={quickAllocation.type} onChange={(event) => setQuickAllocation({ ...quickAllocation, type: event.target.value, destinationAccount: event.target.value })}>{ALLOCATION_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
+              <label><span>Frequency</span><FrequencySelect value={quickAllocation.frequency} onChange={(frequency) => setQuickAllocation({ ...quickAllocation, frequency })} /></label>
+              <label><span>Take-home %</span><input type="number" min="0" max="100" step="0.01" value={quickAllocation.percent} onChange={(event) => setQuickAllocation({ ...quickAllocation, percent: event.target.value })} /></label>
+              <label><span>Fixed amount</span><input type="number" min="0" step="0.01" value={quickAllocation.amount} onChange={(event) => setQuickAllocation({ ...quickAllocation, amount: event.target.value })} /></label>
+              <label><span>From</span><select value={quickAllocation.sourceAccount} onChange={(event) => setQuickAllocation({ ...quickAllocation, sourceAccount: event.target.value })}>{SOURCE_DEFAULTS.map((source) => <option key={source} value={source}>{source}</option>)}</select></label>
+              <label><span>Destination</span><input value={quickAllocation.destinationAccount} onChange={(event) => setQuickAllocation({ ...quickAllocation, destinationAccount: event.target.value })} /></label>
               <div className="modal-actions">
-                <button className="btn btn--primary" type="submit">Add expense</button>
-                <button className="btn" type="button" onClick={() => setMajorExpenseOpen(false)}>Cancel</button>
+                <button className="btn btn--primary" type="submit">Add allocation</button>
+                <button className="btn" type="button" onClick={() => setQuickAllocationOpen(false)}>Cancel</button>
               </div>
             </form>
           </div>

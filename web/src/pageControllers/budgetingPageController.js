@@ -155,6 +155,14 @@ export function initBudgetingPage() {
     return value * (PLANNING_FREQUENCY_FACTOR[frequency] || 12);
   };
 
+  const planningAllocationAnnual = (row, baseAnnual) => {
+    const percent = Number(row?.percent);
+    if (Number.isFinite(percent) && percent > 0 && baseAnnual > 0) {
+      return baseAnnual * (Math.max(0, Math.min(100, percent)) / 100);
+    }
+    return planningAnnualize(row);
+  };
+
   const normalizeTaxData = (value) => {
     const source = value && typeof value === "object" && !Array.isArray(value) ? value : {};
     return {
@@ -247,7 +255,7 @@ export function initBudgetingPage() {
     return planningAnnualize(row, frequency) * Math.min(days / 365, 1);
   };
 
-  const computePlanningSalaryAfterExpensesAnnual = (data, taxData) => {
+  const computePlanningBudgetableAnnual = (data, taxData) => {
     const tables = data?.tables || {};
     const takeHomeRows = Array.isArray(tables.takeHomePay?.rows) ? tables.takeHomePay.rows : [];
     const incomeAnnual = takeHomeRows
@@ -256,11 +264,12 @@ export function initBudgetingPage() {
     const taxAnnual = takeHomeRows
       .filter((row) => row?.type === "tax")
       .reduce((sum, row) => sum + calculatePlanningTax(row, incomeAnnual, taxData), 0);
-    const expenseAnnual = (Array.isArray(tables.expenseItems?.rows) ? tables.expenseItems.rows : [])
-      .reduce((sum, row) => sum + planningAnnualize(row), 0);
+    const takeHomeAnnual = incomeAnnual - taxAnnual;
+    const allocationAnnual = (Array.isArray(tables.expenseItems?.rows) ? tables.expenseItems.rows : [])
+      .reduce((sum, row) => sum + planningAllocationAnnual(row, takeHomeAnnual), 0);
     const temporaryTotal = (Array.isArray(tables.temporaryExpenses?.rows) ? tables.temporaryExpenses.rows : [])
       .reduce((sum, row) => sum + planningTemporaryTotal(row), 0);
-    return incomeAnnual - taxAnnual - expenseAnnual - temporaryTotal;
+    return takeHomeAnnual - allocationAnnual - temporaryTotal;
   };
 
   const amountForCadence = (annual, cadenceId) => {
@@ -1024,7 +1033,7 @@ export function initBudgetingPage() {
           api.planningSheets.get(),
           api.appSettings.getPublic().catch(() => null),
         ]);
-        state.planningSalaryAnnual = computePlanningSalaryAfterExpensesAnnual(payload?.planningSheet?.data, publicSettings?.taxData);
+        state.planningSalaryAnnual = computePlanningBudgetableAnnual(payload?.planningSheet?.data, publicSettings?.taxData);
       } catch {
         state.planningSalaryAnnual = 0;
       }

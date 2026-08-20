@@ -29,17 +29,17 @@ export default function BudgetingPage() {
             </div>
           </section>
 
-          <section className="budget-income-cards" aria-label="Salary totals after expenses">
+          <section className="budget-income-cards" aria-label="Budgetable income after planning">
             <article className="summary-card summary-card--total">
-              <h2>Salary After Expenses (Yearly)</h2>
+              <h2>Budgetable After Planning (Yearly)</h2>
               <p id="planningSalaryYearly">-</p>
             </article>
             <article className="summary-card summary-card--remaining">
-              <h2>Salary After Expenses (Monthly)</h2>
+              <h2>Budgetable After Planning (Monthly)</h2>
               <p id="planningSalaryMonthly">-</p>
             </article>
             <article className="summary-card summary-card--unused">
-              <h2>Salary After Expenses (Weekly)</h2>
+              <h2>Budgetable After Planning (Weekly)</h2>
               <p id="planningSalaryWeekly">-</p>
             </article>
           </section>
