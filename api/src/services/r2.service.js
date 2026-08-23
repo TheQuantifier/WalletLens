@@ -86,6 +86,19 @@ export async function headObject({ key }) {
   return r2.send(cmd);
 }
 
+export async function getObjectPrefix({ key, bytes = 1024 }) {
+  if (await isSystemHealthServiceDeactivated("object_storage_connection")) {
+    throw new Error("Object storage is disconnected by admin.");
+  }
+  const safeBytes = Math.max(16, Math.min(4096, Number(bytes) || 1024));
+  const response = await r2.send(new GetObjectCommand({
+    Bucket: env.objectStore.bucket,
+    Key: key,
+    Range: `bytes=0-${safeBytes - 1}`,
+  }));
+  return Buffer.from(await response.Body.transformToByteArray());
+}
+
 // ---------------------------------------------------------
 // DELETE object
 // ---------------------------------------------------------

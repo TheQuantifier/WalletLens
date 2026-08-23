@@ -313,7 +313,7 @@ const formatMonthDayLabel = (value) => {
   const match = raw.match(/^(\d{2})-(\d{2})$/);
   if (!match) return raw;
   const [, month, day] = match;
-  return new Date(`2026-${month}-${day}T00:00:00Z`).toLocaleDateString(undefined, {
+  return new Date(`2000-${month}-${day}T00:00:00Z`).toLocaleDateString(undefined, {
     month: "short",
     day: "numeric",
     timeZone: "UTC",
@@ -588,10 +588,8 @@ const cleanPublicText = (value) =>
 
 const parseMentionedAppName = (question) => {
   const raw = String(question || "");
-  const match = raw.match(/\b(walletwise|walletlens)\b/i);
+  const match = raw.match(/\bwalletlens\b/i);
   if (!match) return "";
-  const token = match[1].toLowerCase();
-  if (token === "walletwise") return "WalletWise";
   return "WalletLens";
 };
 
@@ -678,6 +676,12 @@ const getQuestionTokens = (question) => {
 
 const detectPublicTopic = (question) => {
   const key = normalizeText(question);
+  if (
+    /\b(walletlens|this app|this service|this website)\b/.test(key) ||
+    /\bwhat (?:is|does) (?:the )?(?:app|service|website)\b/.test(key)
+  ) {
+    return "about";
+  }
   if (/\b(login|log in|sign in|signin|access account)\b/.test(key)) {
     return "login";
   }

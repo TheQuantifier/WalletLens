@@ -12,6 +12,13 @@ const $ = (id) => document.getElementById(id);
 const setText = (el, text) => {
   if (el) el.innerText = text;
 };
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+})[character]);
 
 const formatShortDateTime = (value) => {
   if (!value) return "\u2014";
@@ -202,7 +209,7 @@ const renderLinkedAccounts = () => {
         <span class="linked-group__summary">
           <span class="linked-group__caret">${isExpanded ? "v" : ">"}</span>
           <span>
-            <span class="label">${bankName}</span>
+            <span class="label">${escapeHtml(bankName)}</span>
             <span class="subtle">${accounts.length} connected account${accounts.length === 1 ? "" : "s"}</span>
           </span>
         </span>
@@ -230,11 +237,11 @@ const renderLinkedAccounts = () => {
           row.className = "linked-account-row";
           row.innerHTML = `
             <div>
-              <p class="label">${getAccountLabel(acc)}</p>
-              <p class="subtle">${getAccountDescription(acc)}</p>
+              <p class="label">${escapeHtml(getAccountLabel(acc))}</p>
+              <p class="subtle">${escapeHtml(getAccountDescription(acc))}</p>
             </div>
             <div class="linked-account-row__meta">
-              <button class="btn btn--link" data-remove="${acc.id}" type="button">Remove</button>
+              <button class="btn btn--link" data-remove="${escapeHtml(acc.id)}" type="button">Remove</button>
             </div>
           `;
           accountsWrap.appendChild(row);

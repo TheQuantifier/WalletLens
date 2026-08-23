@@ -5,7 +5,7 @@ let cache = null;
 let cacheExpiresAt = 0;
 
 const DEFAULTS = Object.freeze({
-  app_name: "<AppName>",
+  app_name: "WalletLens",
   receipt_keep_files: true,
   session_timeout_minutes: 15,
   max_concurrent_sessions_per_user: 0,

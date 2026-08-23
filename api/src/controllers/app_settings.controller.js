@@ -209,7 +209,7 @@ export const getPublic = asyncHandler(async (_req, res) => {
     taxData = sanitizeTaxData(settings?.tax_data);
   }
   res.json({
-    appName: settings?.app_name || "<AppName>",
+    appName: settings?.app_name || "WalletLens",
     sessionTimeoutMinutes: Number.isFinite(timeout) ? timeout : 15,
     maintenanceModeEnabled,
     maintenanceModeBannerText,

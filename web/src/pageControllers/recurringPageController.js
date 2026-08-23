@@ -1,5 +1,13 @@
 import { api } from "../../scripts/api.js";
 
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+})[character]);
+
 export function initRecurringPage() {
   if (window.__walletlensRecurringPageInitialized) return;
   window.__walletlensRecurringPageInitialized = true;
@@ -181,7 +189,7 @@ export function initRecurringPage() {
   const formatYearlyDisplay = (value) => {
     const [month, day] = String(value || "").split("-").map(Number);
     if (!month || !day) return String(value || "");
-    const dateOnly = `2026-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+    const dateOnly = `2000-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
     return new Date(`${dateOnly}T00:00:00Z`).toLocaleDateString(undefined, {
       month: "short",
       day: "numeric",
@@ -370,10 +378,10 @@ export function initRecurringPage() {
       row.className = "recurring-upcoming-item";
       row.innerHTML = `
         <div>
-          <div class="label">${item.name || "Recurring item"}</div>
-          <div class="subtle">${formatDate(item.date)} · ${item.category || "Uncategorized"}</div>
+          <div class="label">${escapeHtml(item.name || "Recurring item")}</div>
+          <div class="subtle">${escapeHtml(formatDate(item.date))} · ${escapeHtml(item.category || "Uncategorized")}</div>
         </div>
-        <div>${formatMoney(item.amount)}</div>
+        <div>${escapeHtml(formatMoney(item.amount))}</div>
       `;
       recurringUpcoming.appendChild(row);
     });
@@ -393,11 +401,11 @@ export function initRecurringPage() {
       card.className = "recurring-card";
       card.innerHTML = `
         <span class="recurring-pill">${item.active === false ? "Paused" : "Active"}</span>
-        <h3>${item.name || "Untitled"}</h3>
+        <h3>${escapeHtml(item.name || "Untitled")}</h3>
         <div class="recurring-meta">
-          <div>${item.type || "expense"} · ${item.category || "Uncategorized"}</div>
-          <div>${item.frequency || "monthly"} · ${formatRuleSummary(item) || "Schedule not set"}</div>
-          <div>next ${formatDate(item.nextRun)} · ${formatMoney(item.amount)}</div>
+          <div>${escapeHtml(item.type || "expense")} · ${escapeHtml(item.category || "Uncategorized")}</div>
+          <div>${escapeHtml(item.frequency || "monthly")} · ${escapeHtml(formatRuleSummary(item) || "Schedule not set")}</div>
+          <div>next ${escapeHtml(formatDate(item.nextRun))} · ${escapeHtml(formatMoney(item.amount))}</div>
         </div>
       `;
 

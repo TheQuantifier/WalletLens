@@ -4,12 +4,13 @@ import multer from "multer";
 
 import * as controller from "../controllers/receipts.controller.js";
 import auth from "../middleware/auth.js";
+import env from "../config/env.js";
 
 const router = express.Router();
 const upload = multer({
   storage: multer.memoryStorage(),
-  // Hard upper bound; app_settings max_upload_size_mb applies the active runtime limit.
-  limits: { fileSize: 250 * 1024 * 1024 },
+  // Keep direct uploads bounded before Multer allocates the full in-memory buffer.
+  limits: { fileSize: env.directUploadMaxMb * 1024 * 1024 },
 });
 
 /*

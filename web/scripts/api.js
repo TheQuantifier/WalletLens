@@ -1,6 +1,6 @@
 // web/api.js
 // ======================================================================
-// FinanceApp Frontend API Wrapper (ESM)
+// WalletLens Frontend API Wrapper (ESM)
 // Updated for: Postgres metadata + Cloudflare R2 presigned uploads/downloads
 // ======================================================================
 

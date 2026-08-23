@@ -1,5 +1,6 @@
 // src/app.js
 import express from "express";
+import crypto from "crypto";
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import morgan from "morgan";
@@ -8,8 +9,23 @@ import env from "./config/env.js";
 import apiRouter from "./routes/index.js";
 import { errorHandler } from "./middleware/error.js";
 import securityHeaders from "./middleware/security_headers.js";
+import { query } from "./config/db.js";
 
 const app = express();
+app.disable("x-powered-by");
+if (env.trustProxyHops > 0) {
+  app.set("trust proxy", env.trustProxyHops);
+}
+
+app.use((req, res, next) => {
+  const suppliedId = String(req.get("x-request-id") || "").trim();
+  const requestId = /^[a-zA-Z0-9._:-]{1,64}$/.test(suppliedId)
+    ? suppliedId
+    : crypto.randomUUID();
+  req.requestId = requestId;
+  res.setHeader("X-Request-Id", requestId);
+  next();
+});
 
 // --------------------------------------------------
 // Logging
@@ -87,7 +103,8 @@ const corsOptions = {
   },
   credentials: true,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: ["Content-Type", "Authorization"],
+  allowedHeaders: ["Content-Type", "Authorization", "X-Request-Id"],
+  exposedHeaders: ["X-Request-Id"],
 };
 
 // Main CORS handler
@@ -103,10 +120,24 @@ app.get("/health", (_req, res) => {
   res.json({ status: "ok" });
 });
 
+app.get("/ready", async (req, res) => {
+  try {
+    await query("SELECT 1");
+    return res.json({ status: "ready", requestId: req.requestId });
+  } catch (error) {
+    console.error("Readiness check failed", { requestId: req.requestId, error });
+    return res.status(503).json({ status: "unavailable", requestId: req.requestId });
+  }
+});
+
 // --------------------------------------------------
 // API ROUTES
 // --------------------------------------------------
 app.use("/api", apiRouter);
+
+app.use((req, res) => {
+  res.status(404).json({ message: "Route not found", requestId: req.requestId });
+});
 
 // --------------------------------------------------
 // GLOBAL ERROR HANDLER

@@ -10,6 +10,11 @@ import {
   assessParsedReceipt,
   buildParsedReceiptPayload,
 } from "../services/receipt_normalization.service.js";
+import {
+  hasReceiptFileSignature,
+  validateReceiptUpload,
+  validateStoredReceiptUpload,
+} from "../services/receipt_upload_validation.service.js";
 
 import { query } from "../config/db.js";
 import { logActivity } from "../services/activity.service.js";
@@ -31,6 +36,7 @@ import {
   presignPut,
   presignGet,
   headObject,
+  getObjectPrefix,
   deleteObject,
 } from "../services/r2.service.js";
 
@@ -42,39 +48,21 @@ import {
 export const presignUpload = asyncHandler(async (req, res) => {
   const { filename, contentType, sizeBytes } = req.body;
 
-  if (!filename || !contentType) {
-    return res.status(400).json({ message: "filename and contentType are required" });
-  }
-
   const runtimeSettings = await getRuntimeAppSettings();
   const keepReceiptFiles = await getReceiptKeepFiles(runtimeSettings);
   if (!keepReceiptFiles) {
     return res.status(403).json({ message: "Saving receipt files is currently disabled" });
   }
-  const fileSizeBytes = Number(sizeBytes || 0);
   const maxUploadBytes = Math.max(1, Number(runtimeSettings.max_upload_size_mb || 50)) * 1024 * 1024;
-  if (fileSizeBytes > maxUploadBytes) {
+  const validation = validateReceiptUpload({ filename, contentType, sizeBytes, maxUploadBytes });
+  if (!validation.valid) {
     return res.status(400).json({
-      message: `File exceeds max upload size of ${runtimeSettings.max_upload_size_mb} MB`,
+      message: validation.message === "File exceeds the maximum upload size"
+        ? `File exceeds max upload size of ${runtimeSettings.max_upload_size_mb} MB`
+        : validation.message,
     });
   }
-
-  const allowedExt = new Set(["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff", "bmp", "webp"]);
-  const allowedMime = new Set([
-    "application/pdf",
-    "image/png",
-    "image/jpeg",
-    "image/heic",
-    "image/heif",
-    "image/tiff",
-    "image/bmp",
-    "image/webp",
-  ]);
-  const ext = String(filename).split(".").pop().toLowerCase();
-  const isImage = String(contentType).startsWith("image/");
-  if (!allowedMime.has(contentType) && !(isImage && allowedExt.has(ext))) {
-    return res.status(400).json({ message: "Unsupported file type" });
-  }
+  const fileSizeBytes = validation.sizeBytes;
 
   // Create a DB row first (source of truth)
   // Then create an object key based on the receipt id
@@ -89,14 +77,14 @@ export const presignUpload = asyncHandler(async (req, res) => {
     userId: req.user.id,
     originalFilename: filename,
     objectKey,
-    fileType: contentType,
+    fileType: validation.contentType,
     fileSize: fileSizeBytes,
     fileSaved: true,
   });
 
   const uploadUrl = await presignPut({
     key: receipt.object_key,
-    contentType,
+    contentType: validation.contentType,
     expiresIn: 60,
   });
 
@@ -105,7 +93,7 @@ export const presignUpload = asyncHandler(async (req, res) => {
     action: "receipt_upload_start",
     entityType: "receipt",
     entityId: receipt.id,
-    metadata: { filename, contentType, sizeBytes: Number(sizeBytes || 0) },
+    metadata: { filename, contentType: validation.contentType, sizeBytes: fileSizeBytes },
     req,
   });
   res.json({
@@ -126,11 +114,52 @@ export const confirmUpload = asyncHandler(async (req, res) => {
   const receipt = await getReceiptById(req.user.id, receiptId);
   if (!receipt) return res.status(404).json({ message: "Receipt not found" });
 
+  if (receipt.processing_status === "processed") {
+    return res.json({ receiptId, status: "processed" });
+  }
+  if (["queued", "processing"].includes(receipt.processing_status)) {
+    return res.status(202).json({ receiptId, status: "processing" });
+  }
+
   // 1) Verify object exists in R2 (fail fast if client never uploaded)
+  let objectMetadata;
   try {
-    await headObject({ key: receipt.object_key });
+    objectMetadata = await headObject({ key: receipt.object_key });
   } catch {
     return res.status(400).json({ message: "Upload not found in object storage" });
+  }
+
+  const maxUploadBytes = Math.max(1, Number(runtimeSettings.max_upload_size_mb || 50)) * 1024 * 1024;
+  let storedValidation = validateStoredReceiptUpload({
+    expectedSizeBytes: receipt.file_size,
+    expectedContentType: receipt.file_type,
+    actualSizeBytes: objectMetadata?.ContentLength,
+    actualContentType: objectMetadata?.ContentType,
+    maxUploadBytes,
+  });
+  if (storedValidation.valid) {
+    try {
+      const objectPrefix = await getObjectPrefix({ key: receipt.object_key, bytes: 1024 });
+      if (!hasReceiptFileSignature(objectPrefix, receipt.file_type)) {
+        storedValidation = { valid: false, message: "Uploaded file contents do not match the selected file type" };
+      }
+    } catch {
+      return res.status(503).json({ message: "Unable to verify the uploaded file right now. Please try again." });
+    }
+  }
+  if (!storedValidation.valid) {
+    try {
+      await deleteObject({ key: receipt.object_key });
+    } catch {
+      // Best effort: the receipt remains marked failed even if storage cleanup is unavailable.
+    }
+    await updateReceiptParsedData(req.user.id, receiptId, {
+      fileSaved: false,
+      processingStatus: "failed",
+      processingStage: "failed",
+      processingError: storedValidation.message,
+    });
+    return res.status(400).json({ message: storedValidation.message });
   }
 
   await updateReceiptParsedData(req.user.id, receiptId, {
@@ -171,29 +200,23 @@ export const scanOnly = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "No file uploaded" });
   }
 
-  const allowedExt = new Set(["pdf", "png", "jpg", "jpeg", "heic", "heif", "tif", "tiff", "bmp", "webp"]);
-  const allowedMime = new Set([
-    "application/pdf",
-    "image/png",
-    "image/jpeg",
-    "image/heic",
-    "image/heif",
-    "image/tiff",
-    "image/bmp",
-    "image/webp",
-  ]);
-  const ext = String(file.originalname || "").split(".").pop().toLowerCase();
-  const isImage = String(file.mimetype || "").startsWith("image/");
-  if (!allowedMime.has(file.mimetype) && !(isImage && allowedExt.has(ext))) {
-    return res.status(400).json({ message: "Unsupported file type" });
-  }
-
   const runtimeSettings = await getRuntimeAppSettings();
   const maxUploadBytes = Math.max(1, Number(runtimeSettings.max_upload_size_mb || 50)) * 1024 * 1024;
-  if (Number(file.size || 0) > maxUploadBytes) {
+  const validation = validateReceiptUpload({
+    filename: file.originalname,
+    contentType: file.mimetype,
+    sizeBytes: file.size,
+    maxUploadBytes,
+  });
+  if (!validation.valid) {
     return res.status(400).json({
-      message: `File exceeds max upload size of ${runtimeSettings.max_upload_size_mb} MB`,
+      message: validation.message === "File exceeds the maximum upload size"
+        ? `File exceeds max upload size of ${runtimeSettings.max_upload_size_mb} MB`
+        : validation.message,
     });
+  }
+  if (!hasReceiptFileSignature(file.buffer, validation.contentType)) {
+    return res.status(400).json({ message: "Uploaded file contents do not match the selected file type" });
   }
 
   let ocrText = "";
@@ -372,7 +395,13 @@ export const updateOcrText = asyncHandler(async (req, res) => {
    GET /api/receipts
    ============================================================ */
 export const getAll = asyncHandler(async (req, res) => {
-  const receipts = await listReceipts(req.user.id);
+  const parsedLimit = Number.parseInt(String(req.query.limit ?? ""), 10);
+  const parsedOffset = Number.parseInt(String(req.query.offset ?? ""), 10);
+  const limit = Number.isFinite(parsedLimit) && parsedLimit > 0
+    ? Math.min(parsedLimit, 1000)
+    : 200;
+  const offset = Number.isFinite(parsedOffset) && parsedOffset >= 0 ? parsedOffset : 0;
+  const receipts = await listReceipts(req.user.id, { limit, offset });
   res.json(receipts);
 });
 

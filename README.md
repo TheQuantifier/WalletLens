@@ -1,6 +1,6 @@
-# WiseWallet
+# WalletLens
 
-WiseWallet is a full-stack personal finance web app for tracking income/expenses, scanning receipts with OCR + AI parsing, building budgets, and viewing reports.
+WalletLens is a full-stack personal finance web app for tracking income/expenses, scanning receipts with OCR + AI parsing, building budgets, and viewing reports.
 
 ## What the app includes
 
@@ -15,11 +15,11 @@ WiseWallet is a full-stack personal finance web app for tracking income/expenses
 - Profile management (editable profile, avatar picker, activity feed)
 - Settings for theme, currency, timezone, dashboard defaults, password change, and account/session controls
 - Help/support form wired to backend email delivery
-- Legal pages included: `web/privacy.html` and `web/terms.html`
+- Legal and help pages are included in the React app routes.
 
 ## Tech stack
 
-- Frontend: Vanilla HTML/CSS/JavaScript modules (`web/`)
+- Frontend: React, Vite, CSS, and JavaScript modules (`web/`)
 - Backend: Node.js 20, Express (`api/`)
 - Database: PostgreSQL
 - Object storage: Cloudflare R2 (S3-compatible presigned upload/download)
@@ -29,7 +29,7 @@ WiseWallet is a full-stack personal finance web app for tracking income/expenses
 ## Project structure
 
 ```text
-WiseWallet/
+WalletLens/
   web/                  # static frontend pages + scripts + styles
   api/                  # Express API, models, controllers, routes, migrations
   worker/               # Python OCR worker script
@@ -162,6 +162,12 @@ API health check:
 
 ```bash
 curl http://localhost:4000/health
+```
+
+Database readiness check:
+
+```bash
+curl http://localhost:4000/ready
 ```
 
 ```bash

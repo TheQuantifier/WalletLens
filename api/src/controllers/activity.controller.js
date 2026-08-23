@@ -3,9 +3,12 @@ import asyncHandler from "../middleware/async.js";
 import { listActivityForUser } from "../models/activity.model.js";
 
 export const getRecent = asyncHandler(async (req, res) => {
-  const limit = Number(req.query.limit || 20);
+  const requestedLimit = Number.parseInt(String(req.query.limit || "20"), 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(100, Math.max(1, requestedLimit))
+    : 20;
   const rows = await listActivityForUser(req.user.id, {
-    limit: Number.isFinite(limit) ? limit : 20,
+    limit,
   });
   res.json(rows);
 });

@@ -56,15 +56,17 @@
       <div id="accountArea" class="account-area">
 
         <!-- Avatar / Icon -->
-        <div
+        <button
+          type="button"
           id="account-icon"
           class="account-icon"
-          tabindex="0"
           aria-haspopup="true"
           aria-expanded="false"
+          aria-controls="account-menu"
+          aria-label="Open account menu"
         >
           <div id="avatarLetters" class="avatar-initials">?</div>
-        </div>
+        </button>
 
         <!-- Dropdown -->
         <ul id="account-menu" class="account-menu" role="menu">

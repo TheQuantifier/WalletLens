@@ -1,7 +1,15 @@
 // scripts/upload.js
-// FinanceApp — Receipt Uploads, Downloads, and Deletion (Modal-based)
+// WalletLens — Receipt Uploads, Downloads, and Deletion (Modal-based)
 
 import { api } from "../../scripts/api.js";
+
+const escapeHtml = (value) => String(value ?? "").replace(/[&<>"']/g, (character) => ({
+  "&": "&amp;",
+  "<": "&lt;",
+  ">": "&gt;",
+  '"': "&quot;",
+  "'": "&#39;",
+})[character]);
 
 export function initUploadPage() {
   if (window.__walletlensUploadPageInitialized) return;
@@ -296,10 +304,12 @@ export function initUploadPage() {
       if (processingStatus === "failed") status = "Failed";
 
       const fileSaved = r?.fileSaved ?? r?.file_saved ?? true;
+      const safeId = escapeHtml(id);
+      const safeFilename = escapeHtml(filename);
       const downloadBtn = fileSaved
         ? `<button class="icon-btn js-download" type="button"
-                  data-id="${id}"
-                  data-filename="${filename}">
+                  data-id="${safeId}"
+                  data-filename="${safeFilename}">
             ${downloadIcon}
           </button>`
         : "";
@@ -309,8 +319,8 @@ export function initUploadPage() {
       tr.dataset.linkedRecordId = r?.linkedRecordId || r?.linkedRecord || r?.linked_record_id || "";
 
       tr.innerHTML = `
-        <td>${filename}</td>
-        <td>${r?.fileType || r?.file_type || r?.mimetype || r?.mime_type || "—"}</td>
+        <td class="recent-upload-filename" title="${safeFilename}">${safeFilename}</td>
+        <td>${escapeHtml(r?.fileType || r?.file_type || r?.mimetype || r?.mime_type || "—")}</td>
         <td class="num">${bytesToSize(r?.fileSize || r?.file_size || r?.size || 0)}</td>
         <td>${created}</td>
         <td>${status}</td>
@@ -319,7 +329,7 @@ export function initUploadPage() {
           ${downloadBtn}
 
           <button class="icon-btn js-delete" type="button"
-                  data-id="${id}">
+                  data-id="${safeId}">
             ${trashIcon}
           </button>
         </td>

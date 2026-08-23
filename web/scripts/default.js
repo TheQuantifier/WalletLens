@@ -8,8 +8,6 @@ and manages dashboard view preference.
 =============================================== */
 
 import { api } from "./api.js";
-import { initWalterLens } from "./walterlens.js";
-import { initAppTour } from "./tour.js";
 
 /* ===============================================
   DEVELOPMENT AUTH GUARD TOGGLE
@@ -17,7 +15,7 @@ import { initAppTour } from "./tour.js";
 
 // Set to false while developing pages to bypass login requirement
 const AUTH_GUARD_ENABLED = true;
-const DEFAULT_APP_NAME = "<AppName>";
+const DEFAULT_APP_NAME = "WalletLens";
 const APP_NAME_REGEX = /<AppName>/g;
 const APP_NAME_TEST = /<AppName>/;
 const ACHIEVEMENT_SEEN_KEY = "seen_achievement_keys_v1";
@@ -47,7 +45,7 @@ const MAINTENANCE_MODE_BACKGROUND_COLOR_KEY = "maintenanceModeBackgroundColor";
 const MAINTENANCE_MODE_TEXT_COLOR_KEY = "maintenanceModeTextColor";
 const DEFAULT_EXPORT_FORMAT_KEY = "defaultDataExportFormat";
 const AUTH_TOKEN_KEY = "auth_token";
-const TEMPLATE_CACHE_VERSION = "2026-06-25-planning-after-budgeting";
+const TEMPLATE_CACHE_VERSION = "2026-08-23-persistent-shared-shell";
 const HEADER_CACHE_KEY = `cachedHeaderHtml:${TEMPLATE_CACHE_VERSION}`;
 const FOOTER_CACHE_KEY = `cachedFooterHtml:${TEMPLATE_CACHE_VERSION}`;
 const HEX_COLOR_RE = /^#[0-9a-f]{6}$/i;
@@ -174,14 +172,86 @@ function initializeSharedPageShell() {
   applySavedTheme();
   loadHeaderAndFooter();
   applyCachedAppName();
+  updateCurrentYearLabels();
   updateAppName();
 }
 
+let dynamicShellObserver;
+
+function updateCurrentYearLabels(root = document) {
+  const year = String(new Date().getFullYear());
+  root.querySelectorAll?.("[data-current-year], #year").forEach((element) => {
+    if (element.textContent !== year) element.textContent = year;
+  });
+}
+
+function ensureMainContentTarget() {
+  const main = document.querySelector("main");
+  if (main && !main.id) main.id = "mainContent";
+}
+
+function initDynamicShellObserver() {
+  if (dynamicShellObserver || !document.body) return;
+  dynamicShellObserver = new MutationObserver((mutations) => {
+    const addedNodes = mutations.flatMap((mutation) => Array.from(mutation.addedNodes));
+    const hasAppNamePlaceholder = addedNodes.some((node) =>
+      node.nodeType === Node.TEXT_NODE
+        ? APP_NAME_TEST.test(node.nodeValue || "")
+        : APP_NAME_TEST.test(node.textContent || "")
+    );
+    const hasYearLabel = addedNodes.some((node) =>
+      node.nodeType === Node.ELEMENT_NODE && (
+        node.matches?.("[data-current-year], #year") ||
+        node.querySelector?.("[data-current-year], #year")
+      )
+    );
+    const hasMainContent = addedNodes.some((node) =>
+      node.nodeType === Node.ELEMENT_NODE && (
+        node.matches?.("main") || node.querySelector?.("main")
+      )
+    );
+    if (hasAppNamePlaceholder) applyCachedAppName();
+    if (hasYearLabel) updateCurrentYearLabels();
+    if (hasMainContent) ensureMainContentTarget();
+  });
+  dynamicShellObserver.observe(document.body, { childList: true, subtree: true });
+}
+
+let walterLensModulePromise;
+let appTourModulePromise;
+
+function initWalterLensDeferred() {
+  walterLensModulePromise ||= import("./walterlens.js");
+  walterLensModulePromise.then(({ initWalterLens }) => initWalterLens()).catch((error) => {
+    console.error("Unable to initialize WalterLens:", error);
+  });
+}
+
+function initAppTourDeferred() {
+  appTourModulePromise ||= import("./tour.js");
+  appTourModulePromise.then(({ initAppTour }) => initAppTour()).catch((error) => {
+    console.error("Unable to initialize the app tour:", error);
+  });
+}
+
+function scheduleOptionalUi() {
+  const initialize = () => {
+    initWalterLensDeferred();
+    initAppTourDeferred();
+  };
+  if ("requestIdleCallback" in window) {
+    window.requestIdleCallback(initialize, { timeout: 1200 });
+  } else {
+    window.setTimeout(initialize, 0);
+  }
+}
+
 document.addEventListener("DOMContentLoaded", () => {
+  initDynamicShellObserver();
   initializeSharedPageShell();
+  ensureMainContentTarget();
   initLiveNavigation();
-  initWalterLens();
-  initAppTour();
+  scheduleOptionalUi();
   initAchievementCelebrations();
   initNotifications();
   initInactivityTimeoutMonitor();
@@ -189,83 +259,90 @@ document.addEventListener("DOMContentLoaded", () => {
 
 document.addEventListener("walletlens:template-ready", () => {
   initializeSharedPageShell();
-  initAppTour();
+  initAppTourDeferred();
   updateMobileNavActiveState();
 });
 
 /**
 * Fetch and inject header & footer, then init UI
 */
+let headerTemplatePromise;
+let footerTemplatePromise;
+
+function getSharedTemplate(url, cacheKey, type) {
+  const cached = sessionStorage.getItem(cacheKey);
+  if (cached) return Promise.resolve(cached);
+
+  const currentPromise = type === "header" ? headerTemplatePromise : footerTemplatePromise;
+  if (currentPromise) return currentPromise;
+
+  const request = fetch(url, { cache: "no-cache" })
+    .then((response) => {
+      if (!response.ok) throw new Error(`${type === "header" ? "Header" : "Footer"} not found`);
+      return response.text();
+    })
+    .then((html) => {
+      sessionStorage.setItem(cacheKey, html);
+      return html;
+    })
+    .catch((error) => {
+      if (type === "header") headerTemplatePromise = null;
+      else footerTemplatePromise = null;
+      throw error;
+    });
+
+  if (type === "header") headerTemplatePromise = request;
+  else footerTemplatePromise = request;
+  return request;
+}
+
+function initializeInjectedHeader(headerEl, html) {
+  if (!headerEl?.isConnected) return;
+  if (headerEl.innerHTML !== html) headerEl.innerHTML = html;
+  setLogoLinkDestination("/");
+  setActiveNavLink();
+  initMobileNavMenu();
+  initAccountMenu();
+  updateHeaderAuthState();
+  applyCachedAppName();
+  updateAppName();
+  wireLogoutButton();
+  wireDashboardViewSelector();
+  updateMobileNavActiveState();
+}
+
+function initializeInjectedFooter(footerEl, html) {
+  if (!footerEl?.isConnected) return;
+  if (footerEl.innerHTML !== html) footerEl.innerHTML = html;
+  applyCachedAppName();
+  updateCurrentYearLabels(footerEl);
+  setActiveFooterLink();
+  setProtectedNavigationVisibility(hasClientAuthHint());
+}
+
 function loadHeaderAndFooter() {
   const headerEl = document.getElementById("header");
   const footerEl = document.getElementById("footer");
-  sessionStorage.removeItem("cachedHeaderHtml");
-  sessionStorage.removeItem("cachedFooterHtml");
-  const cachedHeader = sessionStorage.getItem(HEADER_CACHE_KEY);
-  const cachedFooter = sessionStorage.getItem(FOOTER_CACHE_KEY);
 
-  if (headerEl && cachedHeader) {
-    if (headerEl.innerHTML !== cachedHeader) {
-      headerEl.innerHTML = cachedHeader;
+  if (headerEl) {
+    const cachedHeader = sessionStorage.getItem(HEADER_CACHE_KEY);
+    if (cachedHeader) initializeInjectedHeader(headerEl, cachedHeader);
+    else {
+      getSharedTemplate("components/header.html", HEADER_CACHE_KEY, "header")
+        .then((html) => initializeInjectedHeader(headerEl, html))
+        .catch((error) => console.error("Header load failed:", error));
     }
-    setActiveNavLink();
-    initMobileNavMenu();
-    initAccountMenu();
-    updateHeaderAuthState();
-    updateAppName();
-    wireLogoutButton();
-    wireDashboardViewSelector();
-    updateMobileNavActiveState();
   }
 
-  if (footerEl && cachedFooter) {
-    if (footerEl.innerHTML !== cachedFooter) {
-      footerEl.innerHTML = cachedFooter;
+  if (footerEl) {
+    const cachedFooter = sessionStorage.getItem(FOOTER_CACHE_KEY);
+    if (cachedFooter) initializeInjectedFooter(footerEl, cachedFooter);
+    else {
+      getSharedTemplate("components/footer.html", FOOTER_CACHE_KEY, "footer")
+        .then((html) => initializeInjectedFooter(footerEl, html))
+        .catch((error) => console.error("Footer load failed:", error));
     }
-    setActiveFooterLink();
-    setProtectedNavigationVisibility(hasClientAuthHint());
   }
-
-  // --- Load Header ---
-  fetch("components/header.html", { cache: "no-store" })
-    .then((res) => {
-      if (!res.ok) throw new Error("Header not found");
-      return res.text();
-    })
-    .then((html) => {
-      if (headerEl && headerEl.innerHTML !== html) {
-      headerEl.innerHTML = html;
-    }
-    sessionStorage.setItem(HEADER_CACHE_KEY, html);
-    setLogoLinkDestination("/");
-
-    setActiveNavLink();
-      initMobileNavMenu();
-      initAccountMenu();
-      updateHeaderAuthState();
-      updateAppName();
-      wireLogoutButton();
-      wireDashboardViewSelector(); // NEW: Wire dashboard view selector
-      updateMobileNavActiveState();
-    })
-    .catch((err) => console.error("Header load failed:", err));
-
-  // --- Load Footer ---
-  fetch("components/footer.html", { cache: "no-store" })
-    .then((res) => {
-      if (!res.ok) throw new Error("Footer not found");
-      return res.text();
-    })
-    .then((html) => {
-      if (!footerEl) return;
-      if (footerEl.innerHTML !== html) {
-        footerEl.innerHTML = html;
-      }
-      sessionStorage.setItem(FOOTER_CACHE_KEY, html);
-      setActiveFooterLink();
-      setProtectedNavigationVisibility(hasClientAuthHint());
-    })
-    .catch((err) => console.error("Footer load failed:", err));
 }
 
 function setLogoLinkDestination(href) {
@@ -1229,7 +1306,7 @@ function openAccountSwitcher(organizations, activeOrganizationId) {
 }
 
 async function updateAppName() {
-  const cached = sessionStorage.getItem("appName");
+  const cached = sessionStorage.getItem("appName") || DEFAULT_APP_NAME;
   if (cached) {
     const nameEl = document.getElementById("appName");
     if (nameEl) nameEl.textContent = cached;
@@ -1284,10 +1361,7 @@ function normalizeMaintenanceColor(value, fallback) {
 }
 
 function applyCachedAppName() {
-  const cached = sessionStorage.getItem("appName");
-  if (cached) {
-    applyAppName(cached);
-  }
+  applyAppName(sessionStorage.getItem("appName") || DEFAULT_APP_NAME);
 }
 
 function applyAppName(appName) {

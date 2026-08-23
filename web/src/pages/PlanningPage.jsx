@@ -884,8 +884,10 @@ export default function PlanningPage() {
   const [data, setData] = useState(defaultPlanningData(false));
   const [isBusiness, setIsBusiness] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [planningLoaded, setPlanningLoaded] = useState(false);
   const [saving, setSaving] = useState(false);
   const [status, setStatus] = useState("Loading planning tables...");
+  const [taxDataWarning, setTaxDataWarning] = useState("");
   const [quickAllocationOpen, setQuickAllocationOpen] = useState(false);
   const [quickAllocation, setQuickAllocation] = useState({
     type: "Emergency fund",
@@ -903,17 +905,34 @@ export default function PlanningPage() {
     async function load() {
       setLoading(true);
       try {
-        const [me, payload, publicSettings] = await Promise.all([
-          api.auth.me().catch(() => null),
-          api.planningSheets.get().catch(() => null),
-          api.appSettings.getPublic().catch(() => null),
+        const [meResult, planningResult, settingsResult] = await Promise.allSettled([
+          api.auth.me(),
+          api.planningSheets.get(),
+          api.appSettings.getPublic(),
         ]);
         if (!active) return;
+        const me = meResult.status === "fulfilled" ? meResult.value : null;
+        const publicSettings = settingsResult.status === "fulfilled" ? settingsResult.value : null;
         const business = Boolean(me?.user?.active_organization_id || me?.user?.activeOrganizationId || ["org_user", "org_admin"].includes(String(me?.user?.role || "").toLowerCase()));
         setIsBusiness(business);
-        setData(normalizeData(payload?.planningSheet?.data, business));
-        setTaxData(normalizeTaxData(publicSettings?.taxData));
-        setStatus("Planning tables updated.");
+        if (planningResult.status === "fulfilled") {
+          setData(normalizeData(planningResult.value?.planningSheet?.data, business));
+          setPlanningLoaded(true);
+        } else {
+          setPlanningLoaded(false);
+        }
+        if (publicSettings?.taxData) {
+          setTaxData(normalizeTaxData(publicSettings.taxData));
+          setTaxDataWarning("");
+        } else {
+          setTaxData(DEFAULT_TAX_DATA);
+          setTaxDataWarning(`Live tax data is unavailable. Estimates are using the built-in ${DEFAULT_TAX_DATA.year} fallback rates; verify them before making financial or filing decisions.`);
+        }
+        setStatus(
+          planningResult.status === "fulfilled"
+            ? "Planning tables updated."
+            : "Could not load your saved planning tables. Saving is disabled to protect existing data."
+        );
       } catch (err) {
         setStatus(`Could not load planning tables: ${err?.message || "Unknown error"}`);
       } finally {
@@ -985,9 +1004,11 @@ export default function PlanningPage() {
           </div>
           <div className="planning-actions">
             <span className="status-banner subtle" aria-live="polite">{loading ? "Loading..." : status}</span>
-            <button className="btn btn--primary" type="button" onClick={save} disabled={saving}>{saving ? "Saving..." : "Save planning"}</button>
+            <button className="btn btn--primary" type="button" onClick={save} disabled={saving || !planningLoaded}>{saving ? "Saving..." : "Save planning"}</button>
           </div>
         </section>
+
+        {taxDataWarning ? <p className="planning-data-warning" role="alert">{taxDataWarning}</p> : null}
 
         <section className="planning-summary-grid" aria-label="Planning totals">
           <article><span>After-Tax Take-Home</span><strong>{money(convertAnnual(totals.takeHomeAnnual, "monthly"))}</strong><small>Monthly</small></article>

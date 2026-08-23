@@ -21,9 +21,21 @@ const boolFromEnv = (value, defaultValue = false) => {
   return ["1", "true", "yes", "on"].includes(String(value).toLowerCase());
 };
 
+const intFromEnv = (value, defaultValue, min, max) => {
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) return defaultValue;
+  return Math.min(max, Math.max(min, parsed));
+};
+
 const env = {
   nodeEnv: process.env.NODE_ENV || "development",
   port: Number(process.env.PORT || 4000),
+  trustProxyHops: intFromEnv(
+    process.env.TRUST_PROXY_HOPS,
+    (process.env.NODE_ENV || "development") === "production" ? 1 : 0,
+    0,
+    10
+  ),
 
   // Database (switchable)
   dbProvider: (process.env.DB_PROVIDER || "postgres").toLowerCase(),
@@ -65,6 +77,7 @@ const env = {
     : path.resolve(__dirname, "..", "..", "worker", "ocr_demo.py"),
   pythonBin: process.env.PYTHON_BIN || null,
   keepReceiptFiles: boolFromEnv(process.env.RECEIPT_KEEP_FILES, true),
+  directUploadMaxMb: intFromEnv(process.env.DIRECT_UPLOAD_MAX_MB, 50, 1, 250),
 
   // AI Parser
   aiProvider: (process.env.AI_PROVIDER || "gemini").toLowerCase(),

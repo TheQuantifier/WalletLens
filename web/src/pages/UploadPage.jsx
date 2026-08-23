@@ -65,6 +65,14 @@ export default function UploadPage() {
       
             <div className="table-wrap">
               <table className="txn-table">
+                <colgroup>
+                  <col className="recent-upload-file-col" />
+                  <col className="recent-upload-type-col" />
+                  <col className="recent-upload-size-col" />
+                  <col className="recent-upload-date-col" />
+                  <col className="recent-upload-status-col" />
+                  <col className="recent-upload-actions-col" />
+                </colgroup>
                 <thead>
                   <tr>
                     <th scope="col">File name</th>

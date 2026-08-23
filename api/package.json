@@ -1,7 +1,7 @@
 {
   "name": "financeapp-api",
   "version": "1.0.0",
-  "description": "Backend API for FinanceApp (Render + Neon Postgres + R2 + OCR + Gemini AI Parser)",
+  "description": "Backend API for WalletLens (Render + Neon Postgres + R2 + OCR + Gemini AI Parser)",
   "type": "module",
   "main": "src/server.js",
   "scripts": {

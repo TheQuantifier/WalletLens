@@ -312,7 +312,7 @@ export default function AdminPage() {
                   <h3 className="admin-settings-subtitle">General</h3>
                   <label className="settings-item">
                     <span>App Name</span>
-                    <input id="appNameInput" type="text" placeholder="&lt;AppName&gt;" />
+                    <input id="appNameInput" type="text" placeholder="WalletLens" />
                   </label>
                   <label className="settings-item">
                     <span>Receipt Storage</span>

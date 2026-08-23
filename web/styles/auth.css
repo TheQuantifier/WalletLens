@@ -19,7 +19,6 @@ body.landing-light {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
-  overflow-x: hidden;
 }
 
 /* =========================================================
@@ -864,12 +863,17 @@ input:-webkit-autofill {
   }
   .nf-header-inner {
     padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+  .nf-header-inner .logo-group {
+    flex: 1 1 100%;
+    min-width: 0;
   }
   .nf-signup {
     width: 100%;
   }
   .nf-hero {
-    padding: 5rem 1rem 3rem;
+    padding: 7.5rem 1rem 3rem;
   }
 }
 

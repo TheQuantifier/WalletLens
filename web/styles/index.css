@@ -517,14 +517,14 @@
 @media (max-width: 640px) {
   .index-auth-actions {
     width: 100%;
-    flex-direction: column;
-    align-items: stretch;
-    justify-content: flex-end;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: center;
     gap: 0.5rem;
   }
 
   .index-hero {
-    padding-top: 3.1rem;
+    padding-top: 5.6rem;
   }
 
   .index-cta-row,
@@ -541,6 +541,12 @@
   .index-secondary-cta,
   .index-auth-actions .btn {
     width: 100%;
+    min-width: 0;
+  }
+
+  .index-hero h1,
+  .index-hero p {
+    overflow-wrap: anywhere;
   }
 
 }

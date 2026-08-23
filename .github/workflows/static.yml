@@ -2,6 +2,8 @@ name: Build and deploy React app to GitHub Pages
 on:
   push:
     branches: [ main ]
+  pull_request:
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +30,15 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Install API dependencies
+        run: npm ci --prefix api
+
+      - name: Run API tests
+        run: npm test --prefix api
+
+      - name: Run WalterLens question matrix
+        run: npm run test:walterlens-matrix --prefix api
+
       - name: Build React app
         run: npm run build
 
@@ -41,6 +52,7 @@ jobs:
           path: dist
 
   deploy:
+    if: github.event_name != 'pull_request'
     needs: build
     runs-on: ubuntu-latest
     environment:

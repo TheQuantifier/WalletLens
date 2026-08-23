@@ -1,31 +1,33 @@
-import { useEffect, useMemo, useState } from "react";
+import { lazy, Suspense, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { api } from "../scripts/api.js";
-import AboutPage from "./pages/AboutPage.jsx";
-import AcceptInvitePage from "./pages/AcceptInvitePage.jsx";
-import AdminPage from "./pages/AdminPage.jsx";
-import BudgetingPage from "./pages/BudgetingPage.jsx";
-import CareersPage from "./pages/CareersPage.jsx";
-import ExpiredPage from "./pages/ExpiredPage.jsx";
-import HelpPage from "./pages/HelpPage.jsx";
-import HomePage from "./pages/HomePage.jsx";
-import IndexPage from "./pages/IndexPage.jsx";
-import LoginPage from "./pages/LoginPage.jsx";
-import PrivacyPage from "./pages/PrivacyPage.jsx";
-import PlanningPage from "./pages/PlanningPage.jsx";
-import ProfilePage from "./pages/ProfilePage.jsx";
-import RecordsPage from "./pages/RecordsPage.jsx";
-import RecurringPage from "./pages/RecurringPage.jsx";
-import RegisterPage from "./pages/RegisterPage.jsx";
-import RegisterWhoPage from "./pages/RegisterWhoPage.jsx";
-import RegisterBusinessPage from "./pages/RegisterBusinessPage.jsx";
-import ReportsPage from "./pages/ReportsPage.jsx";
-import RulesPage from "./pages/RulesPage.jsx";
-import SettingsPage from "./pages/SettingsPage.jsx";
-import TermsPage from "./pages/TermsPage.jsx";
-import TeamPage from "./pages/TeamPage.jsx";
-import TimeoutPage from "./pages/TimeoutPage.jsx";
-import UploadPage from "./pages/UploadPage.jsx";
+
+const AboutPage = lazy(() => import("./pages/AboutPage.jsx"));
+const AcceptInvitePage = lazy(() => import("./pages/AcceptInvitePage.jsx"));
+const AdminPage = lazy(() => import("./pages/AdminPage.jsx"));
+const BudgetingPage = lazy(() => import("./pages/BudgetingPage.jsx"));
+const CareersPage = lazy(() => import("./pages/CareersPage.jsx"));
+const ExpiredPage = lazy(() => import("./pages/ExpiredPage.jsx"));
+const HelpPage = lazy(() => import("./pages/HelpPage.jsx"));
+const HomePage = lazy(() => import("./pages/HomePage.jsx"));
+const IndexPage = lazy(() => import("./pages/IndexPage.jsx"));
+const LoginPage = lazy(() => import("./pages/LoginPage.jsx"));
+const NotFoundPage = lazy(() => import("./pages/NotFoundPage.jsx"));
+const PrivacyPage = lazy(() => import("./pages/PrivacyPage.jsx"));
+const PlanningPage = lazy(() => import("./pages/PlanningPage.jsx"));
+const ProfilePage = lazy(() => import("./pages/ProfilePage.jsx"));
+const RecordsPage = lazy(() => import("./pages/RecordsPage.jsx"));
+const RecurringPage = lazy(() => import("./pages/RecurringPage.jsx"));
+const RegisterPage = lazy(() => import("./pages/RegisterPage.jsx"));
+const RegisterWhoPage = lazy(() => import("./pages/RegisterWhoPage.jsx"));
+const RegisterBusinessPage = lazy(() => import("./pages/RegisterBusinessPage.jsx"));
+const ReportsPage = lazy(() => import("./pages/ReportsPage.jsx"));
+const RulesPage = lazy(() => import("./pages/RulesPage.jsx"));
+const SettingsPage = lazy(() => import("./pages/SettingsPage.jsx"));
+const TermsPage = lazy(() => import("./pages/TermsPage.jsx"));
+const TeamPage = lazy(() => import("./pages/TeamPage.jsx"));
+const TimeoutPage = lazy(() => import("./pages/TimeoutPage.jsx"));
+const UploadPage = lazy(() => import("./pages/UploadPage.jsx"));
 
 const ROUTES = {
   "/": { title: "WalletLens", Page: IndexPage },
@@ -71,6 +73,7 @@ const PUBLIC_ROUTES = new Set([
   "/timeout",
   "/expired",
 ]);
+const NOT_FOUND_ROUTE = { title: "WalletLens - Page Not Found", Page: NotFoundPage };
 const MAINTENANCE_MODE_ENABLED_KEY = "maintenanceModeEnabled";
 const MAINTENANCE_MODE_BANNER_TEXT_KEY = "maintenanceModeBannerText";
 const MAINTENANCE_MODE_PAGE_IDS_KEY = "maintenanceModePageIds";
@@ -215,6 +218,49 @@ function PublicContactForm() {
 }
 
 function PublicInfoModal({ kind, onClose, hasMaintenanceBanner = false }) {
+  const contentRef = useRef(null);
+
+  useEffect(() => {
+    if (!kind) return undefined;
+    const previousActiveElement = document.activeElement;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const content = contentRef.current;
+    content?.querySelector("button, a, input, textarea, select")?.focus();
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        onClose();
+        return;
+      }
+      if (event.key !== "Tab" || !content) return;
+      const focusable = Array.from(content.querySelectorAll(
+        'button:not([disabled]), a[href], input:not([disabled]), textarea:not([disabled]), select:not([disabled]), iframe, [tabindex]:not([tabindex="-1"])'
+      ));
+      if (!focusable.length) {
+        event.preventDefault();
+        content.focus();
+        return;
+      }
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("keydown", onKeyDown);
+      document.body.style.overflow = previousOverflow;
+      previousActiveElement?.focus?.();
+    };
+  }, [kind]);
+
   if (!kind) return null;
   const title = kind === "about" ? "About WalletLens" : kind === "privacy" ? "Privacy Policy" : "Contact";
   return (
@@ -225,7 +271,7 @@ function PublicInfoModal({ kind, onClose, hasMaintenanceBanner = false }) {
       aria-labelledby="publicInfoModalTitle"
     >
       <button type="button" className="nf-modal-backdrop" aria-label="Close" onClick={onClose}></button>
-      <div className="nf-modal-content public-info-modal-content" role="document">
+      <div ref={contentRef} className="nf-modal-content public-info-modal-content" role="document" tabIndex="-1">
         <div className="nf-modal-header">
           <h2 id="publicInfoModalTitle">{title}</h2>
           <button type="button" className="nf-modal-close" onClick={onClose}>Back</button>
@@ -280,6 +326,31 @@ function ensureMaintenanceBannerHost() {
   return host;
 }
 
+function RoutedPage({ Page, routeKey }) {
+  useLayoutEffect(() => {
+    document.dispatchEvent(new CustomEvent("walletlens:template-ready"));
+  }, [routeKey]);
+
+  return <Page />;
+}
+
+function RouteLoadingFallback({ includeAuthenticatedHeader }) {
+  useLayoutEffect(() => {
+    if (includeAuthenticatedHeader) {
+      document.dispatchEvent(new CustomEvent("walletlens:template-ready"));
+    }
+  }, [includeAuthenticatedHeader]);
+
+  return (
+    <>
+      {includeAuthenticatedHeader ? <div id="header"></div> : null}
+      <main id="mainContent" className="app-route-loading" aria-busy="true">
+        <p role="status">Loading WalletLens…</p>
+      </main>
+    </>
+  );
+}
+
 export default function App() {
   const [locationState, setLocationState] = useState(() => ({
     path: normalizePath(window.location.pathname),
@@ -295,7 +366,7 @@ export default function App() {
   const [maintenanceBannerHost, setMaintenanceBannerHost] = useState(null);
   const [publicModal, setPublicModal] = useState("");
   const path = locationState.path;
-  const route = useMemo(() => ROUTES[path] || ROUTES["/"], [path]);
+  const route = useMemo(() => ROUTES[path] || NOT_FOUND_ROUTE, [path]);
   const Page = route.Page;
   const showMaintenanceBanner = shouldShowMaintenanceBanner(maintenanceSettings, path);
 
@@ -366,10 +437,7 @@ export default function App() {
   useEffect(() => {
     document.title = route.title;
     const landingRoutes = new Set(["/", "/index", "/login", "/register", "/registerwho", "/registerbusiness", "/acceptinvite", "/timeout", "/expired"]);
-    document.body.classList.toggle("landing-light", landingRoutes.has(path));
-    window.setTimeout(() => {
-      document.dispatchEvent(new CustomEvent("walletlens:template-ready"));
-    }, 0);
+    document.body.classList.toggle("landing-light", landingRoutes.has(path) || !ROUTES[path]);
   }, [path, route]);
 
   useEffect(() => {
@@ -452,7 +520,16 @@ export default function App() {
 
   return (
     <>
-      {authGateChecking ? null : <Page key={`${locationState.path}${locationState.search}${locationState.hash}`} />}
+      <a className="skip-link" href="#mainContent">Skip to main content</a>
+      {authGateChecking ? null : (
+        <Suspense fallback={<RouteLoadingFallback includeAuthenticatedHeader={isProtectedRoute(path)} />}>
+          <RoutedPage
+            key={`${locationState.path}${locationState.search}${locationState.hash}`}
+            Page={Page}
+            routeKey={`${locationState.path}${locationState.search}${locationState.hash}`}
+          />
+        </Suspense>
+      )}
       {showMaintenanceBanner && maintenanceBannerHost ? createPortal(
         <div
           id="maintenanceBanner"

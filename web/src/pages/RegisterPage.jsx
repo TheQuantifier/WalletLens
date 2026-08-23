@@ -562,7 +562,7 @@ export default function RegisterPage() {
         {/* Footer */}
         <footer className="nf-footer" role="contentinfo">
           <div className="nf-footer-inner">
-            <p>&copy; <span id="year"></span> &lt;AppName&gt;. All rights reserved.</p>
+            <p>&copy; <span data-current-year></span> &lt;AppName&gt;. All rights reserved.</p>
             <nav className="nf-legal" aria-label="Footer">
               <a href="/about" className="nf-legal-link" data-public-modal="about">About</a><span className="sep">&bull;</span>
               <a href="/privacy" className="nf-legal-link" data-public-modal="privacy">Privacy</a><span className="sep">&bull;</span>

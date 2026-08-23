@@ -15,6 +15,7 @@ const hasBrevoApiKey = !!process.env.BREVO_API_KEY;
 
 let transporter = null;
 const APP_NAME_PLACEHOLDER = "<AppName>";
+const DEFAULT_APP_NAME = "WalletLens";
 
 function getTransporter() {
   if (transporter) return transporter;
@@ -64,9 +65,9 @@ export async function sendEmail({ to, subject, text, replyTo, from }) {
   if (needsAppName) {
     try {
       const settings = await getAppSettings();
-      appName = settings?.app_name || APP_NAME_PLACEHOLDER;
+      appName = settings?.app_name || DEFAULT_APP_NAME;
     } catch {
-      appName = APP_NAME_PLACEHOLDER;
+      appName = DEFAULT_APP_NAME;
     }
   }
 
@@ -117,7 +118,7 @@ export async function sendEmail({ to, subject, text, replyTo, from }) {
   }
 }
 
-function parseSender(fromValue, appName = APP_NAME_PLACEHOLDER) {
+function parseSender(fromValue, appName = DEFAULT_APP_NAME) {
   const defaultName = `${appName} Support`;
   if (!fromValue) return { name: defaultName, email: "no-reply@wisewallet.local" };
 
@@ -134,7 +135,7 @@ function parseSender(fromValue, appName = APP_NAME_PLACEHOLDER) {
 async function sendViaBrevoApi({ to, subject, text, replyTo, from, appName }) {
   const apiKey = process.env.BREVO_API_KEY;
   const apiUrl = process.env.BREVO_API_URL || "https://api.brevo.com/v3/smtp/email";
-  const sender = parseSender(from, appName || APP_NAME_PLACEHOLDER);
+  const sender = parseSender(from, appName || DEFAULT_APP_NAME);
 
   const payload = {
     sender,

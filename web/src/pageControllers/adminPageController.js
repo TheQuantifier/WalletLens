@@ -2623,7 +2623,7 @@ async function loadSettings() {
   try {
     const { settings } = await api.admin.getSettings();
     if (els.appNameInput) {
-      els.appNameInput.value = settings?.app_name || settings?.appName || "<AppName>";
+      els.appNameInput.value = settings?.app_name || settings?.appName || "WalletLens";
     }
     if (els.receiptKeepFilesInput) {
       const keep = settings?.receipt_keep_files;

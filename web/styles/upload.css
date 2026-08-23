@@ -144,23 +144,53 @@
   padding: 1.25rem;
 }
 
+.main--upload .recent .txn-table {
+  table-layout: fixed;
+  min-width: 760px;
+}
+
+.main--upload .recent-upload-file-col {
+  width: auto;
+}
+
+.main--upload .recent-upload-type-col {
+  width: 116px;
+}
+
+.main--upload .recent-upload-size-col {
+  width: 80px;
+}
+
+.main--upload .recent-upload-date-col {
+  width: 140px;
+}
+
+.main--upload .recent-upload-status-col {
+  width: 92px;
+}
+
+.main--upload .recent-upload-actions-col {
+  width: 84px;
+}
+
+.main--upload .recent .txn-table th:nth-child(n + 2):nth-child(-n + 5),
+.main--upload .recent .txn-table td:nth-child(n + 2):nth-child(-n + 5),
+.main--upload .recent-upload-filename {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.main--upload .recent-upload-filename {
+  font-weight: 600;
+}
+
 .main--upload .actions-col {
-  width: 1%;
   white-space: nowrap;
 }
 
-.main--upload .recent .txn-table th:nth-child(1),
-.main--upload .recent .txn-table th:nth-child(4),
-.main--upload .recent .txn-table th:nth-child(5) {
-  text-align: left;
-}
-
-.main--upload .recent .txn-table td:nth-child(2) {
+.main--upload .recent .txn-table th,
+.main--upload .recent .txn-table td {
   text-align: center;
-}
-
-.main--upload .recent .txn-table td:nth-child(5) {
-  text-align: left;
 }
 
 /* Icon button: keep focus ring on the button (accessible), not on the image */

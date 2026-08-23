@@ -559,6 +559,8 @@ header {
   align-items: center;
   cursor: pointer;
   border: 2px solid transparent;
+  padding: 0;
+  font: inherit;
   transition: border-color 0.2s, box-shadow 0.2s;
 }
 
@@ -996,6 +998,32 @@ footer {
 .maintenance-banner-host {
   width: 100%;
   padding-top: var(--maintenance-header-offset, 0px);
+}
+
+.app-route-loading {
+  min-height: 60vh;
+  display: grid;
+  place-items: center;
+  padding: var(--space-6);
+  color: var(--muted);
+}
+
+.skip-link {
+  position: fixed;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 100000;
+  padding: 0.65rem 0.9rem;
+  border-radius: var(--radius);
+  background: var(--primary);
+  color: #fff;
+  font-weight: 800;
+  transform: translateY(-160%);
+  transition: transform 0.15s ease;
+}
+
+.skip-link:focus {
+  transform: translateY(0);
 }
 
 .maintenance-banner {
