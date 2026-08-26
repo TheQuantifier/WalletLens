@@ -19,7 +19,7 @@ export async function generateAiText({
     };
   }
 
-  if (!USE_GEMINI || !env.aiApiKey) {
+  if (!USE_GEMINI || !env.aiChatApiKey) {
     return {
       ok: false,
       error: "AI provider is not configured.",
@@ -33,7 +33,7 @@ export async function generateAiText({
     return { ok: false, error: "AI prompt is empty.", text: "" };
   }
 
-  const ai = new GoogleGenAI({ apiKey: env.aiApiKey });
+  const ai = new GoogleGenAI({ apiKey: env.aiChatApiKey });
   const contents = [
     { role: "system", text: safeSystemPrompt },
     { role: "user", text: safeUserPrompt },
@@ -55,6 +55,10 @@ export async function generateAiText({
 }
 
 async function extractTextFromResponse(response) {
+  if (typeof response?.text === "string") {
+    return response.text;
+  }
+
   if (typeof response?.text === "function") {
     return await response.text();
   }

@@ -308,7 +308,7 @@ export async function runWalterLensChat({ message, context }) {
       "AI chat is disconnected by admin. Please try again later."
     );
   }
-  if (!env.aiApiKey) {
+  if (!env.aiChatApiKey) {
     return fallbackResponse(
       "AI chat is not configured yet. I can still help with basic insights and record edits."
     );

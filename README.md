@@ -88,6 +88,8 @@ RECEIPT_KEEP_FILES=true
 
 AI_PROVIDER=gemini
 AI_API_KEY=your_google_ai_key
+AI_RECEIPT_API_KEY=your_google_ai_key_for_receipts
+AI_TAX_API_KEY=your_google_ai_key_for_tax_sync
 AI_MODEL=models/gemma-3-4b-it
 AI_CHAT_MODEL=models/gemini-2.5-flash
 AI_RECEIPT_MODEL=models/gemini-2.5-flash
@@ -112,6 +114,45 @@ SUPPORT_EMAIL=support@example.com
 # BREVO_API_KEY=
 # BREVO_API_URL=https://api.brevo.com/v3/smtp/email
 ```
+
+### Gemini API key setup
+
+You can keep one shared Gemini key, but the better setup is separate keys by workload:
+
+- `AI_API_KEY`: WalterLens chat and general AI text features
+- `AI_RECEIPT_API_KEY`: receipt OCR parsing and category extraction
+- `AI_TAX_API_KEY`: admin tax-rate sync
+
+All dedicated keys are optional. If you leave them unset, the app falls back to `AI_API_KEY`.
+
+Recommended setup:
+
+1. Open Google AI Studio and sign in:
+   - `https://aistudio.google.com/apikey`
+2. Create three API keys:
+   - one for chat/general AI
+   - one for receipt parsing
+   - one for tax sync
+3. Name them clearly so usage is easy to track:
+   - `walletlens-chat`
+   - `walletlens-receipts`
+   - `walletlens-tax`
+4. Put them in `api/.env`:
+
+```env
+AI_API_KEY=your_chat_key
+AI_RECEIPT_API_KEY=your_receipt_key
+AI_TAX_API_KEY=your_tax_key
+```
+
+5. Restart the API after editing env vars.
+
+Notes:
+
+- `AI_RECEIPT_API_KEY` falls back to `AI_API_KEY` if omitted.
+- `AI_TAX_API_KEY` falls back to `AI_API_KEY` if omitted.
+- You can also use the alternate names `GEMINI_RECEIPT_API_KEY` and `GEMINI_TAX_API_KEY`.
+- If you are on Gemini free tier, splitting keys helps isolate features, but quota still depends on the limits of each key/project arrangement in your Google setup.
 
 ### Google OAuth checklist
 

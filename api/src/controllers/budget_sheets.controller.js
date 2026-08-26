@@ -133,7 +133,7 @@ export const lookup = asyncHandler(async (req, res) => {
     return res.status(400).json({ message: "Invalid cadence" });
   }
   const sheet = await findBudgetSheetByCadencePeriod(req.user.id, String(cadence), String(period));
-  if (!sheet) return res.status(404).json({ message: "Budget sheet not found" });
+  if (!sheet) return res.json(null);
   res.json(sheet);
 });
 
@@ -156,7 +156,21 @@ export const summary = asyncHandler(async (req, res) => {
   }
 
   const sheet = await findBudgetSheetByCadencePeriod(req.user.id, String(cadence), String(period));
-  if (!sheet) return res.status(404).json({ message: "Budget sheet not found" });
+  if (!sheet) {
+    return res.json({
+      cadence: String(cadence),
+      period: String(period),
+      range: {
+        start: window.start.toISOString(),
+        end: window.end.toISOString(),
+      },
+      totals: {
+        totalSpent: 0,
+        standard: {},
+        custom: [],
+      },
+    });
+  }
 
   const { rows } = await query(
     `

@@ -326,7 +326,7 @@ export default function AdminPage() {
                   </label>
                   <label className="settings-item">
                     <span>Session Timeout (minutes)</span>
-                    <input id="sessionTimeoutMinutesInput" type="number" min="1" max="60" step="1" value="15" />
+                    <input id="sessionTimeoutMinutesInput" type="number" min="1" max="60" step="1" defaultValue="15" />
                   </label>
                   <label className="settings-item">
                     <span>Max Concurrent Sessions Per User</span>
@@ -336,7 +336,7 @@ export default function AdminPage() {
                       min="0"
                       max="1000"
                       step="1"
-                      value="0"
+                      defaultValue="0"
                     />
                     <span className="subtle">Use 0 for infinite sessions.</span>
                   </label>
@@ -364,7 +364,7 @@ export default function AdminPage() {
                     </label>
                     <label className="settings-item">
                       <span>Weekly Digest Time (24h)</span>
-                      <input id="weeklyDigestTimeInput" type="time" value="09:00" />
+                      <input id="weeklyDigestTimeInput" type="time" defaultValue="09:00" />
                     </label>
                     <label className="settings-item">
                       <span>Weekly Digest Timezone</span>
@@ -389,15 +389,15 @@ export default function AdminPage() {
                   <h3 className="admin-settings-subtitle">Uploads and OCR</h3>
                   <label className="settings-item">
                     <span>Max Upload Size (MB)</span>
-                    <input id="maxUploadSizeMbInput" type="number" min="1" max="250" step="1" value="50" />
+                    <input id="maxUploadSizeMbInput" type="number" min="1" max="250" step="1" defaultValue="50" />
                   </label>
                   <label className="settings-item">
                     <span>OCR Timeout (seconds)</span>
-                    <input id="ocrTimeoutSecondsInput" type="number" min="5" max="300" step="1" value="25" />
+                    <input id="ocrTimeoutSecondsInput" type="number" min="5" max="300" step="1" defaultValue="25" />
                   </label>
                   <label className="settings-item">
                     <span>OCR Retry Limit</span>
-                    <input id="ocrRetryLimitInput" type="number" min="0" max="5" step="1" value="1" />
+                    <input id="ocrRetryLimitInput" type="number" min="0" max="5" step="1" defaultValue="1" />
                   </label>
       
                   <h3 className="admin-settings-subtitle">Data and Privacy</h3>
@@ -526,7 +526,7 @@ export default function AdminPage() {
                     </label>
                     <label id="achievementTargetNumberWrap">
                       <span>Target</span>
-                      <input id="achievementTargetInput" type="number" min="0.01" step="0.01" value="1" />
+                      <input id="achievementTargetInput" type="number" min="0.01" step="0.01" defaultValue="1" />
                     </label>
                     <label id="achievementTargetBooleanWrap" className="is-hidden">
                       <span>Target</span>

@@ -658,6 +658,7 @@ export const syncTaxDataAdmin = asyncHandler(async (req, res) => {
     forceRefresh: true,
   });
   const syncedTaxData = cachedTaxRates?.data || currentTaxData;
+  const syncResult = cachedTaxRates?.syncResult || null;
   const updated = await updateAppSettings({
     taxData: sanitizeTaxData(syncedTaxData),
     updatedBy: req.user.id,
@@ -679,8 +680,9 @@ export const syncTaxDataAdmin = asyncHandler(async (req, res) => {
       year,
       regions: "all",
       filingStatus,
+      syncResult,
     },
     req,
   });
-  res.json({ settings: updated });
+  res.json({ settings: updated, syncResult });
 });

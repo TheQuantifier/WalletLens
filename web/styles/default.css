@@ -870,8 +870,14 @@ footer {
 }
 
 .status-banner.is-ok,
-.status-banner.is-error {
+.status-banner.is-error,
+.status-banner.is-warning {
   color: var(--text);
+}
+
+.status-banner.is-warning {
+  border-color: #e6a100;
+  background: rgba(230, 161, 0, 0.12);
 }
 
 .flex { display: flex; }
