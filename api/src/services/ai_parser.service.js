@@ -72,6 +72,10 @@ No explanations. No markdown. Only JSON.
 `;
 
 async function extractTextFromResponse(response) {
+  if (typeof response?.text === "string") {
+    return response.text;
+  }
+
   if (typeof response?.text === "function") {
     return await response.text();
   }

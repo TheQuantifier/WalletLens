@@ -55,6 +55,10 @@ export async function generateAiText({
 }
 
 async function extractTextFromResponse(response) {
+  if (typeof response?.text === "string") {
+    return response.text;
+  }
+
   if (typeof response?.text === "function") {
     return await response.text();
   }

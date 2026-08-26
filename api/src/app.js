@@ -27,6 +27,12 @@ if (env.nodeEnv !== "test") {
 // --------------------------------------------------
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true }));
+app.use((req, _res, next) => {
+  // Express 4 exposed an empty object when no body parser matched the request.
+  // Preserve that contract for controllers that destructure req.body.
+  if (req.body === undefined) req.body = {};
+  next();
+});
 app.use(securityHeaders);
 
 // --------------------------------------------------
@@ -94,7 +100,7 @@ const corsOptions = {
 app.use(cors(corsOptions));
 
 // Preflight
-app.options("*", cors(corsOptions));
+app.options("/{*splat}", cors(corsOptions));
 
 // --------------------------------------------------
 // Health Check

@@ -242,10 +242,10 @@ async function runGeminiWithRetry(ai, modelName, contents, config, { retries = 2
 }
 
 async function extractTextFromResponse(response) {
+  if (typeof response?.text === "string") return response.text;
   if (typeof response?.text === "function") return response.text();
   if (typeof response?.output_text === "string") return response.output_text;
   if (typeof response?.outputText === "string") return response.outputText;
-  if (typeof response?.text === "string") return response.text;
   if (Array.isArray(response?.steps)) {
     const text = response.steps
       .flatMap((step) => (Array.isArray(step?.content) ? step.content : []))
