@@ -1280,6 +1280,14 @@ textarea:focus-visible {
   color: var(--text);
 }
 
+:root[data-theme="dark"] .txn-table thead th,
+:root[data-theme="dark"] .admin-table thead th,
+:root[data-theme="dark"] .main--budgeting .table-wrap thead th {
+  background: #1e293b;
+  border-bottom-color: #334155;
+  color: #f8fafc;
+}
+
 :root[data-theme="dark"] .btn {
   background: #111827;
   color: #ffffff;
