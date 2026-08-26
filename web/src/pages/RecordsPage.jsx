@@ -239,6 +239,39 @@ function originBadge(record) {
   return { className: "badge badge-manual", label: "Manual" };
 }
 
+function snapshotRecord(record) {
+  return {
+    id: recordId(record),
+    type: record.type || "expense",
+    date: toDateOnly(record.date),
+    amount: Number(record.amount || 0),
+    category: record.category || "",
+    note: record.note || "",
+    currency: record.currency || "USD",
+    applyRules: false,
+  };
+}
+
+function duplicateKey(record) {
+  return [
+    record.type || "",
+    toDateOnly(record.date),
+    Number(record.amount || 0).toFixed(2),
+    normalizeText(record.category),
+    normalizeText(record.note),
+  ].join("|");
+}
+
+function findDuplicateGroups(rows) {
+  const groups = new Map();
+  rows.forEach((record) => {
+    const key = duplicateKey(record);
+    if (!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(record);
+  });
+  return Array.from(groups.values()).filter((group) => group.length > 1);
+}
+
 function navigateTo(path) {
   if (window.__walletlensNavigate) window.__walletlensNavigate(path);
   else window.location.href = path;
@@ -282,6 +315,15 @@ function RecordsTable({
   rows,
   categories,
   loading,
+  selectedIds,
+  duplicateIds,
+  onToggleSelected,
+  onToggleVisible,
+  onClearSelection,
+  onBulkCategory,
+  onBulkDelete,
+  onFindDuplicates,
+  onSplit,
   onFilterChange,
   onClearFilters,
   onPageChange,
@@ -298,6 +340,10 @@ function RecordsTable({
   const visible = rows.slice((safePage - 1) * pageSize, safePage * pageSize);
   const isExpense = type === "expense";
   const idSuffix = isExpense ? "" : "Income";
+  const selectedCount = selectedIds.size;
+  const visibleIds = visible.map(recordId).filter(Boolean);
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every((id) => selectedIds.has(id));
+  const duplicateCount = duplicateIds.size;
 
   return (
     <section className="records-section">
@@ -312,6 +358,31 @@ function RecordsTable({
           </button>
           <button className="btn btn--primary" id={isExpense ? "btnExportExpenses" : "btnExportIncome"} type="button" onClick={() => onExport(type)} disabled={!rows.length}>
             Export
+          </button>
+        </div>
+      </div>
+
+      <div className="records-cleanup-bar" aria-label={`${title} cleanup tools`}>
+        <div className="records-selection-summary">
+          <strong>{selectedCount}</strong>
+          <span>{selectedCount === 1 ? "record selected" : "records selected"} from current table</span>
+          {duplicateCount ? <span className="records-duplicate-count">{duplicateCount} duplicate candidates</span> : null}
+        </div>
+        <div className="records-cleanup-actions">
+          <button className="btn" type="button" onClick={() => onToggleVisible(type, visible)} disabled={!visibleIds.length}>
+            {allVisibleSelected ? "Unselect Page" : "Select Page"}
+          </button>
+          <button className="btn" type="button" onClick={() => onFindDuplicates(type)} disabled={rows.length < 2}>
+            Find Duplicates
+          </button>
+          <button className="btn" type="button" onClick={() => onBulkCategory(type)} disabled={!selectedCount}>
+            Bulk Recategorize
+          </button>
+          <button className="btn btn--danger" type="button" onClick={() => onBulkDelete(type)} disabled={!selectedCount}>
+            Delete Selected
+          </button>
+          <button className="btn btn--link" type="button" onClick={() => onClearSelection(type)} disabled={!selectedCount && !duplicateCount}>
+            Clear
           </button>
         </div>
       </div>
@@ -404,6 +475,15 @@ function RecordsTable({
           <table className="txn-table">
             <thead>
               <tr>
+                <th className="select-col">
+                  <input
+                    type="checkbox"
+                    checked={allVisibleSelected}
+                    disabled={!visibleIds.length}
+                    onChange={() => onToggleVisible(type, visible)}
+                    aria-label={`Select visible ${title.toLowerCase()} records`}
+                  />
+                </th>
                 <th><SortButton type={type} field="date" label="Date" sort={sort} onSort={onSort} /></th>
                 <th><SortButton type={type} field="type" label="Type" sort={sort} onSort={onSort} /></th>
                 <th><SortButton type={type} field="category" label="Category" sort={sort} onSort={onSort} /></th>
@@ -415,13 +495,21 @@ function RecordsTable({
             </thead>
             <tbody id={isExpense ? "recordsTbody" : "incomeTbody"} aria-live="polite">
               {loading ? (
-                <tr><td colSpan="7" className="subtle">Loading...</td></tr>
+                <tr><td colSpan="8" className="subtle">Loading...</td></tr>
               ) : visible.length ? (
                 visible.map((record) => {
                   const badge = originBadge(record);
                   const id = recordId(record);
                   return (
-                    <tr key={id || `${record.type}-${record.date}-${record.amount}-${record.note}`}>
+                    <tr key={id || `${record.type}-${record.date}-${record.amount}-${record.note}`} className={duplicateIds.has(id) ? "records-row--duplicate" : ""}>
+                      <td className="select-col">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(id)}
+                          onChange={() => onToggleSelected(type, id)}
+                          aria-label={`Select ${record.note || record.category || "record"}`}
+                        />
+                      </td>
                       <td>{fmtDate(record.date)}</td>
                       <td>{record.type || "-"}</td>
                       <td>{record.category || "-"}</td>
@@ -469,6 +557,7 @@ function RecordsTable({
                               {linkedReceiptId(record) ? (
                                 <button type="button" onClick={() => onViewReceipt(record)}>View Items</button>
                               ) : null}
+                              <button type="button" onClick={() => onSplit(record)}>Split Transaction</button>
                               <button type="button" style={{ color: "#b91c1c" }} onClick={() => onDelete(record)}>
                                 Delete Record
                               </button>
@@ -480,7 +569,7 @@ function RecordsTable({
                   );
                 })
               ) : (
-                <tr><td colSpan="7" className="subtle">No matching records.</td></tr>
+                <tr><td colSpan="8" className="subtle">No matching records.</td></tr>
               )}
             </tbody>
           </table>
@@ -497,6 +586,87 @@ function RecordsTable({
         </nav>
       </div>
     </section>
+  );
+}
+
+function BulkCategoryModal({ state, categories, saving, onField, onClose, onSubmit }) {
+  if (!state.open) return null;
+  return (
+    <div id="bulkCategoryModal" className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && onClose()}>
+      <div className="modal-content" onMouseDown={(event) => event.stopPropagation()}>
+        <h2>Bulk Recategorize</h2>
+        <p className="subtle">Update {state.count} selected {state.type === "income" ? "income" : "expense"} records.</p>
+        <form className="txn-form" onSubmit={onSubmit}>
+          <div className="form-row">
+            <label>
+              <span>Category</span>
+              <select value={state.category} onChange={(event) => onField("category", event.target.value)} required>
+                <option value="" disabled>Select a category</option>
+                {categories.map((category) => <option value={category} key={category}>{category}</option>)}
+              </select>
+            </label>
+          </div>
+          {state.error ? <p className="status-banner subtle is-error">{state.error}</p> : null}
+          <div className="modal-actions">
+            <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? "Updating..." : "Update Records"}</button>
+            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+function SplitModal({ state, categories, saving, onField, onPartField, onAddPart, onRemovePart, onClose, onSubmit }) {
+  if (!state.open) return null;
+  const originalAmount = Number(state.original?.amount || 0);
+  const splitTotal = state.parts.reduce((sum, part) => sum + Number(part.amount || 0), 0);
+  const remaining = originalAmount - splitTotal;
+  return (
+    <div id="splitRecordModal" className="modal" onMouseDown={(event) => event.target.classList.contains("modal") && onClose()}>
+      <div className="modal-content split-record-modal" onMouseDown={(event) => event.stopPropagation()}>
+        <h2>Split Transaction</h2>
+        <p className="subtle">Split {fmtMoney(originalAmount, state.original?.currency || "USD")} into separate records. The first split updates the original record.</p>
+        <form className="txn-form" onSubmit={onSubmit}>
+          <div className="split-total-row">
+            <span>Total split: <strong>{fmtMoney(splitTotal, state.original?.currency || "USD")}</strong></span>
+            <span className={Math.abs(remaining) < 0.01 ? "is-balanced" : "is-off"}>Remaining: {fmtMoney(remaining, state.original?.currency || "USD")}</span>
+          </div>
+          <div className="split-parts">
+            {state.parts.map((part, index) => (
+              <div className="split-part" key={part.key}>
+                <label>
+                  <span>Amount</span>
+                  <input type="number" value={part.amount} min="0.01" step="0.01" inputMode="decimal" onChange={(event) => onPartField(index, "amount", event.target.value)} required />
+                </label>
+                <label>
+                  <span>Category</span>
+                  <select value={part.category} onChange={(event) => onPartField(index, "category", event.target.value)} required>
+                    <option value="" disabled>Select</option>
+                    {categories.map((category) => <option value={category} key={category}>{category}</option>)}
+                  </select>
+                </label>
+                <label>
+                  <span>Note</span>
+                  <input type="text" value={part.note} onChange={(event) => onPartField(index, "note", event.target.value)} autoComplete="off" />
+                </label>
+                <button className="split-remove" type="button" onClick={() => onRemovePart(index)} disabled={state.parts.length <= 2} aria-label="Remove split">x</button>
+              </div>
+            ))}
+          </div>
+          <button className="btn btn--link" type="button" onClick={onAddPart}>Add Split</button>
+          <label className="checkbox-inline">
+            <input type="checkbox" checked={state.applyRules} onChange={(event) => onField("applyRules", event.target.checked)} />
+            <span>Apply rules to split records</span>
+          </label>
+          {state.error ? <p className="status-banner subtle is-error">{state.error}</p> : null}
+          <div className="modal-actions">
+            <button type="submit" className="btn btn--primary" disabled={saving}>{saving ? "Splitting..." : "Save Split"}</button>
+            <button type="button" className="btn" onClick={onClose}>Cancel</button>
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
@@ -589,6 +759,12 @@ export default function RecordsPage() {
   const [customCategoryModal, setCustomCategoryModal] = useState({ open: false, type: "expense", name: "", error: "" });
   const [pendingDelete, setPendingDelete] = useState(null);
   const [receiptModal, setReceiptModal] = useState({ open: false, loading: false, record: null, receipt: null, error: "" });
+  const [selectedIds, setSelectedIds] = useState({ expense: new Set(), income: new Set() });
+  const [duplicateIds, setDuplicateIds] = useState({ expense: new Set(), income: new Set() });
+  const [bulkCategoryModal, setBulkCategoryModal] = useState({ open: false, type: "expense", category: "", count: 0, error: "" });
+  const [splitModal, setSplitModal] = useState({ open: false, original: null, parts: [], applyRules: false, error: "" });
+  const [cleanupSaving, setCleanupSaving] = useState(false);
+  const [undoAction, setUndoAction] = useState(null);
 
   const load = async () => {
     setLoading(true);
@@ -614,6 +790,8 @@ export default function RecordsPage() {
       const incomeDefaults = nextIsBusiness ? BUSINESS_INCOME_DEFAULTS : INCOME_DEFAULTS;
 
       setRecords(nextRecords);
+      setSelectedIds({ expense: new Set(), income: new Set() });
+      setDuplicateIds({ expense: new Set(), income: new Set() });
       setIsBusiness(nextIsBusiness);
       setCustomCategories(nextCustom);
       setCategories({
@@ -662,6 +840,12 @@ export default function RecordsPage() {
       income: sortRecords(filterRecords(byType.income, filters.income), sorts.income),
     };
   }, [records, filters, sorts]);
+
+  const recordsById = useMemo(() => {
+    const map = new Map();
+    records.forEach((record) => map.set(recordId(record), record));
+    return map;
+  }, [records]);
 
   const onFilterChange = (type, key, value) => {
     setFilters((current) => ({
@@ -782,6 +966,231 @@ export default function RecordsPage() {
     }
   };
 
+  const toggleSelected = (type, id) => {
+    if (!id) return;
+    setSelectedIds((current) => {
+      const next = new Set(current[type]);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return { ...current, [type]: next };
+    });
+  };
+
+  const toggleVisible = (type, visible) => {
+    const ids = visible.map(recordId).filter(Boolean);
+    if (!ids.length) return;
+    setSelectedIds((current) => {
+      const next = new Set(current[type]);
+      const allSelected = ids.every((id) => next.has(id));
+      ids.forEach((id) => {
+        if (allSelected) next.delete(id);
+        else next.add(id);
+      });
+      return { ...current, [type]: next };
+    });
+  };
+
+  const clearSelection = (type) => {
+    setSelectedIds((current) => ({ ...current, [type]: new Set() }));
+    setDuplicateIds((current) => ({ ...current, [type]: new Set() }));
+  };
+
+  const openBulkCategory = (type) => {
+    const count = selectedIds[type].size;
+    if (!count) return;
+    setBulkCategoryModal({ open: true, type, category: "", count, error: "" });
+  };
+
+  const submitBulkCategory = async (event) => {
+    event.preventDefault();
+    const { type, category } = bulkCategoryModal;
+    const ids = Array.from(selectedIds[type]);
+    if (!category || !ids.length) {
+      setBulkCategoryModal((current) => ({ ...current, error: "Select records and a category." }));
+      return;
+    }
+
+    const before = ids.map((id) => recordsById.get(id)).filter(Boolean).map(snapshotRecord);
+    setCleanupSaving(true);
+    try {
+      for (const record of before) {
+        await api.records.update(record.id, { category, applyRules: false });
+      }
+      setUndoAction({ label: `Undo bulk recategorize of ${before.length} records`, kind: "restore", records: before });
+      setBulkCategoryModal({ open: false, type: "expense", category: "", count: 0, error: "" });
+      await load();
+      setStatus({ message: `Updated ${before.length} records.`, kind: "ok" });
+    } catch (err) {
+      setBulkCategoryModal((current) => ({ ...current, error: err?.message || "Could not update selected records." }));
+    } finally {
+      setCleanupSaving(false);
+    }
+  };
+
+  const bulkDelete = async (type) => {
+    const ids = Array.from(selectedIds[type]);
+    if (!ids.length) return;
+    if (!window.confirm(`Delete ${ids.length} selected ${type === "income" ? "income" : "expense"} records? Linked receipts will be kept and unlinked.`)) return;
+    const before = ids.map((id) => recordsById.get(id)).filter(Boolean).map(snapshotRecord);
+    setCleanupSaving(true);
+    try {
+      for (const record of before) {
+        await api.records.remove(record.id, false);
+      }
+      setUndoAction({ label: `Restore ${before.length} deleted records`, kind: "recreate", records: before });
+      await load();
+      setStatus({ message: `Deleted ${before.length} records. Undo is available for basic record fields.`, kind: "ok" });
+    } catch (err) {
+      setStatus({ message: `Could not delete selected records: ${err?.message || "Unknown error"}`, kind: "error" });
+    } finally {
+      setCleanupSaving(false);
+    }
+  };
+
+  const findDuplicates = (type) => {
+    const groups = findDuplicateGroups(visibleRecords[type]);
+    const ids = new Set();
+    groups.forEach((group) => {
+      group.slice(1).forEach((record) => ids.add(recordId(record)));
+    });
+    setDuplicateIds((current) => ({ ...current, [type]: ids }));
+    setSelectedIds((current) => ({ ...current, [type]: new Set(ids) }));
+    setStatus({
+      message: ids.size ? `Found ${ids.size} duplicate candidates and selected them for review.` : "No duplicates found in the current filtered view.",
+      kind: "ok",
+    });
+  };
+
+  const openSplit = (record) => {
+    const original = snapshotRecord(record);
+    const cents = Math.round(original.amount * 100);
+    if (cents < 2) {
+      setStatus({ message: "Transactions under $0.02 cannot be split into separate positive amounts.", kind: "error" });
+      return;
+    }
+    const firstCents = Math.floor(cents / 2);
+    const secondCents = cents - firstCents;
+    const half = firstCents / 100;
+    const other = secondCents / 100;
+    setSplitModal({
+      open: true,
+      original,
+      applyRules: false,
+      error: "",
+      parts: [
+        { key: "split-1", amount: String(half), category: original.category, note: original.note },
+        { key: "split-2", amount: String(other), category: original.category, note: original.note },
+      ],
+    });
+  };
+
+  const closeSplit = () => setSplitModal({ open: false, original: null, parts: [], applyRules: false, error: "" });
+
+  const updateSplitField = (key, value) => {
+    setSplitModal((current) => ({ ...current, [key]: value, error: "" }));
+  };
+
+  const updateSplitPart = (index, key, value) => {
+    setSplitModal((current) => ({
+      ...current,
+      error: "",
+      parts: current.parts.map((part, partIndex) => partIndex === index ? { ...part, [key]: value } : part),
+    }));
+  };
+
+  const addSplitPart = () => {
+    setSplitModal((current) => ({
+      ...current,
+      parts: [...current.parts, { key: `split-${Date.now()}`, amount: "", category: current.original?.category || "", note: current.original?.note || "" }],
+    }));
+  };
+
+  const removeSplitPart = (index) => {
+    setSplitModal((current) => ({
+      ...current,
+      parts: current.parts.length <= 2 ? current.parts : current.parts.filter((_, partIndex) => partIndex !== index),
+    }));
+  };
+
+  const submitSplit = async (event) => {
+    event.preventDefault();
+    const { original, parts, applyRules } = splitModal;
+    if (!original || parts.length < 2) return;
+    const cleanParts = parts.map((part) => ({ ...part, amount: Number(part.amount || 0), category: String(part.category || "").trim(), note: String(part.note || "").trim() }));
+    const total = cleanParts.reduce((sum, part) => sum + part.amount, 0);
+    if (cleanParts.some((part) => !Number.isFinite(part.amount) || part.amount <= 0 || !part.category)) {
+      setSplitModal((current) => ({ ...current, error: "Each split needs an amount greater than 0 and a category." }));
+      return;
+    }
+    if (Math.abs(total - original.amount) >= 0.01) {
+      setSplitModal((current) => ({ ...current, error: "Split amounts must equal the original transaction total." }));
+      return;
+    }
+
+    setCleanupSaving(true);
+    const created = [];
+    try {
+      const first = cleanParts[0];
+      await api.records.update(original.id, {
+        type: original.type,
+        date: original.date,
+        amount: first.amount,
+        category: first.category,
+        note: first.note,
+        currency: original.currency,
+        applyRules,
+      });
+      for (const part of cleanParts.slice(1)) {
+        const createdRecord = await api.records.create({
+          type: original.type,
+          date: original.date,
+          amount: part.amount,
+          category: part.category,
+          note: part.note,
+          currency: original.currency,
+          applyRules,
+        });
+        created.push(createdRecord);
+      }
+      setUndoAction({ label: "Undo split transaction", kind: "split", original, createdIds: created.map(recordId).filter(Boolean) });
+      closeSplit();
+      await load();
+      setStatus({ message: "Transaction split saved.", kind: "ok" });
+    } catch (err) {
+      setSplitModal((current) => ({ ...current, error: err?.message || "Could not split transaction." }));
+    } finally {
+      setCleanupSaving(false);
+    }
+  };
+
+  const runUndo = async () => {
+    if (!undoAction) return;
+    setCleanupSaving(true);
+    try {
+      if (undoAction.kind === "restore") {
+        for (const record of undoAction.records) {
+          await api.records.update(record.id, record);
+        }
+      } else if (undoAction.kind === "recreate") {
+        for (const record of undoAction.records) {
+          await api.records.create(record);
+        }
+      } else if (undoAction.kind === "split") {
+        for (const id of undoAction.createdIds) {
+          await api.records.remove(id, false);
+        }
+        await api.records.update(undoAction.original.id, undoAction.original);
+      }
+      setUndoAction(null);
+      await load();
+      setStatus({ message: "Cleanup action undone.", kind: "ok" });
+    } catch (err) {
+      setStatus({ message: `Could not undo cleanup action: ${err?.message || "Unknown error"}`, kind: "error" });
+    } finally {
+      setCleanupSaving(false);
+    }
+  };
+
   const exportRecords = async (type) => {
     const rows = visibleRecords[type];
     if (!rows.length) {
@@ -842,6 +1251,14 @@ export default function RecordsPage() {
             {status.message}
           </p>
         ) : null}
+        {undoAction ? (
+          <div className="records-undo-banner" role="status">
+            <span>{undoAction.label}</span>
+            <button className="btn btn--link" type="button" onClick={runUndo} disabled={cleanupSaving}>
+              {cleanupSaving ? "Working..." : "Undo"}
+            </button>
+          </div>
+        ) : null}
 
         <RecordsTable
           type="expense"
@@ -853,6 +1270,15 @@ export default function RecordsPage() {
           rows={visibleRecords.expense}
           categories={categories.expense}
           loading={loading}
+          selectedIds={selectedIds.expense}
+          duplicateIds={duplicateIds.expense}
+          onToggleSelected={toggleSelected}
+          onToggleVisible={toggleVisible}
+          onClearSelection={clearSelection}
+          onBulkCategory={openBulkCategory}
+          onBulkDelete={bulkDelete}
+          onFindDuplicates={findDuplicates}
+          onSplit={openSplit}
           onFilterChange={onFilterChange}
           onClearFilters={onClearFilters}
           onPageChange={(type, page) => setPages((current) => ({ ...current, [type]: page }))}
@@ -874,6 +1300,15 @@ export default function RecordsPage() {
           rows={visibleRecords.income}
           categories={categories.income}
           loading={loading}
+          selectedIds={selectedIds.income}
+          duplicateIds={duplicateIds.income}
+          onToggleSelected={toggleSelected}
+          onToggleVisible={toggleVisible}
+          onClearSelection={clearSelection}
+          onBulkCategory={openBulkCategory}
+          onBulkDelete={bulkDelete}
+          onFindDuplicates={findDuplicates}
+          onSplit={openSplit}
           onFilterChange={onFilterChange}
           onClearFilters={onClearFilters}
           onPageChange={(type, page) => setPages((current) => ({ ...current, [type]: page }))}
@@ -894,6 +1329,27 @@ export default function RecordsPage() {
           onClose={closeForm}
           onSubmit={submitRecord}
           onCustomCategory={saveCustomCategory}
+        />
+
+        <BulkCategoryModal
+          state={bulkCategoryModal}
+          categories={categories[bulkCategoryModal.type] || []}
+          saving={cleanupSaving}
+          onField={(key, value) => setBulkCategoryModal((current) => ({ ...current, [key]: value, error: "" }))}
+          onClose={() => setBulkCategoryModal({ open: false, type: "expense", category: "", count: 0, error: "" })}
+          onSubmit={submitBulkCategory}
+        />
+
+        <SplitModal
+          state={splitModal}
+          categories={categories[splitModal.original?.type || "expense"] || []}
+          saving={cleanupSaving}
+          onField={updateSplitField}
+          onPartField={updateSplitPart}
+          onAddPart={addSplitPart}
+          onRemovePart={removeSplitPart}
+          onClose={closeSplit}
+          onSubmit={submitSplit}
         />
 
         {customCategoryModal.open ? (
@@ -1001,4 +1457,3 @@ export default function RecordsPage() {
     </>
   );
 }
-

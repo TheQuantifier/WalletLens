@@ -35,6 +35,64 @@
   flex-wrap: wrap;
 }
 
+.records-cleanup-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.85rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--card-bg) 92%, var(--primary) 8%);
+  box-shadow: var(--shadow-sm);
+}
+
+.records-selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--muted);
+  font-size: 0.92rem;
+  flex-wrap: wrap;
+}
+
+.records-selection-summary strong {
+  color: var(--text);
+  font-size: 1rem;
+}
+
+.records-duplicate-count {
+  padding: 0.18rem 0.5rem;
+  border: 1px solid color-mix(in srgb, #d97706 42%, var(--border));
+  border-radius: 999px;
+  background: color-mix(in srgb, #f59e0b 16%, var(--card-bg));
+  color: #92400e;
+  font-weight: 700;
+}
+
+.records-cleanup-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.records-undo-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--primary) 34%, var(--border));
+  border-radius: var(--radius);
+  background: color-mix(in srgb, var(--primary) 10%, var(--card-bg));
+  color: var(--text);
+  font-weight: 700;
+}
+
 /* Space between subsections (filters → table → pagination) */
 .records-subsection {
   margin-top: 1.75rem;
@@ -229,7 +287,9 @@
 #addExpenseModal,
 #addIncomeModal,
 #deleteRecordModal,
-#receiptItemsModal {
+#receiptItemsModal,
+#bulkCategoryModal,
+#splitRecordModal {
   --modal-max-width: 400px;
   --modal-padding: 1.5rem;
 }
@@ -237,7 +297,9 @@
 #addExpenseModal h2,
 #addIncomeModal h2,
 #deleteRecordModal h2,
-#receiptItemsModal h2 {
+#receiptItemsModal h2,
+#bulkCategoryModal h2,
+#splitRecordModal h2 {
   margin-top: 0;
   margin-bottom: 0.75rem;
 }
@@ -245,7 +307,9 @@
 #addExpenseModal .modal-actions,
 #addIncomeModal .modal-actions,
 #deleteRecordModal .modal-actions,
-#receiptItemsModal .modal-actions {
+#receiptItemsModal .modal-actions,
+#bulkCategoryModal .modal-actions,
+#splitRecordModal .modal-actions {
   --modal-actions-gap: 0.75rem;
   --modal-actions-margin: 1.25rem;
   flex-direction: column;
@@ -256,7 +320,9 @@
 #addExpenseModal .modal-actions .btn,
 #addIncomeModal .modal-actions .btn,
 #deleteRecordModal .modal-actions .btn,
-#receiptItemsModal .modal-actions .btn {
+#receiptItemsModal .modal-actions .btn,
+#bulkCategoryModal .modal-actions .btn,
+#splitRecordModal .modal-actions .btn {
   width: min(100%, 320px);
   min-width: 0;
   text-align: center;
@@ -264,6 +330,68 @@
 
 #receiptItemsModal {
   --modal-max-width: 560px;
+}
+
+#splitRecordModal {
+  --modal-max-width: 760px;
+}
+
+.split-record-modal {
+  max-height: min(88vh, 780px);
+  overflow-y: auto;
+}
+
+.split-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface-2);
+  font-weight: 700;
+}
+
+.split-total-row .is-balanced {
+  color: var(--good);
+}
+
+.split-total-row .is-off {
+  color: var(--bad);
+}
+
+.split-parts {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.split-part {
+  display: grid;
+  grid-template-columns: minmax(100px, 0.65fr) minmax(160px, 1fr) minmax(180px, 1.2fr) auto;
+  gap: 0.65rem;
+  align-items: end;
+  padding: 0.75rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--card-bg) 94%, var(--surface-2));
+}
+
+.split-remove {
+  width: 2.25rem;
+  height: 2.25rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--card-bg);
+  color: var(--bad);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.split-remove:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .receipt-items-panel {
@@ -389,6 +517,23 @@
   table-layout: fixed;
 }
 
+.records-table .txn-table .select-col {
+  width: 42px;
+  text-align: center;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.records-table .txn-table .select-col input {
+  width: 1rem;
+  height: 1rem;
+  padding: 0;
+}
+
+.records-row--duplicate {
+  background: color-mix(in srgb, #f59e0b 14%, transparent);
+}
+
 .records-sort-btn {
   border: none;
   background: transparent;
@@ -417,56 +562,56 @@
 /* ----- COLUMN WIDTHS ----- */
 
 /* Date */
-.records-table .txn-table th:nth-child(1),
-.records-table .txn-table td:nth-child(1) {
-  width: 110px;
-}
-
-/* Type */
 .records-table .txn-table th:nth-child(2),
 .records-table .txn-table td:nth-child(2) {
   width: 110px;
 }
 
-.records-table .txn-table th:nth-child(2) {
-  text-align: left;
-}
-
-/* Category */
+/* Type */
 .records-table .txn-table th:nth-child(3),
 .records-table .txn-table td:nth-child(3) {
-  width: 190px;
-  white-space: normal;
-  overflow-wrap: anywhere;
+  width: 110px;
 }
 
 .records-table .txn-table th:nth-child(3) {
   text-align: left;
 }
 
-/* Amount (right aligned) */
+/* Category */
 .records-table .txn-table th:nth-child(4),
 .records-table .txn-table td:nth-child(4) {
+  width: 190px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.records-table .txn-table th:nth-child(4) {
+  text-align: left;
+}
+
+/* Amount (right aligned) */
+.records-table .txn-table th:nth-child(5),
+.records-table .txn-table td:nth-child(5) {
   width: 110px;
   text-align: right;
   padding-right: 0.75rem;
 }
 
 /* Notes — flexible width */
-.records-table .txn-table th:nth-child(5),
-.records-table .txn-table td:nth-child(5) {
+.records-table .txn-table th:nth-child(6),
+.records-table .txn-table td:nth-child(6) {
   width: 180px;
   white-space: normal;
   overflow-wrap: anywhere;
 }
 
 /* Origin */
-.records-table .txn-table th:nth-child(6),
-.records-table .txn-table td:nth-child(6) {
+.records-table .txn-table th:nth-child(7),
+.records-table .txn-table td:nth-child(7) {
   width: 90px;
 }
 
-.records-table .txn-table th:nth-child(6) {
+.records-table .txn-table th:nth-child(7) {
   text-align: left;
 }
 
@@ -479,10 +624,53 @@
 
 @media (max-width: 720px) {
   /* Shrink Origin so Notes get more room on mobile */
-  .records-table .txn-table th:nth-child(6),
-  .records-table .txn-table td:nth-child(6) {
+  .records-table .txn-table th:nth-child(7),
+  .records-table .txn-table td:nth-child(7) {
     width: 80px;
   }
+}
+
+@media (max-width: 760px) {
+  .records-cleanup-bar,
+  .records-undo-banner,
+  .split-total-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .records-cleanup-actions {
+    justify-content: flex-start;
+  }
+
+  .split-part {
+    grid-template-columns: 1fr;
+  }
+
+  .split-remove {
+    width: 100%;
+  }
+}
+
+:root[data-theme="dark"] .records-cleanup-bar,
+:root[data-theme="dark"] .records-undo-banner,
+:root[data-theme="dark"] .split-part,
+:root[data-theme="dark"] .split-total-row {
+  background: color-mix(in srgb, var(--surface-2) 86%, var(--primary) 8%);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .records-duplicate-count {
+  background: color-mix(in srgb, #f59e0b 18%, var(--surface-2));
+  color: #fde68a;
+}
+
+:root[data-theme="dark"] .records-row--duplicate {
+  background: color-mix(in srgb, #f59e0b 16%, transparent);
+}
+
+:root[data-theme="dark"] .split-remove {
+  background: var(--surface-2);
+  border-color: var(--border);
 }
 
 @media (prefers-reduced-motion: reduce) {

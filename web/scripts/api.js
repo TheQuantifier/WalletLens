@@ -351,10 +351,10 @@ export const records = {
     return request(`/records/${id}`);
   },
 
-  create({ type, amount, category, date, note, applyRules } = {}) {
+  create({ type, amount, category, date, note, applyRules, currency } = {}) {
     return request("/records", {
       method: "POST",
-      body: JSON.stringify({ type, amount, category, date, note, applyRules }),
+      body: JSON.stringify({ type, amount, category, date, note, applyRules, currency }),
     });
   },
 

@@ -37,6 +37,7 @@
 :root[data-theme="dark"] .planning-data-warning {
   background: #431407;
   color: #ffedd5;
+  border-color: #9a3412;
 }
 
 .planning-actions {
@@ -371,4 +372,65 @@
 
 [data-theme="dark"] .planning-table tbody tr:nth-child(even) td {
   background: rgba(30,41,59,0.44);
+}
+
+:root[data-theme="dark"] .planning-table th {
+  background: #0f172a;
+  color: var(--text);
+}
+
+html[data-theme="dark"] .main--planning .planning-table thead th {
+  background: #1e293b !important;
+  color: #f8fafc !important;
+  border-color: #334155 !important;
+}
+
+html[data-theme="dark"] .main--planning .planning-table-head {
+  background: #111827 !important;
+  border-bottom-color: #334155 !important;
+}
+
+html[data-theme="dark"] .main--planning .planning-table-head h2,
+html[data-theme="dark"] .main--planning .planning-table-head p,
+html[data-theme="dark"] .main--planning .planning-table-head .subtle {
+  color: #f8fafc !important;
+}
+
+:root[data-theme="dark"] .planning-table td {
+  background: color-mix(in srgb, var(--card-bg) 94%, #0f172a);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .planning-table tfoot td {
+  background: color-mix(in srgb, var(--primary) 16%, #0f172a);
+  border-top-color: var(--primary);
+}
+
+:root[data-theme="dark"] .planning-tax-correction-preview {
+  background: var(--surface-2);
+  border-color: var(--border);
+}
+
+:root[data-theme="dark"] .planning-entry-modal,
+:root[data-theme="dark"] .planning-major-modal {
+  background: var(--card-bg);
+  color: var(--text);
+}
+
+:root[data-theme="dark"] .planning-debit,
+:root[data-theme="dark"] .planning-computed.planning-debit,
+:root[data-theme="dark"] .planning-row--debit .planning-title-cell,
+:root[data-theme="dark"] .planning-tax-correction-preview strong {
+  color: #fb7185;
+}
+
+:root[data-theme="dark"] .planning-table-actions select,
+:root[data-theme="dark"] .planning-major-modal input,
+:root[data-theme="dark"] .planning-major-modal select,
+:root[data-theme="dark"] .planning-entry-modal input,
+:root[data-theme="dark"] .planning-entry-modal select,
+:root[data-theme="dark"] .planning-entry-modal textarea {
+  background: var(--surface-2);
+  border-color: var(--border);
+  color: var(--text);
 }
