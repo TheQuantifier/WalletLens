@@ -15,7 +15,6 @@ ENV NODE_ENV=production
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
         python3 \
-        python3-pip \
         python3-venv \
         tesseract-ocr \
         tesseract-ocr-eng \
@@ -41,7 +40,10 @@ RUN if [ -f package-lock.json ]; then npm ci --omit=dev; else npm install --omit
 # ---------------------------------------------------------
 WORKDIR /usr/src/app
 COPY worker/requirements.txt ./worker/requirements.txt
-RUN pip3 install --no-cache-dir -r worker/requirements.txt
+ENV VIRTUAL_ENV=/opt/walletlens-venv
+RUN python3 -m venv "$VIRTUAL_ENV"
+ENV PATH="$VIRTUAL_ENV/bin:$PATH"
+RUN python -m pip install --no-cache-dir -r worker/requirements.txt
 
 # ---------------------------------------------------------
 # Copy full project AFTER deps installed (better layer caching)
@@ -56,8 +58,8 @@ WORKDIR /usr/src/app/api
 # Render will set PORT, but local dev uses 4000
 EXPOSE 4000
 
-# Ensure the python binary name matches your env defaults
-# (you can still override with PYTHON_BIN)
-ENV PYTHON_BIN=python3
+# Use the isolated Python environment for the OCR worker.
+# This can still be overridden with Render's PYTHON_BIN variable.
+ENV PYTHON_BIN=/opt/walletlens-venv/bin/python
 
 CMD ["node", "src/server.js"]
