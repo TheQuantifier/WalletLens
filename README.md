@@ -20,7 +20,7 @@ WalletLens is a full-stack personal finance web app for tracking income/expenses
 ## Tech stack
 
 - Frontend: React, Vite, CSS, and JavaScript modules (`web/`)
-- Backend: Node.js 20, Express (`api/`)
+- Backend: Node.js 22, Express (`api/`)
 - Database: PostgreSQL
 - Object storage: Cloudflare R2 (S3-compatible presigned upload/download)
 - OCR worker: Python + Tesseract + PyMuPDF (`worker/`)
@@ -40,7 +40,7 @@ WalletLens/
 
 ### 1) Prerequisites
 
-- Node.js >= 20
+- Node.js >= 22
 - Python 3.10+
 - PostgreSQL
 - Tesseract OCR installed on your machine

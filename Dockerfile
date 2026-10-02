@@ -1,9 +1,9 @@
 # Dockerfile
 # ---------------------------------------------------------
-# Base Image — Node 20 + Debian (Render compatible)
+# Base Image — Node 22 + Debian (Render compatible)
 # Includes Python + Tesseract for OCR worker
 # ---------------------------------------------------------
-FROM node:20-bullseye
+FROM node:22-bullseye
 
 # Make Python output unbuffered (critical for OCR piping)
 ENV PYTHONUNBUFFERED=1
